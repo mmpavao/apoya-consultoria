@@ -246,7 +246,7 @@ function FinanceiroTab({ clienteId }: { clienteId: string }) {
 }
 
 function NfseTab({ clienteId }: { clienteId: string }) {
-  const [items, setItems] = useState<NfseDoc[]>([]);
+  const [items, setItems] = useState<NfseNota[]>([]);
   useEffect(() => {
     const load = () => setItems(nfseStore.list().filter((n) => n.clienteId === clienteId));
     load();
