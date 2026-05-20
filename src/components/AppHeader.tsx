@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ApoyaLogo } from "@/components/ApoyaLogo";
 import { clearMockUser, type MockUser } from "@/lib/mock-auth";
 
 const roleLabels: Record<MockUser["role"], string> = {
@@ -24,6 +25,12 @@ export function AppHeader({ user, onMenuClick }: { user: MockUser; onMenuClick: 
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
         <Menu className="h-5 w-5" />
       </Button>
+
+      {/* Logo compacto — somente mobile (sidebar fica escondida) */}
+      <div className="md:hidden">
+        <ApoyaLogo variant="on-light" size="sm" withTagline={false} className="max-w-[100px]" />
+      </div>
+
 
       <div className="relative hidden md:flex flex-1 max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
