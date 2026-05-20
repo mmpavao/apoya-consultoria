@@ -225,7 +225,10 @@ function FinanceiroPage() {
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">{brl(c.valor)}</TableCell>
                 <TableCell><StatusBadge status={c.status} /></TableCell>
-                <TableCell><ReguaBadge stage={c.reguaStage} /></TableCell>
+                <TableCell>
+                  <ReguaBadge stage={c.reguaStage} />
+                  <div className="mt-1 text-[10px] text-muted-foreground">{proximaAcao(c.reguaStage)}</div>
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     {c.linkPagamento && (
@@ -266,6 +269,16 @@ function StatusBadge({ status }: { status: CobrancaStatus }) {
   };
   const { cls, label } = map[status];
   return <Badge variant="outline" className={`rounded-full border ${cls}`}>{label}</Badge>;
+}
+
+function proximaAcao(stage: ReguaStage): string {
+  return {
+    ok: "Sem ação",
+    lembrete: "WhatsApp amigável",
+    cobranca: "Cobrar por boleto + ligação",
+    negativacao: "Avisar negativação Serasa",
+    suspensao: "Suspender serviços",
+  }[stage];
 }
 
 function ReguaBadge({ stage }: { stage: ReguaStage }) {

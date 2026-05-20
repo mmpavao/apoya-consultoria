@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Bot, Check, CheckCheck, FileText, MessageSquare, Paperclip,
-  Phone, Search, Send, User,
+  ArrowLeft, Bot, Check, CheckCheck, Circle, FileText, MessageSquare, Paperclip,
+  Phone, Power, Search, Send, User, Wifi, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,23 @@ function WhatsappPage() {
   const [tag, setTag] = useState<"todas" | ConversationTag>("todas");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [conn, setConn] = useState<"connected" | "connecting" | "disconnected">(whatsappStore.getConnStatus());
+  const [, forceTick] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refresh = () => setConversas(whatsappStore.list());
+    const refreshConn = () => setConn(whatsappStore.getConnStatus());
+    const refreshTyping = () => forceTick((n) => n + 1);
     refresh();
     window.addEventListener("apoya:whatsapp:changed", refresh);
-    return () => window.removeEventListener("apoya:whatsapp:changed", refresh);
+    window.addEventListener("apoya:whatsapp:conn", refreshConn);
+    window.addEventListener("apoya:whatsapp:typing", refreshTyping);
+    return () => {
+      window.removeEventListener("apoya:whatsapp:changed", refresh);
+      window.removeEventListener("apoya:whatsapp:conn", refreshConn);
+      window.removeEventListener("apoya:whatsapp:typing", refreshTyping);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -83,11 +93,41 @@ function WhatsappPage() {
     toast.success(`${map[tipo]} enviado via Evolution API (mock)`);
   }
 
+  const connMeta = {
+    connected: { label: "Evolution conectada", cls: "bg-success/10 text-success border-success/20", icon: Wifi },
+    connecting: { label: "Conectando…", cls: "bg-warning/10 text-warning border-warning/30", icon: Circle },
+    disconnected: { label: "Desconectada", cls: "bg-destructive/10 text-destructive border-destructive/20", icon: WifiOff },
+  }[conn];
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="WhatsApp"
         subtitle={`${totais.todas} conversas · ${totais.naoLidas} não lidas — via Evolution API (mock)`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("gap-1.5 rounded-full border", connMeta.cls)}>
+              <connMeta.icon className={cn("h-3 w-3", conn === "connecting" && "animate-pulse")} />
+              {connMeta.label}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={() => {
+                if (conn === "connected") {
+                  whatsappStore.setConnStatus("disconnected");
+                  toast.warning("Evolution API desconectada");
+                } else {
+                  whatsappStore.setConnStatus("connecting");
+                  setTimeout(() => { whatsappStore.setConnStatus("connected"); toast.success("Evolution API conectada"); }, 900);
+                }
+              }}
+            >
+              <Power className="h-4 w-4" /> {conn === "connected" ? "Desconectar" : "Reconectar"}
+            </Button>
+          </div>
+        }
       />
 
       <div className="grid h-[calc(100vh-13rem)] grid-cols-1 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]">
@@ -243,6 +283,14 @@ function WhatsappPage() {
                       </div>
                     </div>
                   ))}
+                  {whatsappStore.isTyping(active.id) && (
+                    <div className="flex max-w-[60%] items-center gap-1 self-start rounded-2xl bg-card px-3 py-2 shadow-sm">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "300ms" }} />
+                      <span className="ml-1 text-[10px] text-muted-foreground">digitando…</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
