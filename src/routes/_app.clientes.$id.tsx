@@ -270,7 +270,7 @@ function NfseTab({ clienteId }: { clienteId: string }) {
             <TableRow key={n.id}>
               <TableCell className="font-mono text-xs">{n.numero ?? "—"}</TableCell>
               <TableCell>{n.competencia}</TableCell>
-              <TableCell>{fmtMoney(n.valor)}</TableCell>
+              <TableCell>{fmtMoney(n.valorServico)}</TableCell>
               <TableCell><Badge variant="outline" className="rounded-full capitalize">{n.status}</Badge></TableCell>
             </TableRow>
           ))}
