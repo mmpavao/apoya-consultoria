@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import logo from "@/assets/apoya-logo.png";
+import { ApoyaLogo } from "@/components/ApoyaLogo";
 
 type Item = { to: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -60,14 +60,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <aside className="flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2 px-5 py-5 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white">
-          <img src={logo} alt="APOYA" className="h-6 w-6 object-contain" />
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-wide">APOYA</div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">Gestão</div>
-        </div>
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
+        <ApoyaLogo variant="on-dark" size="md" withTagline={false} className="max-w-[140px]" />
+        <span className="ml-auto rounded-full bg-sidebar-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-sidebar-accent">
+          Gestão
+        </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" onClick={onNavigate}>

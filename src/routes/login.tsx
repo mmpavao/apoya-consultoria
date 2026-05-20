@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { setMockUser } from "@/lib/mock-auth";
-import logo from "@/assets/apoya-logo.png";
+import { ApoyaLogo } from "@/components/ApoyaLogo";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -19,32 +19,19 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setTimeout(() => {
-      setMockUser({
-        name: "Daniel Araújo",
-        email,
-        role: "admin",
-      });
+      setMockUser({ name: "Daniel Araújo", email, role: "admin" });
       navigate({ to: "/" });
     }, 400);
   };
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
-      <div className="hidden md:flex flex-col justify-between bg-sidebar text-sidebar-foreground p-10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white">
-            <img src={logo} alt="APOYA" className="h-7 w-7 object-contain" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold tracking-wide">APOYA</div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">
-              Auditoria, Consultoria e Contabilidade
-            </div>
-          </div>
-        </div>
+      {/* Painel institucional — desktop/tablet */}
+      <div className="hidden md:flex flex-col justify-between bg-sidebar text-sidebar-foreground p-8 lg:p-12">
+        <ApoyaLogo variant="on-dark" size="lg" className="max-w-[200px] lg:max-w-[240px]" />
 
         <div className="space-y-6 max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight">
+          <h2 className="text-2xl lg:text-3xl font-semibold leading-tight">
             Gestão contábil <span className="text-primary">automatizada</span> para o escritório APOYA.
           </h2>
           <p className="text-sm text-sidebar-foreground/70">
@@ -60,16 +47,12 @@ function LoginPage() {
         <div className="text-[11px] text-sidebar-foreground/40">© 2026 APOYA Contabilidade · Uso interno</div>
       </div>
 
+      {/* Formulário */}
       <div className="flex items-center justify-center p-6 md:p-10">
         <form onSubmit={onSubmit} className="w-full max-w-sm space-y-6">
-          <div className="md:hidden flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar">
-              <img src={logo} alt="APOYA" className="h-7 w-7 object-contain invert" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold">APOYA Gestão</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Uso interno</div>
-            </div>
+          {/* Logo no topo — visível somente em mobile */}
+          <div className="md:hidden flex justify-center">
+            <ApoyaLogo variant="on-light" size="lg" className="max-w-[180px]" />
           </div>
 
           <div>
