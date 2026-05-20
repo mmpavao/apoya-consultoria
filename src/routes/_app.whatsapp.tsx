@@ -33,13 +33,23 @@ function WhatsappPage() {
   const [tag, setTag] = useState<"todas" | ConversationTag>("todas");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [conn, setConn] = useState<"connected" | "connecting" | "disconnected">(whatsappStore.getConnStatus());
+  const [, forceTick] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refresh = () => setConversas(whatsappStore.list());
+    const refreshConn = () => setConn(whatsappStore.getConnStatus());
+    const refreshTyping = () => forceTick((n) => n + 1);
     refresh();
     window.addEventListener("apoya:whatsapp:changed", refresh);
-    return () => window.removeEventListener("apoya:whatsapp:changed", refresh);
+    window.addEventListener("apoya:whatsapp:conn", refreshConn);
+    window.addEventListener("apoya:whatsapp:typing", refreshTyping);
+    return () => {
+      window.removeEventListener("apoya:whatsapp:changed", refresh);
+      window.removeEventListener("apoya:whatsapp:conn", refreshConn);
+      window.removeEventListener("apoya:whatsapp:typing", refreshTyping);
+    };
   }, []);
 
   const filtered = useMemo(() => {
