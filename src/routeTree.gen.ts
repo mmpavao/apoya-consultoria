@@ -9,61 +9,268 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
+import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
+import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
+import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
+import { Route as AppClientesRouteImport } from './routes/_app.clientes'
+import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
+import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
+import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
 
-const IndexRoute = IndexRouteImport.update({
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AppWhatsappRoute = AppWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObrigacoesRoute = AppObrigacoesRouteImport.update({
+  id: '/obrigacoes',
+  path: '/obrigacoes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesRoute = AppClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFiscalSerproRoute = AppFiscalSerproRouteImport.update({
+  id: '/fiscal/serpro',
+  path: '/fiscal/serpro',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFiscalNfseRoute = AppFiscalNfseRouteImport.update({
+  id: '/fiscal/nfse',
+  path: '/fiscal/nfse',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFiscalDasRoute = AppFiscalDasRouteImport.update({
+  id: '/fiscal/das',
+  path: '/fiscal/das',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/login': typeof LoginRoute
+  '/clientes': typeof AppClientesRoute
+  '/configuracoes': typeof AppConfiguracoesRoute
+  '/financeiro': typeof AppFinanceiroRoute
+  '/obrigacoes': typeof AppObrigacoesRoute
+  '/whatsapp': typeof AppWhatsappRoute
+  '/fiscal/das': typeof AppFiscalDasRoute
+  '/fiscal/nfse': typeof AppFiscalNfseRoute
+  '/fiscal/serpro': typeof AppFiscalSerproRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/clientes': typeof AppClientesRoute
+  '/configuracoes': typeof AppConfiguracoesRoute
+  '/financeiro': typeof AppFinanceiroRoute
+  '/obrigacoes': typeof AppObrigacoesRoute
+  '/whatsapp': typeof AppWhatsappRoute
+  '/': typeof AppIndexRoute
+  '/fiscal/das': typeof AppFiscalDasRoute
+  '/fiscal/nfse': typeof AppFiscalNfseRoute
+  '/fiscal/serpro': typeof AppFiscalSerproRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/clientes': typeof AppClientesRoute
+  '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/financeiro': typeof AppFinanceiroRoute
+  '/_app/obrigacoes': typeof AppObrigacoesRoute
+  '/_app/whatsapp': typeof AppWhatsappRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/fiscal/das': typeof AppFiscalDasRoute
+  '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
+  '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/clientes'
+    | '/configuracoes'
+    | '/financeiro'
+    | '/obrigacoes'
+    | '/whatsapp'
+    | '/fiscal/das'
+    | '/fiscal/nfse'
+    | '/fiscal/serpro'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/login'
+    | '/clientes'
+    | '/configuracoes'
+    | '/financeiro'
+    | '/obrigacoes'
+    | '/whatsapp'
+    | '/'
+    | '/fiscal/das'
+    | '/fiscal/nfse'
+    | '/fiscal/serpro'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/clientes'
+    | '/_app/configuracoes'
+    | '/_app/financeiro'
+    | '/_app/obrigacoes'
+    | '/_app/whatsapp'
+    | '/_app/'
+    | '/_app/fiscal/das'
+    | '/_app/fiscal/nfse'
+    | '/_app/fiscal/serpro'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/whatsapp': {
+      id: '/_app/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof AppWhatsappRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/obrigacoes': {
+      id: '/_app/obrigacoes'
+      path: '/obrigacoes'
+      fullPath: '/obrigacoes'
+      preLoaderRoute: typeof AppObrigacoesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/configuracoes': {
+      id: '/_app/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AppConfiguracoesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clientes': {
+      id: '/_app/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AppClientesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/fiscal/serpro': {
+      id: '/_app/fiscal/serpro'
+      path: '/fiscal/serpro'
+      fullPath: '/fiscal/serpro'
+      preLoaderRoute: typeof AppFiscalSerproRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/fiscal/nfse': {
+      id: '/_app/fiscal/nfse'
+      path: '/fiscal/nfse'
+      fullPath: '/fiscal/nfse'
+      preLoaderRoute: typeof AppFiscalNfseRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/fiscal/das': {
+      id: '/_app/fiscal/das'
+      path: '/fiscal/das'
+      fullPath: '/fiscal/das'
+      preLoaderRoute: typeof AppFiscalDasRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppClientesRoute: typeof AppClientesRoute
+  AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppFinanceiroRoute: typeof AppFinanceiroRoute
+  AppObrigacoesRoute: typeof AppObrigacoesRoute
+  AppWhatsappRoute: typeof AppWhatsappRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppFiscalDasRoute: typeof AppFiscalDasRoute
+  AppFiscalNfseRoute: typeof AppFiscalNfseRoute
+  AppFiscalSerproRoute: typeof AppFiscalSerproRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppClientesRoute: AppClientesRoute,
+  AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppFinanceiroRoute: AppFinanceiroRoute,
+  AppObrigacoesRoute: AppObrigacoesRoute,
+  AppWhatsappRoute: AppWhatsappRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppFiscalDasRoute: AppFiscalDasRoute,
+  AppFiscalNfseRoute: AppFiscalNfseRoute,
+  AppFiscalSerproRoute: AppFiscalSerproRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
