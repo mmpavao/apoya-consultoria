@@ -283,6 +283,14 @@ function WhatsappPage() {
                       </div>
                     </div>
                   ))}
+                  {whatsappStore.isTyping(active.id) && (
+                    <div className="flex max-w-[60%] items-center gap-1 self-start rounded-2xl bg-card px-3 py-2 shadow-sm">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "300ms" }} />
+                      <span className="ml-1 text-[10px] text-muted-foreground">digitando…</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
