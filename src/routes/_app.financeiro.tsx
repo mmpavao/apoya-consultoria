@@ -271,6 +271,16 @@ function StatusBadge({ status }: { status: CobrancaStatus }) {
   return <Badge variant="outline" className={`rounded-full border ${cls}`}>{label}</Badge>;
 }
 
+function proximaAcao(stage: ReguaStage): string {
+  return {
+    ok: "Sem ação",
+    lembrete: "WhatsApp amigável",
+    cobranca: "Cobrar por boleto + ligação",
+    negativacao: "Avisar negativação Serasa",
+    suspensao: "Suspender serviços",
+  }[stage];
+}
+
 function ReguaBadge({ stage }: { stage: ReguaStage }) {
   const map: Record<ReguaStage, { cls: string; label: string; icon: typeof Clock }> = {
     ok: { cls: "bg-muted text-muted-foreground border-border", label: "Em dia", icon: CheckCircle2 },
