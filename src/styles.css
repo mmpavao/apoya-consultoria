@@ -5,15 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─── Google Font ─────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap');
 
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm:  calc(var(--radius) - 4px);
+  --radius-md:  calc(var(--radius) - 2px);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 14px);
 
@@ -44,7 +44,6 @@
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
 
-  /* Sidebar tokens */
   --color-sidebar:                    var(--sidebar);
   --color-sidebar-foreground:         var(--sidebar-foreground);
   --color-sidebar-accent:             var(--sidebar-accent);
@@ -53,115 +52,284 @@
   --color-sidebar-muted:              var(--sidebar-muted);
 }
 
-/* ─── Light mode ─────────────────────────────────────────── */
+/* ─── Design tokens — Light ────────────────────────────────── */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.625rem;          /* 10px — levemente menor, mais profissional */
 
-  /* Background levemente quente — não branco puro */
-  --background:     oklch(0.975 0.006 60);
-  --foreground:     oklch(0.18 0.02 260);
+  --background:     oklch(0.972 0.004 250);   /* cinza frio suave */
+  --foreground:     oklch(0.16 0.020 260);
 
-  /* Cards brancos puros com sombra */
   --card:           oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 260);
+  --card-foreground: oklch(0.16 0.020 260);
   --popover:        oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 260);
+  --popover-foreground: oklch(0.16 0.020 260);
 
-  /* APOYA Orange — vibrante, igual ao Elegent */
-  --primary:          oklch(0.68 0.20 47);
+  /* APOYA — laranja quente institucional */
+  --primary:          oklch(0.66 0.195 44);
   --primary-foreground: oklch(1 0 0);
-  --primary-soft:     oklch(0.96 0.06 60);
+  --primary-soft:     oklch(0.96 0.055 55);
 
-  --secondary:        oklch(0.96 0.004 260);
-  --secondary-foreground: oklch(0.25 0.02 260);
-  --muted:            oklch(0.955 0.005 260);
-  --muted-foreground: oklch(0.52 0.018 260);
-  --accent:           oklch(0.96 0.06 60);
-  --accent-foreground: oklch(0.38 0.16 47);
+  --secondary:        oklch(0.955 0.004 260);
+  --secondary-foreground: oklch(0.24 0.020 260);
+  --muted:            oklch(0.950 0.004 260);
+  --muted-foreground: oklch(0.50 0.016 260);
+  --accent:           oklch(0.96 0.055 55);
+  --accent-foreground: oklch(0.36 0.155 44);
 
-  /* Semânticas */
-  --destructive:      oklch(0.59 0.22 27);
+  --destructive:      oklch(0.57 0.218 27);
   --destructive-foreground: oklch(1 0 0);
-  --success:          oklch(0.63 0.16 155);
+  --success:          oklch(0.61 0.155 152);
   --success-foreground: oklch(1 0 0);
-  --warning:          oklch(0.76 0.16 85);
-  --warning-foreground: oklch(0.22 0.05 85);
-  --info:             oklch(0.60 0.16 235);
+  --warning:          oklch(0.74 0.155 82);
+  --warning-foreground: oklch(0.20 0.050 82);
+  --info:             oklch(0.58 0.155 232);
   --info-foreground:  oklch(1 0 0);
 
-  --border: oklch(0.91 0.006 260);
-  --input:  oklch(0.91 0.006 260);
-  --ring:   oklch(0.68 0.20 47);
+  --border: oklch(0.90 0.005 260);
+  --input:  oklch(0.90 0.005 260);
+  --ring:   oklch(0.66 0.195 44);
 
-  /* ── Sidebar escura (igual Elegent dark sidebar) ── */
-  --sidebar:                   oklch(0.20 0.025 260);
-  --sidebar-foreground:        oklch(0.85 0.012 260);
-  --sidebar-muted:             oklch(0.55 0.015 260);
-  --sidebar-accent:            oklch(0.68 0.20 47);
+  /* Sidebar escura */
+  --sidebar:                   oklch(0.18 0.024 255);
+  --sidebar-foreground:        oklch(0.88 0.010 260);
+  --sidebar-muted:             oklch(0.52 0.014 260);
+  --sidebar-accent:            oklch(0.66 0.195 44);
   --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border:            oklch(0.27 0.022 260);
+  --sidebar-border:            oklch(0.25 0.020 258);
+
+  /* Layout */
+  --sidebar-width: 256px;
+  --header-height: 64px;
 }
 
-/* ─── Base styles ────────────────────────────────────────── */
+/* ─── Base ─────────────────────────────────────────────────── */
 @layer base {
-  * {
-    border-color: var(--color-border);
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
-  html, body {
+  html {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    /* Impede scroll horizontal na página toda */
+    overflow-x: hidden;
   }
 
-  /* Scrollbar discreta */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 99px; }
+  /* Scrollbar fina e discreta */
+  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
 }
 
-/* ─── Utility classes de design system ───────────────────── */
+/* ─── App Shell Layout ─────────────────────────────────────── */
+@layer components {
+
+  /* Container raiz — full viewport */
+  .app-shell {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;           /* nada vaza para fora */
+  }
+
+  /* Sidebar fixa — nunca rola com a página */
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    z-index: 40;
+    background: var(--color-sidebar);
+    border-right: 1px solid var(--color-sidebar-border);
+    overflow: hidden;           /* scroll só DENTRO dela (via flex-1 + overflow-y-auto) */
+  }
+
+  /* Coluna principal — recua para dar espaço à sidebar */
+  .app-main {
+    flex: 1 1 0%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;               /* impede overflow */
+    min-height: 100dvh;
+    /* Desktop: empurra para direita da sidebar */
+    margin-left: var(--sidebar-width);
+  }
+
+  /* Header sticky (dentro de .app-main) */
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: var(--header-height);
+    background: oklch(1 0 0 / 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* Área de conteúdo — scroll vertical aqui */
+  .app-content {
+    flex: 1 1 0%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Wrapper interno com padding responsivo e max-width */
+  .app-content-inner {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
+  }
+
+  /* Mobile: sidebar não ocupa espaço */
+  @media (max-width: 767px) {
+    .app-sidebar { display: none; }
+    .app-main    { margin-left: 0; }
+  }
+}
+
+/* ─── Design System Utilities ──────────────────────────────── */
 @layer utilities {
-  /* Card padrão com sombra suave */
+
+  /* Card padrão */
   .ds-card {
     background: var(--color-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
-    box-shadow: 0 1px 3px 0 oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.04);
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
   }
 
-  /* Pill de ícone colorido — estilo Elegent */
+  .ds-card-hover {
+    transition: box-shadow 150ms, transform 150ms;
+  }
+  .ds-card-hover:hover {
+    box-shadow: 0 4px 14px oklch(0 0 0 / 0.09);
+    transform: translateY(-1px);
+  }
+
+  /* Pill de ícone */
   .ds-icon-pill {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
     flex-shrink: 0;
   }
 
-  /* Stat card delta positivo */
+  /* Badge de status — substitui tabelas de status */
+  .ds-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  /* Tabelas responsivas — sem scroll horizontal */
+  .ds-table-wrapper {
+    width: 100%;
+    overflow: hidden;           /* NUNCA scroll lateral */
+  }
+
+  .ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .ds-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted-foreground);
+    border-bottom: 2px solid var(--color-border);
+    background: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .ds-table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    /* Células que podem truncar */
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ds-table tr:last-child td { border-bottom: none; }
+
+  .ds-table tbody tr {
+    transition: background 100ms;
+  }
+  .ds-table tbody tr:hover {
+    background: var(--color-muted) / 60%;
+  }
+
+  /* Card-list — alternativa a tabelas em mobile */
+  .ds-list-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .ds-list-item:last-child { border-bottom: none; }
+
+  /* KPI section */
+  .ds-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  /* Seção de página */
+  .ds-page-header {
+    margin-bottom: 1.5rem;
+  }
+  .ds-page-title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--color-foreground);
+    line-height: 1.25;
+  }
+  .ds-page-subtitle {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--color-muted-foreground);
+  }
+
+  /* Deltas */
   .ds-delta-up   { color: var(--color-success); }
   .ds-delta-down { color: var(--color-destructive); }
 
-  /* Sidebar nav item ativo */
+  /* Sidebar active / hover */
   .sidebar-item-active {
     background: var(--color-sidebar-accent);
     color: var(--color-sidebar-accent-foreground);
     font-weight: 600;
   }
-
-  /* Sidebar nav item hover */
   .sidebar-item-hover:hover {
-    background: oklch(1 0 0 / 0.06);
+    background: oklch(1 0 0 / 0.07);
     color: oklch(1 0 0);
   }
+
+  /* Animate spin */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .animate-spin { animation: spin 0.8s linear infinite; }
 }

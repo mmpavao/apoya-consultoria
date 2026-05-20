@@ -23,10 +23,19 @@ function AppShell() {
     if (!loading && !user) navigate({ to: "/login" });
   }, [loading, user, navigate]);
 
+  useEffect(() => {
+    const fn = () => { if (window.innerWidth >= 768) setMobileOpen(false); };
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-        Carregando...
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span className="text-sm text-muted-foreground">Carregando...</span>
+        </div>
       </div>
     );
   }
@@ -37,21 +46,33 @@ function AppShell() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="hidden md:block">
-        <AppSidebar />
-      </div>
+    /*
+      Estrutura:
+        fixed sidebar (left-0, inset-y-0) — nunca faz scroll
+        main column tem padding-left = sidebar width via CSS class
+    */
+    <div className="app-shell">
 
+      {/* ─── SIDEBAR — Desktop (fixed) ─────────────────── */}
+      <aside className="app-sidebar hidden md:flex flex-col">
+        <AppSidebar />
+      </aside>
+
+      {/* ─── DRAWER — Mobile (overlay) ─────────────────── */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <div className="absolute inset-y-0 left-0">
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="relative z-10 app-sidebar flex flex-col">
             <AppSidebar onNavigate={() => setMobileOpen(false)} />
-          </div>
+          </aside>
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* ─── CONTEÚDO PRINCIPAL ────────────────────────── */}
+      <div className="app-main">
         <AppHeader
           user={{
             name: profile?.nome ?? user.email ?? "Usuário",
@@ -61,8 +82,10 @@ function AppShell() {
           onMenuClick={() => setMobileOpen(true)}
           onLogout={handleLogout}
         />
-        <main className="flex-1 px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-8">
-          <Outlet />
+        <main className="app-content">
+          <div className="app-content-inner">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
