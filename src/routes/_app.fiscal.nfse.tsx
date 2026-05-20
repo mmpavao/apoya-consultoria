@@ -110,6 +110,18 @@ function NfsePage() {
         subtitle="Emissão via NFE.io com cálculo CBS/IBS 2026 (MEI isento)"
       />
 
+      <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <Receipt className="h-5 w-5" />
+        </div>
+        <div className="flex-1 text-sm">
+          <div className="font-semibold">NFS-e Nacional + Reforma Tributária 2026</div>
+          <p className="mt-0.5 text-muted-foreground">
+            MEI prestador de serviço deve emitir NFS-e pelo padrão nacional desde set/2023. Em 2026, alíquota de teste CBS 0,9% + IBS 0,1% (sem efeito arrecadatório).
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi label="Notas no mês" value={counts.total.toString()} tone="default" icon={Receipt} />
         <Kpi label="Em rascunho" value={counts.rascunho.toString()} tone="info" icon={FileText} />
