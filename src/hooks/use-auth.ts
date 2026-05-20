@@ -28,9 +28,11 @@ export function useAuth() {
   });
 
   const loadProfileAndRoles = useCallback(async (userId: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any;
     const [{ data: profile }, { data: roleRows }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
+      db.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      db.from("user_roles").select("role").eq("user_id", userId),
     ]);
     setState((s) => ({
       ...s,
