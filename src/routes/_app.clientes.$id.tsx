@@ -166,8 +166,8 @@ function ObrigacoesTab({ clienteId }: { clienteId: string }) {
   const [items, setItems] = useState<Obrigacao[]>([]);
   useEffect(() => {
     const load = () => {
-      const now = new Date();
-      setItems(obrigacoesStore.listByMonth(now.getFullYear(), now.getMonth() + 1).filter((o) => o.clienteId === clienteId));
+      const comp = new Date().toISOString().slice(0, 7);
+      setItems(obrigacoesStore.list().filter((o: Obrigacao) => o.clienteId === clienteId && o.competencia === comp));
     };
     load();
     window.addEventListener("apoya:obrigacoes:changed", load);
