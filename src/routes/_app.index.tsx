@@ -1,300 +1,313 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
-  AlertTriangle, Building2, Calendar, DollarSign, FileText, MessageSquare,
-  Receipt, TrendingUp, CheckCircle2, Clock, Plus, Send, Zap, ArrowRight,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  FileText,
+  Receipt,
+  TrendingUp,
+  Users,
 } from "lucide-react";
-import { PageHeader } from "@/components/PagePlaceholder";
-import { Button } from "@/components/ui/button";
-import { clientesStore } from "@/lib/clientes-store";
-import { obrigacoesStore, calcularMulta } from "@/lib/obrigacoes-store";
-import { financeiroStore } from "@/lib/financeiro-store";
-import { nfseStore } from "@/lib/nfse-store";
-import { dasStore } from "@/lib/das-store";
-import { whatsappStore } from "@/lib/whatsapp-store";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
   head: () => ({ meta: [{ title: "Dashboard · APOYA Gestão" }] }),
 });
 
+/* ─── Mock data ────────────────────────────────────────────── */
+const honorariosData = [
+  { mes: "Jan", recebido: 38200, previsto: 40000 },
+  { mes: "Fev", recebido: 41500, previsto: 40000 },
+  { mes: "Mar", recebido: 39800, previsto: 42000 },
+  { mes: "Abr", recebido: 43200, previsto: 42000 },
+  { mes: "Mai", recebido: 45100, previsto: 44000 },
+  { mes: "Jun", recebido: 42700, previsto: 44000 },
+];
+
+const clientesRecentes = [
+  { nome: "Padaria Pão Dourado Ltda", cnpj: "12.345.678/0001-90", regime: "Simples", status: "ativo", honorario: "R$ 680" },
+  { nome: "Clínica Saúde Total ME", cnpj: "23.456.789/0001-01", regime: "Lucro Presumido", status: "ativo", honorario: "R$ 1.200" },
+  { nome: "Tech Solutions Ltda", cnpj: "34.567.890/0001-12", regime: "Simples", status: "inadimplente", honorario: "R$ 850" },
+  { nome: "Maria Silva MEI", cnpj: "45.678.901/0001-23", regime: "MEI", status: "ativo", honorario: "R$ 120" },
+  { nome: "Construção RJ Ltda", cnpj: "56.789.012/0001-34", regime: "Lucro Presumido", status: "suspenso", honorario: "R$ 2.100" },
+];
+
+const alertas = [
+  { tipo: "danger", texto: "3 clientes com DAS vencendo amanhã", sub: "Ação necessária hoje" },
+  { tipo: "warning", texto: "2 NFS-e com dados incompletos", sub: "Revisar antes do envio em lote" },
+  { tipo: "warning", texto: "DCTFWeb de maio ainda não enviada", sub: "Prazo: último dia útil do mês" },
+  { tipo: "success", texto: "DAS de abril 100% emitido", sub: "72/72 clientes — enviado via WhatsApp" },
+];
+
+/* ─── Sub-components ───────────────────────────────────────── */
+
 function StatCard({
-  icon: Icon, label, value, hint, tone = "default", to,
+  icon: Icon,
+  label,
+  value,
+  delta,
+  deltaUp,
+  hint,
+  iconBg,
+  iconColor,
 }: {
   icon: React.ComponentType<{ className?: string }>;
-  label: string; value: string; hint?: string;
-  tone?: "default" | "success" | "warning" | "destructive" | "info";
-  to?: string;
+  label: string;
+  value: string;
+  delta?: string;
+  deltaUp?: boolean;
+  hint?: string;
+  iconBg: string;
+  iconColor: string;
 }) {
-  const toneCls = {
-    default: "bg-primary-soft text-primary",
-    success: "bg-success/15 text-success",
-    warning: "bg-warning/20 text-warning-foreground",
-    destructive: "bg-destructive/15 text-destructive",
-    info: "bg-info/15 text-info",
-  }[tone];
-  const inner = (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm h-full transition hover:shadow-md hover:border-primary/30">
-      <div className="flex items-start justify-between">
-        <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-          <div className="mt-2 text-2xl font-semibold truncate">{value}</div>
-          {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+  return (
+    <div className="ds-card p-5 flex items-start justify-between gap-4">
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          {label}
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneCls}`}>
-          <Icon className="h-5 w-5" />
-        </div>
+        <div className="text-2xl font-bold text-foreground leading-none">{value}</div>
+        {(delta || hint) && (
+          <div className="mt-2 flex items-center gap-1.5">
+            {delta && (
+              <>
+                {deltaUp ? (
+                  <ArrowUpRight className="h-3.5 w-3.5 text-success shrink-0" />
+                ) : (
+                  <ArrowDownRight className="h-3.5 w-3.5 text-destructive shrink-0" />
+                )}
+                <span className={`text-xs font-medium ${deltaUp ? "text-success" : "text-destructive"}`}>
+                  {delta}
+                </span>
+              </>
+            )}
+            {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+          </div>
+        )}
+      </div>
+      <div className={`ds-icon-pill shrink-0 ${iconBg}`}>
+        <Icon className={`h-5 w-5 ${iconColor}`} />
       </div>
     </div>
   );
-  return to ? <Link to={to as any}>{inner}</Link> : inner;
 }
 
-function brl(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
+const statusStyles: Record<string, string> = {
+  ativo:        "bg-success/10 text-success border border-success/20",
+  inadimplente: "bg-warning/15 text-warning-foreground border border-warning/25",
+  suspenso:     "bg-destructive/10 text-destructive border border-destructive/20",
+  inativo:      "bg-muted text-muted-foreground border border-border",
+  em_analise:   "bg-info/10 text-info border border-info/20",
+};
 
-function competenciaAtual() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+const statusLabels: Record<string, string> = {
+  ativo: "Ativo", inadimplente: "Inadimplente", suspenso: "Suspenso",
+  inativo: "Inativo", em_analise: "Em análise",
+};
 
-function formatRelative(iso: string) {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "agora";
-  if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `há ${Math.floor(diff / 3600)} h`;
-  return `há ${Math.floor(diff / 86400)} d`;
-}
+const alertStyles = {
+  danger:  { bg: "bg-destructive/8 border-destructive/25", icon: AlertTriangle, iconColor: "text-destructive" },
+  warning: { bg: "bg-warning/10 border-warning/30",        icon: Clock,          iconColor: "text-warning-foreground" },
+  success: { bg: "bg-success/8 border-success/25",         icon: CheckCircle2,   iconColor: "text-success" },
+};
+
+/* ─── Main component ───────────────────────────────────────── */
 
 function Dashboard() {
-  const [, force] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => force((n) => n + 1);
-    const events = [
-      "apoya:clientes:changed", "apoya:obrigacoes:changed",
-      "apoya:financeiro:changed", "apoya:nfse:changed",
-      "apoya:das:changed", "apoya:whatsapp:changed",
-    ];
-    events.forEach((e) => window.addEventListener(e, refresh));
-    return () => events.forEach((e) => window.removeEventListener(e, refresh));
-  }, []);
-
-  const data = useMemo(() => {
-    const comp = competenciaAtual();
-    const clientes = clientesStore.list();
-    const obrigacoes = obrigacoesStore.list().filter((o) => o.competencia === comp);
-    const cobrancas = financeiroStore.listByCompetencia(comp);
-    const nfse = nfseStore.listByCompetencia(comp);
-    const das = dasStore.listByCompetencia(comp);
-    const conversas = whatsappStore.list();
-
-    const ativos = clientes.filter((c) => c.status === "ativo").length;
-    const inad = clientes.filter((c) => c.status === "inadimplente").length;
-    const susp = clientes.filter((c) => c.status === "suspenso").length;
-
-    const recebido = cobrancas.filter((c) => c.status === "paga").reduce((s, c) => s + c.valor, 0);
-    const pendente = cobrancas.filter((c) => c.status === "pendente").reduce((s, c) => s + c.valor, 0);
-    const atraso = cobrancas.filter((c) => c.status === "vencida").reduce((s, c) => s + c.valor, 0);
-    const pagas = cobrancas.filter((c) => c.status === "paga").length;
-    const vencidas = cobrancas.filter((c) => c.status === "vencida").length;
-
-    const obrTotal = obrigacoes.length;
-    const obrOk = obrigacoes.filter((o) => o.status === "concluida").length;
-    const obrAtras = obrigacoes.filter((o) => o.status === "atrasada");
-    const multaEstimada = obrAtras.reduce((s, o) => s + calcularMulta(o.valor || 0, o.vencimento).total - (o.valor || 0), 0);
-
-    const proximas = obrigacoes
-      .filter((o) => o.status !== "concluida")
-      .map((o) => ({ ...o, dias: Math.ceil((new Date(o.vencimento).getTime() - Date.now()) / 86400000) }))
-      .filter((o) => o.dias >= 0 && o.dias <= 7)
-      .sort((a, b) => a.dias - b.dias)
-      .slice(0, 5);
-
-    const nfsePend = nfse.filter((n) => n.status === "rascunho").length;
-    const nfseOk = nfse.filter((n) => n.status === "emitida").length;
-    const dasPend = das.filter((g) => g.status === "pendente").length;
-    const dasOk = das.filter((g) => g.status === "gerada" || g.status === "paga").length;
-
-    const naoLidas = conversas.reduce((s, c) => s + c.naoLidas, 0);
-    const ultimaConversa = conversas.find((c) => c.naoLidas > 0) || conversas[0];
-
-    // Feed: combina eventos recentes (cobranças pagas, NFS-e emitidas, mensagens, obrigações concluídas)
-    const feed: { id: string; tipo: string; texto: string; quando: string; tone: string }[] = [];
-    cobrancas.filter((c) => c.pagoEm).forEach((c) =>
-      feed.push({ id: "c" + c.id, tipo: "Pagamento", texto: `${c.clienteNome} pagou ${brl(c.valor)}`, quando: c.pagoEm!, tone: "success" }));
-    nfse.filter((n) => n.status === "emitida").slice(0, 8).forEach((n) =>
-      feed.push({ id: "n" + n.id, tipo: "NFS-e", texto: `Nota ${n.numero} emitida para ${n.clienteNome}`, quando: n.emissao, tone: "info" }));
-    conversas.slice(0, 5).forEach((c) =>
-      feed.push({ id: "w" + c.id, tipo: "WhatsApp", texto: `${c.clienteNome}: ${c.ultimaMensagem}`, quando: c.ultimaAt, tone: "default" }));
-    obrigacoes.filter((o) => o.concluidaEm).slice(0, 5).forEach((o) =>
-      feed.push({ id: "o" + o.id, tipo: "Obrigação", texto: `${o.tipo} concluída — ${o.clienteNome}`, quando: o.concluidaEm + "T12:00:00", tone: "success" }));
-    feed.sort((a, b) => +new Date(b.quando) - +new Date(a.quando));
-
-    return {
-      ativos, inad, susp, totalClientes: clientes.length,
-      recebido, pendente, atraso, pagas, vencidas, totalCob: cobrancas.length,
-      obrTotal, obrOk, obrAtras, multaEstimada, proximas,
-      nfsePend, nfseOk, totalNfse: nfse.length,
-      dasPend, dasOk, totalDas: das.length,
-      naoLidas, ultimaConversa,
-      feed: feed.slice(0, 10),
-    };
-  }, []);
-
-  const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const pctObr = data.obrTotal > 0 ? Math.round((data.obrOk / data.obrTotal) * 100) : 0;
+  const hoje = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle={`Visão geral do escritório · ${mesAtual}`}
-      />
-
-      {/* Alertas críticos */}
-      {(data.obrAtras.length > 0 || data.vencidas > 0 || data.susp > 0) && (
-        <div className="space-y-2">
-          {data.obrAtras.length > 0 && (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="text-sm flex-1">
-                <div className="font-medium text-destructive">
-                  {data.obrAtras.length} obrigação(ões) atrasada(s) · multa estimada {brl(data.multaEstimada)}
-                </div>
-                <div className="text-muted-foreground text-xs mt-0.5">Resolva antes que a multa atinja 20% do valor.</div>
-              </div>
-              <Link to="/obrigacoes"><Button size="sm" variant="outline">Ver <ArrowRight className="h-3 w-3" /></Button></Link>
-            </div>
-          )}
-          {data.vencidas > 0 && (
-            <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 flex items-start gap-3">
-              <Clock className="h-5 w-5 text-warning-foreground shrink-0 mt-0.5" />
-              <div className="text-sm flex-1">
-                <div className="font-medium">{data.vencidas} cobrança(s) vencida(s) — {brl(data.atraso)}</div>
-                <div className="text-muted-foreground text-xs mt-0.5">Acione a régua de cobrança no Financeiro.</div>
-              </div>
-              <Link to="/financeiro"><Button size="sm" variant="outline">Cobrar <ArrowRight className="h-3 w-3" /></Button></Link>
-            </div>
-          )}
-          {data.susp > 0 && (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="text-sm flex-1">
-                <div className="font-medium text-destructive">{data.susp} cliente(s) suspenso(s)</div>
-                <div className="text-muted-foreground text-xs mt-0.5">Reative ou encerre contrato no módulo de Clientes.</div>
-              </div>
-              <Link to="/clientes"><Button size="sm" variant="outline">Abrir</Button></Link>
-            </div>
-          )}
+      {/* Header da página */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground capitalize mt-0.5">{hoje}</p>
         </div>
-      )}
-
-      {/* Ações rápidas */}
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Zap className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Ações rápidas</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/clientes"><Button size="sm" variant="outline"><Plus className="h-3 w-3" /> Novo cliente</Button></Link>
-          <Link to="/fiscal/das"><Button size="sm" variant="outline"><FileText className="h-3 w-3" /> Gerar DAS</Button></Link>
-          <Link to="/fiscal/nfse"><Button size="sm" variant="outline"><Receipt className="h-3 w-3" /> Emitir NFS-e</Button></Link>
-          <Link to="/financeiro"><Button size="sm" variant="outline"><DollarSign className="h-3 w-3" /> Gerar cobranças</Button></Link>
-          <Link to="/whatsapp"><Button size="sm" variant="outline"><Send className="h-3 w-3" /> Abrir WhatsApp</Button></Link>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-primary-soft text-primary text-xs font-semibold px-3 py-1.5">
+            75 clientes ativos
+          </span>
         </div>
       </div>
 
-      {/* KPIs financeiros */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={DollarSign} label="Recebido este mês" value={brl(data.recebido)} hint={`${data.pagas} pagamento(s)`} tone="success" to="/financeiro" />
-        <StatCard icon={TrendingUp} label="Pendentes" value={brl(data.pendente)} hint={`${data.totalCob - data.pagas - data.vencidas} cobrança(s)`} tone="warning" to="/financeiro" />
-        <StatCard icon={AlertTriangle} label="Em atraso" value={brl(data.atraso)} hint={`${data.vencidas} cobrança(s)`} tone="destructive" to="/financeiro" />
-      </section>
-
-      {/* KPIs operacionais */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={Calendar} label="Obrigações do mês" value={`${data.obrOk} / ${data.obrTotal}`} hint={`${pctObr}% concluídas`} to="/obrigacoes" />
-        <StatCard icon={Receipt} label="NFS-e emitidas" value={`${data.nfseOk} / ${data.totalNfse}`} hint={`${data.nfsePend} rascunhos`} tone="info" to="/fiscal/nfse" />
-        <StatCard icon={FileText} label="DAS gerados" value={`${data.dasOk} / ${data.totalDas}`} hint={`${data.dasPend} pendentes`} tone="info" to="/fiscal/das" />
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <StatCard
-          icon={MessageSquare}
-          label="WhatsApp"
-          value={`${data.naoLidas} não lida(s)`}
-          hint={data.ultimaConversa ? `Última: ${data.ultimaConversa.clienteNome} · ${formatRelative(data.ultimaConversa.ultimaAt)}` : "Sem conversas"}
-          tone={data.naoLidas > 0 ? "warning" : "default"}
-          to="/whatsapp"
-        />
+      {/* ── KPI cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={Building2}
-          label="Clientes"
-          value={`${data.ativos} ativos`}
-          hint={`${data.inad} inadimplente(s) · ${data.susp} suspenso(s) · ${data.totalClientes} total`}
-          to="/clientes"
+          label="Clientes ativos"
+          value="75"
+          delta="+3 este mês"
+          deltaUp={true}
+          iconBg="bg-primary/12"
+          iconColor="text-primary"
         />
-      </section>
+        <StatCard
+          icon={DollarSign}
+          label="Honorários / mês"
+          value="R$ 45.100"
+          delta="+4,2% vs abr"
+          deltaUp={true}
+          iconBg="bg-success/12"
+          iconColor="text-success"
+        />
+        <StatCard
+          icon={FileText}
+          label="DAS pendentes"
+          value="4"
+          hint="de 47 clientes Simples"
+          iconBg="bg-warning/12"
+          iconColor="text-warning-foreground"
+        />
+        <StatCard
+          icon={Receipt}
+          label="NFS-e este mês"
+          value="68 / 75"
+          delta="7 pendentes"
+          deltaUp={false}
+          iconBg="bg-info/12"
+          iconColor="text-info"
+        />
+      </div>
 
-      {/* Próximos vencimentos + Feed */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-warning-foreground" /> Próximos 7 dias
-            </h3>
-            <Link to="/obrigacoes" className="text-xs text-primary hover:underline">Ver todas</Link>
-          </div>
-          {data.proximas.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center flex flex-col items-center gap-2">
-              <CheckCircle2 className="h-8 w-8 text-success/60" />
-              Nenhuma obrigação vencendo nos próximos 7 dias.
+      {/* ── Gráfico + Alertas ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Gráfico de honorários */}
+        <div className="lg:col-span-2 ds-card p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Honorários 2026</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Recebido vs previsto</p>
             </div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {data.proximas.map((o) => (
-                <li key={o.id} className="py-2.5 flex items-center gap-3">
-                  <div className={`text-xs font-semibold px-2 py-0.5 rounded ${o.dias === 0 ? "bg-destructive/15 text-destructive" : o.dias <= 2 ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
-                    {o.dias === 0 ? "Hoje" : `${o.dias}d`}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">{o.tipo} — {o.clienteNome}</div>
-                    <div className="text-xs text-muted-foreground truncate">{o.descricao} · vence {new Date(o.vencimento).toLocaleDateString("pt-BR")}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary inline-block" />
+                Recebido
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-border inline-block" />
+                Previsto
+              </div>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={210}>
+            <AreaChart data={honorariosData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gradRecebido" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="oklch(0.68 0.20 47)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="oklch(0.68 0.20 47)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradPrevisto" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#94a3b8" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.006 260)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "oklch(0.52 0.018 260)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "oklch(0.52 0.018 260)" }} axisLine={false} tickLine={false}
+                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ borderRadius: "0.75rem", border: "1px solid oklch(0.91 0.006 260)", fontSize: 12 }}
+                formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR")}`, ""]}
+              />
+              <Area type="monotone" dataKey="previsto" stroke="#94a3b8" strokeWidth={2}
+                fill="url(#gradPrevisto)" strokeDasharray="4 3" dot={false} />
+              <Area type="monotone" dataKey="recebido" stroke="oklch(0.68 0.20 47)" strokeWidth={2.5}
+                fill="url(#gradRecebido)" dot={{ r: 4, fill: "oklch(0.68 0.20 47)", strokeWidth: 2, stroke: "#fff" }}
+                activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" /> Atividade recente
-            </h3>
+        {/* Alertas */}
+        <div className="ds-card p-5 flex flex-col gap-3">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-base font-semibold text-foreground">Atenção necessária</h2>
+            <span className="rounded-full bg-destructive/10 text-destructive text-[11px] font-semibold px-2 py-0.5">
+              {alertas.filter((a) => a.tipo !== "success").length} itens
+            </span>
           </div>
-          {data.feed.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">Sem atividade recente.</div>
-          ) : (
-            <ul className="space-y-2.5">
-              {data.feed.map((f) => (
-                <li key={f.id} className="flex items-start gap-3 text-sm">
-                  <div className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-                    f.tone === "success" ? "bg-success" : f.tone === "info" ? "bg-info" : "bg-muted-foreground"
-                  }`} />
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{f.tipo}</span>
-                    <div className="truncate">{f.texto}</div>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{formatRelative(f.quando)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          {alertas.map((a, i) => {
+            const style = alertStyles[a.tipo as keyof typeof alertStyles];
+            const Icon = style.icon;
+            return (
+              <div
+                key={i}
+                className={`flex items-start gap-3 rounded-xl border p-3 ${style.bg}`}
+              >
+                <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${style.iconColor}`} />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground leading-snug">{a.texto}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{a.sub}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </section>
+      </div>
+
+      {/* ── Clientes recentes ── */}
+      <div className="ds-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-base font-semibold text-foreground">Clientes recentes</h2>
+          <a href="/clientes" className="text-sm font-medium text-primary hover:underline">
+            Ver todos →
+          </a>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cliente</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">CNPJ</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Regime</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Honorário</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clientesRecentes.map((c, i) => (
+                <tr
+                  key={i}
+                  className="border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer last:border-0"
+                >
+                  <td className="px-5 py-3.5">
+                    <div className="font-medium text-foreground truncate max-w-[200px]">{c.nome}</div>
+                  </td>
+                  <td className="px-4 py-3.5 text-muted-foreground font-mono text-xs hidden md:table-cell">{c.cnpj}</td>
+                  <td className="px-4 py-3.5 hidden lg:table-cell">
+                    <span className="rounded-full bg-primary-soft text-primary text-[11px] font-medium px-2.5 py-0.5">
+                      {c.regime}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <span className={`rounded-full text-[11px] font-medium px-2.5 py-0.5 ${statusStyles[c.status]}`}>
+                      {statusLabels[c.status]}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-semibold text-foreground">{c.honorario}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
