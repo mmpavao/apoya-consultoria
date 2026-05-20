@@ -93,11 +93,41 @@ function WhatsappPage() {
     toast.success(`${map[tipo]} enviado via Evolution API (mock)`);
   }
 
+  const connMeta = {
+    connected: { label: "Evolution conectada", cls: "bg-success/10 text-success border-success/20", icon: Wifi },
+    connecting: { label: "Conectando…", cls: "bg-warning/10 text-warning border-warning/30", icon: Circle },
+    disconnected: { label: "Desconectada", cls: "bg-destructive/10 text-destructive border-destructive/20", icon: WifiOff },
+  }[conn];
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="WhatsApp"
         subtitle={`${totais.todas} conversas · ${totais.naoLidas} não lidas — via Evolution API (mock)`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("gap-1.5 rounded-full border", connMeta.cls)}>
+              <connMeta.icon className={cn("h-3 w-3", conn === "connecting" && "animate-pulse")} />
+              {connMeta.label}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={() => {
+                if (conn === "connected") {
+                  whatsappStore.setConnStatus("disconnected");
+                  toast.warning("Evolution API desconectada");
+                } else {
+                  whatsappStore.setConnStatus("connecting");
+                  setTimeout(() => { whatsappStore.setConnStatus("connected"); toast.success("Evolution API conectada"); }, 900);
+                }
+              }}
+            >
+              <Power className="h-4 w-4" /> {conn === "connected" ? "Desconectar" : "Reconectar"}
+            </Button>
+          </div>
+        }
       />
 
       <div className="grid h-[calc(100vh-13rem)] grid-cols-1 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]">
