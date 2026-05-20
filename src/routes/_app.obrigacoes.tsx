@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Calendar as CalendarIcon, CheckCircle2, Clock, Info, LayoutGrid, List, RefreshCw, Search, Sparkles } from "lucide-react";
+import {
+  AlertTriangle, Calendar, CheckCircle2, Clock,
+  LayoutGrid, List, RefreshCw, Search, Sparkles,
+  TrendingUp, XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader } from "@/components/PagePlaceholder";
 import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
@@ -16,418 +17,356 @@ export const Route = createFileRoute("/_app/obrigacoes")({
   head: () => ({ meta: [{ title: "Obrigações · APOYA Gestão" }] }),
 });
 
-const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-const KANBAN_COLS: { key: ObrigacaoStatus; label: string; tone: string }[] = [
-  { key: "pendente", label: "A fazer", tone: "bg-info/10 text-info border-info/20" },
-  { key: "em_andamento", label: "Em andamento", tone: "bg-warning/10 text-warning border-warning/20" },
-  { key: "concluida", label: "Concluídas", tone: "bg-success/10 text-success border-success/20" },
-  { key: "atrasada", label: "Atrasadas", tone: "bg-destructive/10 text-destructive border-destructive/20" },
+const STATUS_CFG: Record<ObrigacaoStatus, { bg: string; text: string; border: string; Icon: React.ElementType; label: string }> = {
+  pendente:     { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    Icon: Clock,         label: "Pendente"     },
+  em_andamento: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   Icon: TrendingUp,    label: "Em andamento" },
+  concluida:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", Icon: CheckCircle2,  label: "Concluída"    },
+  atrasada:     { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     Icon: AlertTriangle, label: "Atrasada"     },
+};
+
+const TIPO_COLOR: Record<string, string> = {
+  DAS:                "bg-blue-100 text-blue-800",
+  "DASN-Simei":       "bg-violet-100 text-violet-800",
+  DCTFWeb:            "bg-orange-100 text-orange-800",
+  "EFD-Contribuições":"bg-cyan-100 text-cyan-800",
+  "EFD-ICMS/IPI":     "bg-indigo-100 text-indigo-800",
+  "EFD-Reinf":        "bg-pink-100 text-pink-800",
+  ECF:                "bg-rose-100 text-rose-800",
+  ECD:                "bg-purple-100 text-purple-800",
+  DIRBI:              "bg-amber-100 text-amber-800",
+  DEFIS:              "bg-lime-100 text-lime-800",
+  NFSe:               "bg-teal-100 text-teal-800",
+  "FGTS Digital":     "bg-green-100 text-green-800",
+  eSocial:            "bg-sky-100 text-sky-800",
+};
+
+const KANBAN_COLS: { key: ObrigacaoStatus; label: string }[] = [
+  { key: "pendente",     label: "A fazer"      },
+  { key: "em_andamento", label: "Em andamento" },
+  { key: "concluida",    label: "Concluídas"   },
+  { key: "atrasada",     label: "Atrasadas"    },
 ];
+
+function fmt(v: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+}
+
+function diasRestantes(venc: string) {
+  const diff = Math.ceil((new Date(venc).getTime() - Date.now()) / 86400000);
+  return diff;
+}
 
 function ObrigacoesPage() {
   const now = new Date();
-  const [items, setItems] = useState<Obrigacao[]>([]);
-  const [ano, setAno] = useState(now.getFullYear());
-  const [mes, setMes] = useState(now.getMonth() + 1);
-  const [query, setQuery] = useState("");
-  const [regime, setRegime] = useState("todos");
-  const [status, setStatus] = useState("todos");
-  const [responsavel, setResponsavel] = useState("todos");
-  const [view, setView] = useState<"lista" | "kanban">("lista");
-  const [reformaDismissed, setReformaDismissed] = useState(() =>
-    typeof window !== "undefined" && localStorage.getItem("apoya:reforma:dismissed") === "1"
-  );
+  const [items, setItems]     = useState<Obrigacao[]>([]);
+  const [ano, setAno]         = useState(now.getFullYear());
+  const [mes, setMes]         = useState(now.getMonth() + 1);
+  const [query, setQuery]     = useState("");
+  const [regime, setRegime]   = useState("todos");
+  const [status, setStatus]   = useState("todos");
+  const [resp, setResp]       = useState("todos");
+  const [view, setView]       = useState<"lista" | "kanban">("lista");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const refresh = () => setItems(obrigacoesStore.list());
-    refresh();
-    window.addEventListener("apoya:obrigacoes:changed", refresh);
-    window.addEventListener("apoya:clientes:changed", refresh);
+    const fn = () => setItems(obrigacoesStore.list());
+    fn();
+    window.addEventListener("apoya:obrigacoes:changed", fn);
+    window.addEventListener("apoya:clientes:changed", fn);
     return () => {
-      window.removeEventListener("apoya:obrigacoes:changed", refresh);
-      window.removeEventListener("apoya:clientes:changed", refresh);
+      window.removeEventListener("apoya:obrigacoes:changed", fn);
+      window.removeEventListener("apoya:clientes:changed", fn);
     };
   }, []);
 
   const competencia = `${ano}-${mes.toString().padStart(2, "0")}`;
-
   const responsaveis = useMemo(() => Array.from(new Set(items.map((o) => o.responsavel))), [items]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
       .filter((o) => o.competencia === competencia)
-      .filter((o) => (q ? `${o.clienteNome} ${o.tipo} ${o.descricao}`.toLowerCase().includes(q) : true))
+      .filter((o) => q ? `${o.clienteNome} ${o.tipo} ${o.descricao}`.toLowerCase().includes(q) : true)
       .filter((o) => regime === "todos" || o.regime === regime)
       .filter((o) => status === "todos" || o.status === status)
-      .filter((o) => responsavel === "todos" || o.responsavel === responsavel)
+      .filter((o) => resp   === "todos" || o.responsavel === resp)
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-  }, [items, competencia, query, regime, status, responsavel]);
+  }, [items, competencia, query, regime, status, resp]);
 
   const counts = useMemo(() => {
-    const monthItems = items.filter((o) => o.competencia === competencia);
+    const m = items.filter((o) => o.competencia === competencia);
     return {
-      total: monthItems.length,
-      pendente: monthItems.filter((o) => o.status === "pendente").length,
-      atrasada: monthItems.filter((o) => o.status === "atrasada").length,
-      concluida: monthItems.filter((o) => o.status === "concluida").length,
+      total:    m.length,
+      pendente: m.filter((o) => o.status === "pendente").length,
+      atrasada: m.filter((o) => o.status === "atrasada").length,
+      concluida:m.filter((o) => o.status === "concluida").length,
     };
   }, [items, competencia]);
 
-  // Alertas: atrasadas + vencendo em ≤3 dias
-  const alertas = useMemo(() => {
-    const monthItems = items.filter((o) => o.competencia === competencia);
-    const atrasadas = monthItems.filter((o) => o.status === "atrasada");
-    const proximas = monthItems.filter((o) => {
-      if (o.status !== "pendente") return false;
-      const days = Math.ceil((new Date(o.vencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      return days >= 0 && days <= 3;
-    });
-    const multaTotal = atrasadas.reduce((acc, o) => acc + (o.valor ? calcularMulta(o.valor, o.vencimento).multa + calcularMulta(o.valor, o.vencimento).juros : 0), 0);
-    return { atrasadas, proximas, multaTotal };
-  }, [items, competencia]);
-
-  function handleRegenerate() {
-    obrigacoesStore.regenerate(ano, mes);
-    toast.success(`Obrigações de ${MESES[mes - 1]}/${ano} geradas`);
+  function markSelected(newStatus: ObrigacaoStatus) {
+    selected.forEach((id) => obrigacoesStore.updateStatus(id, newStatus));
+    toast.success(`${selected.size} obrigação(ões) marcadas como "${STATUS_CFG[newStatus].label}"`);
+    setSelected(new Set());
   }
 
-  function dismissReforma() {
-    localStorage.setItem("apoya:reforma:dismissed", "1");
-    setReformaDismissed(true);
+  function gerarMes() {
+    obrigacoesStore.generateForMonth(competencia);
+    toast.success(`Obrigações de ${MESES[mes - 1]}/${ano} geradas!`);
+  }
+
+  function toggleOne(id: string) {
+    const s = new Set(selected);
+    s.has(id) ? s.delete(id) : s.add(id);
+    setSelected(s);
+  }
+
+  function toggleAll() {
+    setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((o) => o.id)));
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Obrigações"
-        subtitle="Calendário fiscal por cliente e regime tributário"
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-xl border bg-card p-0.5">
-              <Button
-                variant={view === "lista" ? "secondary" : "ghost"}
-                size="sm"
-                className="rounded-lg"
-                onClick={() => setView("lista")}
-              >
-                <List className="h-4 w-4" /> Lista
-              </Button>
-              <Button
-                variant={view === "kanban" ? "secondary" : "ghost"}
-                size="sm"
-                className="rounded-lg"
-                onClick={() => setView("kanban")}
-              >
-                <LayoutGrid className="h-4 w-4" /> Kanban
-              </Button>
-            </div>
-            <Button variant="outline" className="rounded-xl" onClick={handleRegenerate}>
-              <RefreshCw className="h-4 w-4" /> Gerar do mês
-            </Button>
-          </div>
-        }
-      />
 
-      {/* Banner Reforma Tributária */}
-      {!reformaDismissed && (
-        <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent p-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">Reforma Tributária 2026 — CBS e IBS</h3>
-              <Badge variant="outline" className="rounded-full border-primary/30 text-primary">EC 132/2023</Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              A partir de jan/2026 entra a fase de testes da CBS (federal) e IBS (estadual/municipal). NFS-e nacional já é obrigatória para MEI.
-              Revise CNAEs e códigos de serviço dos seus clientes.
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={dismissReforma}>Ocultar</Button>
-        </div>
-      )}
-
-      {/* Alertas de multa */}
-      {(alertas.atrasadas.length > 0 || alertas.proximas.length > 0) && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {alertas.atrasadas.length > 0 && (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                <h3 className="text-sm font-semibold">{alertas.atrasadas.length} obrigações atrasadas</h3>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Multa de mora estimada (0,33%/dia, máx. 20%) + juros Selic acumulados:{" "}
-                <span className="font-mono font-semibold text-foreground">
-                  {alertas.multaTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </span>
-              </p>
-            </div>
-          )}
-          {alertas.proximas.length > 0 && (
-            <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
-              <div className="flex items-center gap-2 text-warning">
-                <Clock className="h-5 w-5" />
-                <h3 className="text-sm font-semibold">{alertas.proximas.length} vencem em até 3 dias</h3>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Priorize estas obrigações para evitar multas e juros.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Kpi icon={CalendarIcon} label="Total no mês" value={counts.total} tone="default" />
-        <Kpi icon={Clock} label="Pendentes" value={counts.pendente} tone="info" />
-        <Kpi icon={AlertTriangle} label="Atrasadas" value={counts.atrasada} tone="destructive" />
-        <Kpi icon={CheckCircle2} label="Concluídas" value={counts.concluida} tone="success" />
-      </div>
-
-      <div className="rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b p-4">
-          <Select value={mes.toString()} onValueChange={(v) => setMes(parseInt(v, 10))}>
-            <SelectTrigger className="w-[130px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MESES.map((m, i) => <SelectItem key={m} value={(i + 1).toString()}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={ano.toString()} onValueChange={(v) => setAno(parseInt(v, 10))}>
-            <SelectTrigger className="w-[110px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="relative min-w-[220px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar cliente ou obrigação" className="rounded-xl pl-9" />
-          </div>
-
-          <FilterSelect label="Regime" value={regime} onChange={setRegime} options={["todos", "MEI", "Simples", "Lucro Presumido", "Lucro Real", "Doméstica"]} />
-          {view === "lista" && (
-            <FilterSelect label="Status" value={status} onChange={setStatus} options={["todos", "pendente", "em_andamento", "atrasada", "concluida"]} capitalize />
-          )}
-          <FilterSelect label="Responsável" value={responsavel} onChange={setResponsavel} options={["todos", ...responsaveis]} />
-        </div>
-
-        {view === "lista" ? (
-          <ListaView filtered={filtered} />
-        ) : (
-          <KanbanView items={filtered} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ListaView({ filtered }: { filtered: Obrigacao[] }) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[44px]"></TableHead>
-          <TableHead>Cliente</TableHead>
-          <TableHead>Obrigação</TableHead>
-          <TableHead>Regime</TableHead>
-          <TableHead>Vencimento</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Responsável</TableHead>
-          <TableHead className="text-right">Valor</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filtered.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={8} className="py-16 text-center text-sm text-muted-foreground">
-              <CalendarIcon className="mx-auto mb-3 h-8 w-8 opacity-40" />
-              Nenhuma obrigação para os filtros selecionados
-            </TableCell>
-          </TableRow>
-        )}
-        {filtered.map((o) => {
-          const multa = o.valor && o.status === "atrasada" ? calcularMulta(o.valor, o.vencimento) : null;
-          return (
-            <TableRow key={o.id} className={o.status === "concluida" ? "opacity-60" : ""}>
-              <TableCell>
-                <Checkbox
-                  checked={o.status === "concluida"}
-                  onCheckedChange={() => obrigacoesStore.toggle(o.id)}
-                  aria-label="Marcar como concluída"
-                />
-              </TableCell>
-              <TableCell className="font-medium">{o.clienteNome}</TableCell>
-              <TableCell>
-                <div className="font-medium">{o.tipo}</div>
-                <div className="text-xs text-muted-foreground">{o.descricao}</div>
-              </TableCell>
-              <TableCell><Badge variant="outline" className="rounded-full">{o.regime}</Badge></TableCell>
-              <TableCell className="text-sm">{formatDate(o.vencimento)}</TableCell>
-              <TableCell><StatusBadge status={o.status} vencimento={o.vencimento} /></TableCell>
-              <TableCell className="text-sm">{o.responsavel}</TableCell>
-              <TableCell className="text-right font-mono text-sm">
-                {o.valor != null ? o.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
-                {multa && (
-                  <div className="text-[10px] font-normal text-destructive">
-                    +{(multa.multa + multa.juros).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} multa
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
-}
-
-function KanbanView({ items }: { items: Obrigacao[] }) {
-  const [dragId, setDragId] = useState<string | null>(null);
-
-  function handleDrop(target: ObrigacaoStatus) {
-    if (!dragId) return;
-    obrigacoesStore.setStatus(dragId, target);
-    setDragId(null);
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="py-16 text-center text-sm text-muted-foreground">
-        <CalendarIcon className="mx-auto mb-3 h-8 w-8 opacity-40" />
-        Nenhuma obrigação para os filtros selecionados
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
-      {KANBAN_COLS.map((col) => {
-        const colItems = items.filter((o) => o.status === col.key);
-        return (
-          <div
-            key={col.key}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDrop(col.key)}
-            className="flex min-h-[280px] flex-col rounded-2xl border bg-muted/30 p-3"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-semibold">{col.label}</span>
-              <Badge variant="outline" className={`rounded-full border ${col.tone}`}>{colItems.length}</Badge>
-            </div>
-            <div className="flex flex-col gap-2">
-              {colItems.map((o) => {
-                const multa = o.valor && col.key === "atrasada" ? calcularMulta(o.valor, o.vencimento) : null;
-                return (
-                  <div
-                    key={o.id}
-                    draggable
-                    onDragStart={() => setDragId(o.id)}
-                    onDragEnd={() => setDragId(null)}
-                    className="cursor-grab rounded-xl border bg-card p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold">{o.tipo}</span>
-                      <Badge variant="outline" className="rounded-full text-[10px]">{o.regime}</Badge>
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">{o.clienteNome}</div>
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Venc. {formatDate(o.vencimento)}</span>
-                      {o.valor != null && (
-                        <span className="font-mono font-medium">
-                          {o.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                        </span>
-                      )}
-                    </div>
-                    {multa && (
-                      <div className="mt-1 flex items-center gap-1 text-[10px] text-destructive">
-                        <AlertTriangle className="h-3 w-3" />
-                        +{(multa.multa + multa.juros).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ({multa.dias}d)
-                      </div>
-                    )}
-                    <div className="mt-2 text-[10px] text-muted-foreground">{o.responsavel}</div>
-                  </div>
-                );
-              })}
-              {colItems.length === 0 && (
-                <div className="flex items-center justify-center rounded-xl border border-dashed py-6 text-xs text-muted-foreground">
-                  <Info className="mr-1 h-3 w-3" /> Arraste cards aqui
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function formatDate(iso: string) {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function StatusBadge({ status, vencimento }: { status: ObrigacaoStatus; vencimento: string }) {
-  const map: Record<ObrigacaoStatus, string> = {
-    pendente: "bg-info/10 text-info border-info/20",
-    em_andamento: "bg-warning/10 text-warning border-warning/20",
-    atrasada: "bg-destructive/10 text-destructive border-destructive/20",
-    concluida: "bg-success/10 text-success border-success/20",
-  };
-  const labels: Record<ObrigacaoStatus, string> = {
-    pendente: "Pendente",
-    em_andamento: "Em andamento",
-    atrasada: "Atrasada",
-    concluida: "Concluída",
-  };
-  const days = Math.ceil((new Date(vencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  const hint = status === "pendente" && days <= 5 && days >= 0 ? ` · ${days}d` : status === "atrasada" ? ` · ${Math.abs(days)}d` : "";
-  return <Badge variant="outline" className={`rounded-full border ${map[status]}`}>{labels[status]}{hint}</Badge>;
-}
-
-function Kpi({ icon: Icon, label, value, tone }: { icon: typeof CalendarIcon; label: string; value: number; tone: "default" | "info" | "destructive" | "success" }) {
-  const toneCls = {
-    default: "bg-muted text-foreground",
-    info: "bg-info/10 text-info",
-    destructive: "bg-destructive/10 text-destructive",
-    success: "bg-success/10 text-success",
-  }[tone];
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneCls}`}>
-          <Icon className="h-5 w-5" />
-        </div>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-2xl font-semibold leading-tight">{value}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
+          <h1 className="text-xl font-semibold tracking-tight">Obrigações Fiscais</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {counts.total} obrigações em {MESES[mes - 1]}/{ano}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-xl gap-1" onClick={gerarMes}>
+            <RefreshCw className="h-3.5 w-3.5" /> Gerar mês
+          </Button>
+          <Button size="sm" className="rounded-xl gap-1">
+            <Sparkles className="h-3.5 w-3.5" /> Marcar em lote
+          </Button>
         </div>
       </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Total",     v: counts.total,     bg: "bg-muted",      text: "text-foreground"    },
+          { label: "Pendentes", v: counts.pendente,  bg: "bg-blue-50",    text: "text-blue-700"      },
+          { label: "Atrasadas", v: counts.atrasada,  bg: "bg-red-50",     text: "text-red-700"       },
+          { label: "Concluídas",v: counts.concluida, bg: "bg-emerald-50", text: "text-emerald-700"   },
+        ].map(({ label, v, bg, text }) => (
+          <div key={label} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${bg}`}>
+            <span className={`text-2xl font-bold ${text}`}>{v}</span>
+            <span className={`text-xs font-medium ${text} opacity-70`}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Nav mês */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl"
+          onClick={() => { let m = mes - 1, a = ano; if (m < 1) { m = 12; a--; } setMes(m); setAno(a); }}>
+          ‹
+        </Button>
+        <span className="min-w-[110px] text-center text-sm font-semibold">
+          {MESES[mes - 1]} {ano}
+        </span>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl"
+          onClick={() => { let m = mes + 1, a = ano; if (m > 12) { m = 1; a++; } setMes(m); setAno(a); }}>
+          ›
+        </Button>
+        <div className="h-4 w-px bg-border mx-1" />
+
+        {/* Filtros */}
+        <div className="relative hidden sm:block">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar cliente ou tipo…" className="h-8 rounded-xl pl-8 text-sm w-52" />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="h-8 rounded-xl text-xs w-36">
+            <SelectValue>{status === "todos" ? "Todos status" : STATUS_CFG[status as ObrigacaoStatus]?.label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos status</SelectItem>
+            {(["pendente","em_andamento","concluida","atrasada"] as ObrigacaoStatus[]).map((s) => (
+              <SelectItem key={s} value={s}>{STATUS_CFG[s].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="ml-auto flex items-center gap-1 rounded-xl border bg-card p-1">
+          <button onClick={() => setView("lista")}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${view === "lista" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            <List className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => setView("kanban")}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${view === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Ações em lote */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border bg-primary/5 px-4 py-2.5">
+          <span className="text-sm font-medium">{selected.size} selecionada(s)</span>
+          <div className="flex gap-2 ml-auto">
+            <Button size="sm" variant="outline" className="rounded-xl h-7 text-xs gap-1"
+              onClick={() => markSelected("em_andamento")}>
+              <TrendingUp className="h-3 w-3" /> Em andamento
+            </Button>
+            <Button size="sm" variant="outline" className="rounded-xl h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              onClick={() => markSelected("concluida")}>
+              <CheckCircle2 className="h-3 w-3" /> Concluir
+            </Button>
+            <Button size="sm" variant="ghost" className="rounded-xl h-7 text-xs"
+              onClick={() => setSelected(new Set())}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Vista lista */}
+      {view === "lista" && (
+        <div className="space-y-2">
+          {/* Cabeçalho lista */}
+          {filtered.length > 0 && (
+            <div className="flex items-center gap-3 px-4 text-xs font-medium text-muted-foreground pb-1">
+              <Checkbox checked={selected.size === filtered.length && filtered.length > 0}
+                onCheckedChange={toggleAll} className="rounded" />
+              <span className="flex-1">Obrigação</span>
+              <span className="hidden w-28 sm:block">Vencimento</span>
+              <span className="hidden w-24 sm:block">Status</span>
+              <span className="w-20 text-right">Valor</span>
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-card py-16 text-center">
+              <Calendar className="h-8 w-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium">Nenhuma obrigação para este mês</p>
+              <p className="text-xs text-muted-foreground mt-1">Clique em "Gerar mês" para criar automaticamente</p>
+            </div>
+          ) : (
+            filtered.map((o) => <ObrCard key={o.id} ob={o} selected={selected.has(o.id)} onToggle={() => toggleOne(o.id)} />)
+          )}
+        </div>
+      )}
+
+      {/* Vista kanban */}
+      {view === "kanban" && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {KANBAN_COLS.map(({ key, label }) => {
+            const col = filtered.filter((o) => o.status === key);
+            const cfg = STATUS_CFG[key];
+            return (
+              <div key={key} className="space-y-2">
+                <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${cfg.bg}`}>
+                  <cfg.Icon className={`h-3.5 w-3.5 ${cfg.text}`} />
+                  <span className={`text-xs font-semibold ${cfg.text}`}>{label}</span>
+                  <span className={`ml-auto text-xs font-bold ${cfg.text}`}>{col.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {col.map((o) => <KanbanCard key={o.id} ob={o} />)}
+                  {col.length === 0 && (
+                    <div className="rounded-xl border border-dashed bg-card p-4 text-center text-xs text-muted-foreground">
+                      Nenhuma
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function FilterSelect({
-  label, value, onChange, options, capitalize,
-}: { label: string; value: string; onChange: (v: string) => void; options: string[]; capitalize?: boolean }) {
+/* ── ObrCard (lista) ─────────────────────────────────────────── */
+function ObrCard({ ob, selected, onToggle }: { ob: Obrigacao; selected: boolean; onToggle: () => void }) {
+  const cfg  = STATUS_CFG[ob.status];
+  const dias = diasRestantes(ob.vencimento);
+  const multa = ob.status === "atrasada" && ob.valor ? calcularMulta(ob.valor, ob.vencimento) : null;
+
+  const urgencia = dias <= 0 ? "border-l-red-500" : dias <= 3 ? "border-l-amber-400" : "border-l-transparent";
+
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[170px] rounded-xl">
-        <SelectValue placeholder={label} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o} value={o} className={capitalize ? "capitalize" : undefined}>
-            {o === "todos" ? `${label}: todos` : o.replace("_", " ")}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className={`group flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm transition-all hover:shadow-md border-l-4 ${urgencia} ${selected ? "ring-2 ring-primary/30" : ""}`}>
+      <Checkbox checked={selected} onCheckedChange={onToggle} className="rounded shrink-0" />
+
+      {/* Tipo badge */}
+      <span className={`shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-bold ${TIPO_COLOR[ob.tipo] ?? "bg-gray-100 text-gray-700"}`}>
+        {ob.tipo}
+      </span>
+
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold">{ob.clienteNome}</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">· {ob.descricao}</span>
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{ob.responsavel}</span>
+          {multa && multa.dias > 0 && (
+            <span className="text-red-600 font-medium">
+              +{multa.dias}d atraso · multa ~{new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(multa.multa)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Vencimento */}
+      <div className="hidden shrink-0 text-right sm:block">
+        <div className="text-sm font-medium">
+          {new Date(ob.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}
+        </div>
+        {ob.status !== "concluida" && (
+          <div className={`text-[11px] ${dias < 0 ? "text-red-600 font-semibold" : dias <= 3 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+            {dias < 0 ? `${Math.abs(dias)}d atrasado` : dias === 0 ? "Vence hoje!" : `${dias}d restantes`}
+          </div>
+        )}
+      </div>
+
+      {/* Status */}
+      <span className={`hidden shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold sm:inline-flex ${cfg.bg} ${cfg.text}`}>
+        <cfg.Icon className="h-3 w-3" />{cfg.label}
+      </span>
+
+      {/* Valor */}
+      {ob.valor ? (
+        <div className="shrink-0 text-right">
+          <div className="text-sm font-semibold tabular-nums">{fmt(ob.valor)}</div>
+        </div>
+      ) : (
+        <div className="w-16 shrink-0" />
+      )}
+    </div>
+  );
+}
+
+/* ── KanbanCard ─────────────────────────────────────────────── */
+function KanbanCard({ ob }: { ob: Obrigacao }) {
+  const dias = diasRestantes(ob.vencimento);
+  return (
+    <div className="rounded-xl border bg-card p-3 shadow-sm space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${TIPO_COLOR[ob.tipo] ?? "bg-gray-100 text-gray-700"}`}>
+          {ob.tipo}
+        </span>
+        {ob.valor && <span className="text-xs font-semibold tabular-nums">{fmt(ob.valor)}</span>}
+      </div>
+      <p className="text-xs font-semibold leading-snug truncate">{ob.clienteNome}</p>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">
+          {new Date(ob.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}
+        </span>
+        {ob.status !== "concluida" && (
+          <span className={`text-[11px] font-medium ${dias < 0 ? "text-red-600" : dias <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
+            {dias < 0 ? `${Math.abs(dias)}d atraso` : `${dias}d`}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
