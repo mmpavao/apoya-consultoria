@@ -225,7 +225,10 @@ function FinanceiroPage() {
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">{brl(c.valor)}</TableCell>
                 <TableCell><StatusBadge status={c.status} /></TableCell>
-                <TableCell><ReguaBadge stage={c.reguaStage} /></TableCell>
+                <TableCell>
+                  <ReguaBadge stage={c.reguaStage} />
+                  <div className="mt-1 text-[10px] text-muted-foreground">{proximaAcao(c.reguaStage)}</div>
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     {c.linkPagamento && (
