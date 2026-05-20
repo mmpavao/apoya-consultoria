@@ -137,9 +137,19 @@ function seedIfEmpty() {
   return seeded;
 }
 
+type ConnStatus = "connected" | "connecting" | "disconnected";
+let connStatus: ConnStatus = "connected";
+const typingSet = new Set<string>();
+
 export const whatsappStore = {
   list: () => seedIfEmpty().sort((a, b) => +new Date(b.ultimaAt) - +new Date(a.ultimaAt)),
   get: (id: string) => read().find((c) => c.id === id),
+  getConnStatus: (): ConnStatus => connStatus,
+  setConnStatus(s: ConnStatus) {
+    connStatus = s;
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("apoya:whatsapp:conn"));
+  },
+  isTyping: (id: string) => typingSet.has(id),
   marcarLida(id: string) {
     const list = read().map((c) =>
       c.id === id
@@ -168,8 +178,12 @@ export const whatsappStore = {
       ultimaAt: msg.createdAt,
     };
     write(list);
-    // resposta automática mock
+    // indicador "digitando…"
+    typingSet.add(id);
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("apoya:whatsapp:typing"));
     setTimeout(() => {
+      typingSet.delete(id);
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("apoya:whatsapp:typing"));
       const cur = read();
       const j = cur.findIndex((c) => c.id === id);
       if (j === -1) return;
