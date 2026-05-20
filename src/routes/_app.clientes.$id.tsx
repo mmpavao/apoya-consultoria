@@ -9,7 +9,7 @@ import { ClienteFormDialog } from "@/components/ClienteFormDialog";
 import { clientesStore, REGIME_LABEL, STATUS_LABEL, type Cliente } from "@/lib/clientes-store";
 import { obrigacoesStore, type Obrigacao } from "@/lib/obrigacoes-store";
 import { financeiroStore, type Cobranca } from "@/lib/financeiro-store";
-import { nfseStore, type NfseDoc } from "@/lib/nfse-store";
+import { nfseStore, type NfseNota } from "@/lib/nfse-store";
 
 export const Route = createFileRoute("/_app/clientes/$id")({
   component: ClienteDetalhe,
