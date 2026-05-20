@@ -2,23 +2,31 @@ import { useNavigate } from "@tanstack/react-router";
 import { LogOut, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApoyaLogo } from "@/components/ApoyaLogo";
-import { clearMockUser, type MockUser } from "@/lib/mock-auth";
 
-const roleLabels: Record<MockUser["role"], string> = {
-  admin: "Administrador",
-  fiscal: "Fiscal",
-  financeiro: "Financeiro",
-  dp: "Depto. Pessoal",
+type AppUser = {
+  name: string;
+  email: string;
+  role: "admin" | "contador" | "assistente" | "cliente";
 };
 
-export function AppHeader({ user, onMenuClick }: { user: MockUser; onMenuClick: () => void }) {
+const roleLabels: Record<AppUser["role"], string> = {
+  admin: "Administrador",
+  contador: "Contador",
+  assistente: "Assistente",
+  cliente: "Cliente (portal)",
+};
+
+export function AppHeader({
+  user, onMenuClick, onLogout,
+}: { user: AppUser; onMenuClick: () => void; onLogout?: () => void }) {
   const navigate = useNavigate();
   const initials = user.name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+    .split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+
+  const handleLogout = () => {
+    if (onLogout) onLogout();
+    else navigate({ to: "/login" });
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 backdrop-blur px-4 md:px-6">
@@ -26,11 +34,9 @@ export function AppHeader({ user, onMenuClick }: { user: MockUser; onMenuClick: 
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Logo compacto — somente mobile (sidebar fica escondida) */}
       <div className="md:hidden">
         <ApoyaLogo variant="on-light" size="sm" withTagline={false} className="max-w-[100px]" />
       </div>
-
 
       <div className="relative hidden md:flex flex-1 max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -49,15 +55,7 @@ export function AppHeader({ user, onMenuClick }: { user: MockUser; onMenuClick: 
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
           {initials}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => {
-            clearMockUser();
-            navigate({ to: "/login" });
-          }}
-          aria-label="Sair"
-        >
+        <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Sair">
           <LogOut className="h-4 w-4" />
         </Button>
       </div>
