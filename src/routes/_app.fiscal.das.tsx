@@ -201,7 +201,14 @@ function DasPage() {
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((g) => (
+            {filtered.map((g) => {
+              const venc = new Date(g.vencimento);
+              const today = new Date();
+              const overdue = g.status !== "paga" && venc < today;
+              const diasAtraso = overdue ? Math.floor((today.getTime() - venc.getTime()) / 86400000) : 0;
+              const pctMulta = Math.min(0.2, diasAtraso * 0.0033);
+              const multa = overdue ? g.valor * (pctMulta + (diasAtraso / 30) * 0.01) : 0;
+              return (
               <TableRow key={g.id} className={g.status === "paga" ? "opacity-60" : ""}>
                 <TableCell>
                   <Checkbox checked={selected.has(g.id)} onCheckedChange={() => toggleOne(g.id)} />
@@ -215,11 +222,28 @@ function DasPage() {
                 </TableCell>
                 <TableCell className="font-mono text-xs">{g.cnpj}</TableCell>
                 <TableCell><Badge variant="outline" className="rounded-full">{g.regime}</Badge></TableCell>
-                <TableCell className="text-sm">{formatDate(g.vencimento)}</TableCell>
+                <TableCell className="text-sm">
+                  {formatDate(g.vencimento)}
+                  {overdue && (
+                    <div className="text-xs text-destructive">{diasAtraso}d atraso</div>
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {g.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  {multa > 0 && (
+                    <div className="text-[10px] font-normal text-destructive">
+                      +{multa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} multa
+                    </div>
+                  )}
                 </TableCell>
-                <TableCell><StatusBadge status={g.status} /></TableCell>
+                <TableCell>
+                  <StatusBadge status={g.status} overdue={overdue} />
+                  {g.status === "paga" && g.pagoEm && (
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      em {new Date(g.pagoEm).toLocaleDateString("pt-BR")}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     {(g.status === "pendente" || g.status === "erro") && (
@@ -246,7 +270,8 @@ function DasPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
