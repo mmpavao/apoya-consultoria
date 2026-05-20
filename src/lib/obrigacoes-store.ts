@@ -157,6 +157,17 @@ export const obrigacoesStore = {
     });
     write(list);
   },
+  setStatus: (id: string, status: ObrigacaoStatus) => {
+    const list = read().map((o) => {
+      if (o.id !== id) return o;
+      return {
+        ...o,
+        status,
+        concluidaEm: status === "concluida" ? new Date().toISOString().slice(0, 10) : undefined,
+      };
+    });
+    write(list);
+  },
   regenerate: (ano: number, mes: number) => {
     const existing = read().filter((o) => o.competencia !== `${ano}-${pad(mes)}`);
     const novos = genForMonth(clientesStore.list(), ano, mes);
