@@ -41,6 +41,9 @@ const CATALOGO: Record<Regime, { tipo: ObrigacaoTipo; descricao: string; dia: nu
     { tipo: "EFD-ICMS/IPI", descricao: "EFD ICMS/IPI", dia: 25 },
     { tipo: "DIRBI", descricao: "DIRBI — Benefícios fiscais", dia: 20 },
   ],
+  "Doméstica": [
+    { tipo: "DAS", descricao: "DAE — Doméstica", dia: 7 },
+  ],
 };
 
 function pad(n: number) {
