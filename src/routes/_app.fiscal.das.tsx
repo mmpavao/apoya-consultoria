@@ -284,7 +284,10 @@ function formatDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
-function StatusBadge({ status }: { status: DasStatus }) {
+function StatusBadge({ status, overdue }: { status: DasStatus; overdue?: boolean }) {
+  if (overdue && status !== "paga") {
+    return <Badge variant="outline" className="rounded-full border bg-destructive/10 text-destructive border-destructive/20">Atrasada</Badge>;
+  }
   const map: Record<DasStatus, { cls: string; label: string }> = {
     pendente: { cls: "bg-muted text-muted-foreground border-border", label: "Pendente" },
     gerada: { cls: "bg-info/10 text-info border-info/20", label: "Gerada" },
