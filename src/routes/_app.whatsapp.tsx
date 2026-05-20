@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Bot, Check, CheckCheck, FileText, MessageSquare, Paperclip,
-  Phone, Search, Send, User,
+  ArrowLeft, Bot, Check, CheckCheck, Circle, FileText, MessageSquare, Paperclip,
+  Phone, Power, Search, Send, User, Wifi, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
