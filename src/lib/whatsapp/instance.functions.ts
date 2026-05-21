@@ -6,7 +6,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evo, publicBaseUrlFromRequest } from "@/integrations/evolution/client.server";
-import { sb } from "./sb.server";
+import { sbFromContext, type WaSupabaseClient } from "./sb.server";
 import { INSTANCE_NAME_RE, slugifyInstanceName } from "./wa.server";
 
 const WEBHOOK_EVENTS = [
@@ -15,7 +15,7 @@ const WEBHOOK_EVENTS = [
   "MESSAGE_REACTION", "PRESENCE_UPDATE",
 ];
 
-async function ensureAdmin(userId: string) {
+async function ensureAdmin(sb: WaSupabaseClient, userId: string) {
   const r = await sb.from("user_roles").select("role").eq("user_id", userId);
   const roles: string[] = (r.data ?? []).map((x: { role: string }) => x.role);
   if (!roles.includes("admin")) throw new Error("Apenas administradores podem gerenciar instâncias do WhatsApp.");
@@ -30,7 +30,8 @@ function buildWebhookUrl(baseUrl: string, instanceName: string, token: string): 
 // ──────────────────────────────────────────────────────────────────────────
 export const listInstances = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("wa_instance").select("*").order("created_at", { ascending: false });
     if (r.error) throw new Error(r.error.message);
     return { instances: r.data ?? [] };
@@ -48,7 +49,8 @@ export const createInstance = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await ensureAdmin(context.userId);
+    const sb = sbFromContext(context);
+    await ensureAdmin(sb, context.userId);
 
     const slug = slugifyInstanceName(data.displayName);
     if (!INSTANCE_NAME_RE.test(slug)) throw new Error("Nome inválido. Use 3-40 caracteres alfanuméricos.");
@@ -119,7 +121,8 @@ export const connectInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await ensureAdmin(context.userId);
+    const sb = sbFromContext(context);
+    await ensureAdmin(sb, context.userId);
     const r = await sb.from("wa_instance").select("*").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const inst = r.data;
@@ -141,7 +144,8 @@ export const connectInstance = createServerFn({ method: "POST" })
 export const refreshStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const res = await evo<any>("GET", `/instance/connectionState/${encodeURIComponent(r.data.nome)}`);
@@ -161,7 +165,8 @@ export const deleteInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await ensureAdmin(context.userId);
+    const sb = sbFromContext(context);
+    await ensureAdmin(sb, context.userId);
     const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     try {
@@ -181,7 +186,8 @@ export const logoutInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await ensureAdmin(context.userId);
+    const sb = sbFromContext(context);
+    await ensureAdmin(sb, context.userId);
     const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     await evo("DELETE", `/instance/logout/${encodeURIComponent(r.data.nome)}`);

@@ -5,10 +5,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evo } from "@/integrations/evolution/client.server";
-import { sb } from "./sb.server";
+import { sbFromContext, type WaSupabaseClient } from "./sb.server";
 import { phoneToJid, upsertConversa } from "./wa.server";
 
-async function loadCtx(conversaId: string, userId: string) {
+async function loadCtx(sb: WaSupabaseClient, conversaId: string, userId: string) {
   const c = await sb.from("wa_conversa").select("*, wa_instance:instance_id (id, nome, evolution_apikey)").eq("id", conversaId).single();
   if (c.error || !c.data) throw new Error("Conversa não encontrada");
   const u = await sb.from("profiles").select("nome").eq("id", userId).single();
@@ -26,7 +26,8 @@ function withTag(content: string, departamento: string | null, agenteNome: strin
 export const listConversas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid().optional() }).parse(input ?? {}))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     let q = sb.from("wa_conversa").select("*").order("ultima_em", { ascending: false, nullsFirst: false });
     if (data.instanceId) q = q.eq("instance_id", data.instanceId);
     const r = await q;
@@ -37,7 +38,8 @@ export const listConversas = createServerFn({ method: "GET" })
 export const getMensagens = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid(), limit: z.number().min(1).max(200).default(100) }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("mensagem_whatsapp")
       .select("*")
       .eq("conversa_id", data.conversaId)
@@ -57,6 +59,7 @@ export const assumeConversa = createServerFn({ method: "POST" })
     departamento: z.string().min(1).max(40),
   }).parse(input))
   .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("wa_conversa").update({
       assigned_to: context.userId,
       assigned_at: new Date().toISOString(),
@@ -70,7 +73,8 @@ export const assumeConversa = createServerFn({ method: "POST" })
 export const liberarConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     await sb.from("wa_conversa").update({ assigned_to: null, assigned_at: null, departamento: null }).eq("id", data.conversaId);
     return { ok: true };
   });
@@ -78,7 +82,8 @@ export const liberarConversa = createServerFn({ method: "POST" })
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     await sb.from("wa_conversa").update({ nao_lidas: 0 }).eq("id", data.conversaId);
     return { ok: true };
   });
@@ -93,7 +98,8 @@ export const sendPresence = createServerFn({ method: "POST" })
     presence: z.enum(["composing", "recording", "paused"]),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/chat/sendPresence/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
       presence: data.presence,
@@ -113,7 +119,8 @@ export const sendText = createServerFn({ method: "POST" })
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const conteudo = withTag(data.texto, conv.departamento, agenteNome);
     const body: any = { number: conv.telefone, text: conteudo, linkPreview: true };
     if (data.replyTo) body.quoted = { key: { id: data.replyTo } };
@@ -159,7 +166,8 @@ export const sendMedia = createServerFn({ method: "POST" })
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const caption = data.caption ? withTag(data.caption, conv.departamento, agenteNome) : undefined;
     const body: any = {
       number: conv.telefone,
@@ -209,7 +217,8 @@ export const sendAudio = createServerFn({ method: "POST" })
     audio: z.string().min(1),    // base64 ou URL
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const evoRes = await evo<any>("POST", `/message/sendWhatsAppAudio/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
       audio: data.audio,
@@ -251,7 +260,8 @@ export const sendReaction = createServerFn({ method: "POST" })
     fromMe: z.boolean().default(false),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/message/sendReaction/${encodeURIComponent(instance.nome)}`, {
       reactionMessage: {
         key: { remoteJid: phoneToJid(conv.telefone), fromMe: data.fromMe, id: data.messageId },
@@ -285,13 +295,14 @@ export const startConversa = createServerFn({ method: "POST" })
     clienteId: z.string().uuid().optional(),
     nomeContato: z.string().max(80).optional(),
   }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const tel = data.telefone.replace(/\D/g, "");
     const conv = await upsertConversa({
       instanceId: data.instanceId,
       telefone: tel,
       nomeContato: data.nomeContato,
-    });
+    }, sb);
     if (data.clienteId) {
       await sb.from("wa_conversa").update({ cliente_id: data.clienteId }).eq("id", conv.id);
     }

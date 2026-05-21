@@ -2,6 +2,7 @@
  * Helpers compartilhados (server-only) para o módulo WhatsApp.
  */
 import { sb } from "./sb.server";
+import type { WaSupabaseClient } from "./sb.server";
 
 export const INSTANCE_NAME_RE = /^[a-z0-9_-]{3,40}$/;
 
@@ -32,11 +33,11 @@ export async function upsertConversa(params: {
   ultimaMensagem?: string | null;
   incrementaNaoLidas?: boolean;
   marcarRecebida?: boolean;
-}) {
+}, db: WaSupabaseClient = sb) {
   const { instanceId, telefone, nomeContato, ultimaMensagem, incrementaNaoLidas, marcarRecebida } = params;
 
   // tenta achar
-  const existing = await sb
+  const existing = await db
     .from("wa_conversa")
     .select("*")
     .eq("instance_id", instanceId)
@@ -52,13 +53,13 @@ export async function upsertConversa(params: {
     }
     if (incrementaNaoLidas) patch.nao_lidas = (existing.data.nao_lidas ?? 0) + 1;
     if (Object.keys(patch).length) {
-      const upd = await sb.from("wa_conversa").update(patch).eq("id", existing.data.id).select("*").single();
+      const upd = await db.from("wa_conversa").update(patch).eq("id", existing.data.id).select("*").single();
       return upd.data ?? existing.data;
     }
     return existing.data;
   }
 
-  const ins = await sb
+  const ins = await db
     .from("wa_conversa")
     .insert({
       instance_id: instanceId,
