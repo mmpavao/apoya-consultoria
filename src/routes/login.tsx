@@ -101,11 +101,11 @@ function LoginPage() {
         {/* Conteúdo central */}
         <div className="relative z-10 space-y-8 max-w-md">
           <div className="space-y-3">
-            <h2 className="text-3xl lg:text-4xl font-bold leading-tight" style={{ color: "oklch(0.95 0.01 260)" }}>
+            <h2 className="text-3xl lg:text-4xl font-bold leading-tight text-white">
               Seu escritório contábil{" "}
               <span style={{ color: "var(--color-sidebar-accent)" }}>no piloto automático.</span>
             </h2>
-            <p className="text-base leading-relaxed" style={{ color: "oklch(0.65 0.015 260)" }}>
+            <p className="text-base leading-relaxed text-white/75">
               Gerencie 75+ clientes, automatize obrigações fiscais e nunca mais perca um prazo.
             </p>
           </div>
