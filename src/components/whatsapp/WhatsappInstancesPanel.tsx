@@ -72,11 +72,7 @@ export function WhatsappInstancesPanel() {
                     <WifiOff className="h-3.5 w-3.5" /> Desconectar
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={async () => {
-                  if (!confirm(`Excluir a instância "${inst.display_name}"? Esta ação remove a conexão WhatsApp.`)) return;
-                  await remove(inst.id);
-                  toast.success("Instância removida");
-                }}>
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(inst)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
