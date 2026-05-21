@@ -13,6 +13,7 @@ import {
   Plus,
   Save,
   Settings,
+  Shield,
   Trash2,
   UserPlus,
   Users,
@@ -33,6 +34,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/PagePlaceholder";
 import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 // config-store: migrado para hooks Supabase (use-usuarios, use-escritorio, use-integracoes)
+import { PermissoesTab } from "@/components/PermissoesTab";
 
 export const Route = createFileRoute("/_app/configuracoes")({
   component: ConfiguracoesGuard,
@@ -88,6 +90,7 @@ function ConfiguracoesPageContent() {
           <TabsTrigger value="integracoes" className="gap-2"><Plug className="h-4 w-4" />Integrações</TabsTrigger>
           <TabsTrigger value="templates" className="gap-2"><MessageSquare className="h-4 w-4" />Templates</TabsTrigger>
           <TabsTrigger value="escritorio" className="gap-2"><Building2 className="h-4 w-4" />Escritório</TabsTrigger>
+          <TabsTrigger value="permissoes" className="gap-2"><Shield className="h-4 w-4" />Permissões</TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios"><UsuariosTab /></TabsContent>
@@ -97,6 +100,7 @@ function ConfiguracoesPageContent() {
 
             <TabsContent value="templates"><TemplatesTab /></TabsContent>
         <TabsContent value="escritorio"><EscritorioTab /></TabsContent>
+        <TabsContent value="permissoes"><PermissoesTab /></TabsContent>
       </Tabs>
     </div>
   );
