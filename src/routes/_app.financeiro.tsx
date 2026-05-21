@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -53,6 +54,12 @@ function FinanceiroPage(){
       .filter(c=>stage==="todos"||c.reguaStage===stage)
       .sort((a,b)=>b.diasAtraso-a.diasAtraso||a.clienteNome.localeCompare(b.clienteNome));
   },[items,query,status,stage]);
+
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,status,stage,comp]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const kpi = useMemo(()=>({
     total:   items.reduce((s,c)=>s+c.valor,0),
@@ -141,41 +148,27 @@ function FinanceiroPage(){
   return (
     <div className="space-y-5">
 
-      {/* Header + nav mês */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Financeiro</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Régua de cobrança · {MESES[mes-1]} {ano}</p>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
-            onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
-          <span className="min-w-[110px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
-            onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
-        </div>
-      </div>
-
-      {/* KPI */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          {icon:Wallet,       label:"Total previsto", val:fmtBRL(kpi.total),   color:"text-foreground",  bg:"bg-card",       sub:`${kpi.count} clientes`},
-          {icon:CheckCircle2, label:"Recebido",       val:fmtBRL(kpi.pago),    color:"text-emerald-600", bg:"bg-emerald-50", sub:`${Math.round(kpi.pago/(kpi.total||1)*100)}%`},
-          {icon:AlertTriangle,label:"Em atraso",      val:fmtBRL(kpi.vencido), color:"text-red-600",     bg:"bg-red-50",     sub:`${items.filter(c=>c.status==="vencida").length} cobranças`},
-          {icon:ShieldAlert,  label:"Risco alto",     val:`${kpi.inad}`,       color:"text-orange-600",  bg:"bg-orange-50",  sub:"negativação/suspensão"},
-        ].map(({icon:Icon,label,val,color,bg,sub})=>(
-          <div key={label} className={`ds-card flex items-start gap-3 p-3 ${bg}`}>
-            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
-              <Icon className="h-4 w-4 m-auto"/>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-              <p className={`truncate text-base font-bold tabular-nums ${color}`}>{val}</p>
-              <p className="text-[11px] text-muted-foreground">{sub}</p>
-            </div>
+      <PageHeader
+        title="Financeiro"
+        subtitle={`Régua de cobrança · ${MESES[mes-1]} ${ano}`}
+        actions={
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+              onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
+            <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+              onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
           </div>
-        ))}
-      </div>
+        }
+      />
+
+      <KpiGrid cols={4}>
+        <KpiCard icon={Wallet}        tone="neutral" label="Total previsto" value={fmtBRL(kpi.total)}   hint={`${kpi.count} clientes`} />
+        <KpiCard icon={CheckCircle2}  tone="success" label="Recebido"       value={fmtBRL(kpi.pago)}    hint={`${Math.round(kpi.pago/(kpi.total||1)*100)}%`} />
+        <KpiCard icon={AlertTriangle} tone="danger"  label="Em atraso"      value={fmtBRL(kpi.vencido)} hint={`${items.filter(c=>c.status==="vencida").length} cobranças`} />
+        <KpiCard icon={ShieldAlert}   tone="warning" label="Risco alto"     value={kpi.inad}            hint="negativação/suspensão" />
+      </KpiGrid>
+
 
       {/* Barra de ações em lote */}
       {sel.size>0 && (
@@ -195,7 +188,7 @@ function FinanceiroPage(){
       )}
 
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={c=>c.id}
         selected={sel}
@@ -231,7 +224,10 @@ function FinanceiroPage(){
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }

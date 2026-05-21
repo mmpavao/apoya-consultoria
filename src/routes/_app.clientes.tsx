@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ClienteFormDialog } from "@/components/ClienteFormDialog";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { useClientes, REGIME_LABEL, STATUS_LABEL, type Cliente, type Regime, type Status } from "@/hooks/use-clientes";
 
 export const Route = createFileRoute("/_app/clientes")({
@@ -193,34 +194,24 @@ function ClientesPage(){
   return (
     <div className="space-y-5">
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {loading ? "Carregando…" : `${clientes.length} clientes cadastrados`}
-          </p>
-        </div>
-        <Button size="sm" className="rounded-xl gap-1.5 h-8 shrink-0"
-          onClick={()=>{setEditing(null);setDialog(true);}}>
-          <Plus className="h-3.5 w-3.5"/> Novo Cliente
-        </Button>
-      </div>
+      <PageHeader
+        title="Clientes"
+        subtitle={loading ? "Carregando…" : `${clientes.length} clientes cadastrados`}
+        actions={
+          <Button size="sm" className="rounded-xl gap-1.5 h-9"
+            onClick={()=>{setEditing(null);setDialog(true);}}>
+            <Plus className="h-4 w-4"/> Novo Cliente
+          </Button>
+        }
+      />
 
-      {/* KPI pills */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          {label:"Ativos",        val:kpi.ativos,        color:"bg-emerald-50 text-emerald-700"},
-          {label:"Inadimplentes", val:kpi.inadimplentes, color:"bg-amber-50   text-amber-700"},
-          {label:"Suspensos",     val:kpi.suspensos,     color:"bg-red-50     text-red-700"},
-          {label:"Total",         val:clientes.length,   color:"bg-muted      text-muted-foreground"},
-        ].map(({label,val,color})=>(
-          <div key={label} className={`flex items-baseline gap-1.5 rounded-xl border px-3 py-1.5 ${color}`}>
-            <span className="text-lg font-bold tabular-nums">{val}</span>
-            <span className="text-xs opacity-70">{label}</span>
-          </div>
-        ))}
-      </div>
+      <KpiGrid cols={4}>
+        <KpiCard icon={CheckCircle2} tone="success" label="Ativos"        value={kpi.ativos} />
+        <KpiCard icon={AlertTriangle} tone="warning" label="Inadimplentes" value={kpi.inadimplentes} />
+        <KpiCard icon={Ban}           tone="danger"  label="Suspensos"     value={kpi.suspensos} />
+        <KpiCard icon={Users}         tone="neutral" label="Total"         value={clientes.length} />
+      </KpiGrid>
+
 
       {loading && (
         <div className="flex justify-center py-16">
@@ -273,17 +264,10 @@ function ClientesPage(){
               </>
             }
           />
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <TableFooter total={filtered.length} filtered={pageItems.length} selected={sel.size}/>
-            {filtered.length>PAGE_SIZE && (
-              <div className="flex items-center gap-2 px-4 py-2 text-sm">
-                <Button variant="outline" size="sm" className="h-7 rounded-xl" disabled={page===1}
-                  onClick={()=>setPage(p=>Math.max(1,p-1))}>‹</Button>
-                <span className="text-muted-foreground">{page} / {totalPages}</span>
-                <Button variant="outline" size="sm" className="h-7 rounded-xl" disabled={page===totalPages}
-                  onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>›</Button>
-              </div>
-            )}
+            <Pagination page={page} totalPages={totalPages} onChange={setPage}
+              pageSize={PAGE_SIZE} total={filtered.length}/>
           </div>
         </>
       )}

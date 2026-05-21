@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
@@ -67,6 +68,12 @@ function ObrigacoesPage(){
         return (order[a.status]??4)-(order[b.status]??4)||new Date(a.vencimento).getTime()-new Date(b.vencimento).getTime();
       });
   },[items,query,status,tipo]);
+
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,status,tipo,comp]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const kpi = useMemo(()=>({
     total:    items.length,
@@ -152,41 +159,28 @@ function ObrigacoesPage(){
   return (
     <div className="space-y-5">
 
-      {/* Header + nav mês */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Obrigações</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Calendário fiscal · {MESES[mes-1]} {ano}</p>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
-            onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
-          <span className="min-w-[110px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
-            onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
-        </div>
-      </div>
-
-      {/* KPI */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          {icon:Calendar,     label:"Total",       val:kpi.total,    color:"text-foreground",  bg:"bg-card"},
-          {icon:Clock,        label:"Pendente",    val:kpi.pendente, color:"text-blue-600",    bg:"bg-blue-50"},
-          {icon:AlertTriangle,label:"Atrasadas",   val:kpi.atrasada, color:"text-red-600",     bg:"bg-red-50"},
-          {icon:TrendingUp,   label:"Em andamento",val:kpi.andamento,color:"text-amber-600",   bg:"bg-amber-50"},
-          {icon:CheckCircle2, label:"Concluídas",  val:kpi.concluida,color:"text-emerald-600", bg:"bg-emerald-50"},
-        ].map(({icon:Icon,label,val,color,bg})=>(
-          <div key={label} className={`ds-card flex items-center gap-3 p-3 ${bg}`}>
-            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
-              <Icon className="h-4 w-4 m-auto"/>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-              <p className={`text-base font-bold tabular-nums leading-tight ${color}`}>{val}</p>
-            </div>
+      <PageHeader
+        title="Obrigações"
+        subtitle={`Calendário fiscal · ${MESES[mes-1]} ${ano}`}
+        actions={
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+              onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
+            <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+              onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
           </div>
-        ))}
-      </div>
+        }
+      />
+
+      <KpiGrid cols={5}>
+        <KpiCard icon={Calendar}      tone="neutral" label="Total"        value={kpi.total} />
+        <KpiCard icon={Clock}         tone="info"    label="Pendente"     value={kpi.pendente} />
+        <KpiCard icon={AlertTriangle} tone="danger"  label="Atrasadas"    value={kpi.atrasada} />
+        <KpiCard icon={TrendingUp}    tone="warning" label="Em andamento" value={kpi.andamento} />
+        <KpiCard icon={CheckCircle2}  tone="success" label="Concluídas"   value={kpi.concluida} />
+      </KpiGrid>
+
 
       {/* Barra ações em lote */}
       {sel.size>0 && (
@@ -202,7 +196,7 @@ function ObrigacoesPage(){
       )}
 
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={o=>o.id}
         selected={sel}
@@ -234,7 +228,10 @@ function ObrigacoesPage(){
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }

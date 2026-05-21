@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
@@ -57,6 +58,12 @@ function DasPage() {
       .filter(g => status === "todos" || g.status === status)
       .sort((a,b) => a.clienteNome.localeCompare(b.clienteNome));
   }, [items, query, regime, status]);
+
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,regime,status,mes,ano]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const kpi = useMemo(() => ({
     total:    items.length,
@@ -159,49 +166,36 @@ function DasPage() {
   return (
     <div className="space-y-5">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">DAS em Lote</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Geração via SERPRO · MEI e Simples Nacional</p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-8"
-            onClick={enviarWhats} disabled={sel.size===0}>
-            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-          </Button>
-          <Button size="sm" className="rounded-xl gap-1.5 h-8"
-            onClick={gerarLote} disabled={busy||sel.size===0}>
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Send className="h-3.5 w-3.5"/>}
-            Gerar ({sel.size})
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="DAS em Lote"
+        subtitle="Geração via SERPRO · MEI e Simples Nacional"
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
+              onClick={enviarWhats} disabled={sel.size===0}>
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </Button>
+            <Button size="sm" className="rounded-xl gap-1.5 h-9"
+              onClick={gerarLote} disabled={busy||sel.size===0}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
+              Gerar ({sel.size})
+            </Button>
+          </>
+        }
+      />
 
-      {/* ── KPI strip ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          {icon:FileText,     label:"Total",    val:kpi.total,        color:"text-foreground",  bg:"bg-card"},
-          {icon:Loader2,      label:"Pendente", val:kpi.pendente,     color:"text-blue-600",    bg:"bg-blue-50"},
-          {icon:CheckCircle2, label:"Geradas",  val:kpi.gerada,       color:"text-amber-600",   bg:"bg-amber-50"},
-          {icon:Wallet,       label:"Pagas",    val:kpi.paga,         color:"text-emerald-600", bg:"bg-emerald-50"},
-          {icon:AlertTriangle,label:"Total R$", val:fmtBRL(kpi.valor),color:"text-foreground",  bg:"bg-muted"},
-        ].map(({icon:Icon,label,val,color,bg}) => (
-          <div key={label} className={`ds-card flex items-center gap-3 p-3 ${bg}`}>
-            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
-              <Icon className="h-4 w-4 m-auto" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-              <p className={`text-base font-bold tabular-nums leading-tight ${color}`}>{val}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <KpiGrid cols={5}>
+        <KpiCard icon={FileText}      tone="neutral" label="Total"    value={kpi.total} />
+        <KpiCard icon={Loader2}       tone="info"    label="Pendente" value={kpi.pendente} />
+        <KpiCard icon={CheckCircle2}  tone="warning" label="Geradas"  value={kpi.gerada} />
+        <KpiCard icon={Wallet}        tone="success" label="Pagas"    value={kpi.paga} />
+        <KpiCard icon={AlertTriangle} tone="neutral" label="Total R$" value={fmtBRL(kpi.valor)} />
+      </KpiGrid>
+
 
       {/* ── Tabela ── */}
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={g => g.id}
         selected={sel}
@@ -243,7 +237,10 @@ function DasPage() {
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }
