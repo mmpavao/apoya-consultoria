@@ -88,22 +88,22 @@ function LoginPage() {
         {/* Decoração de fundo — círculos sutis */}
         <div
           className="pointer-events-none absolute -top-32 -left-32 h-96 w-96 rounded-full opacity-[0.06]"
-          style={{ background: "var(--color-sidebar-accent)" }}
+          style={{ background: "var(--color-primary)" }}
         />
         <div
           className="pointer-events-none absolute -bottom-20 -right-20 h-72 w-72 rounded-full opacity-[0.05]"
-          style={{ background: "var(--color-sidebar-accent)" }}
+          style={{ background: "var(--color-primary)" }}
         />
 
         {/* Logo */}
-        <ApoyaLogo variant="on-dark" size="lg" withTagline={false} className="max-w-[180px] relative z-10" />
+        <ApoyaLogo variant="on-dark" size="xl" withTagline={false} className="max-w-[260px] relative z-10" />
 
         {/* Conteúdo central */}
         <div className="relative z-10 space-y-8 max-w-md">
           <div className="space-y-3">
             <h2 className="text-3xl lg:text-4xl font-bold leading-tight text-white">
               Seu escritório contábil{" "}
-              <span style={{ color: "var(--color-sidebar-accent)" }}>no piloto automático.</span>
+              <span style={{ color: "var(--color-primary)" }}>no piloto automático.</span>
             </h2>
             <p className="text-base leading-relaxed text-white/75">
               Gerencie 75+ clientes, automatize obrigações fiscais e nunca mais perca um prazo.
@@ -118,9 +118,9 @@ function LoginPage() {
                 <div key={f.title} className="flex items-start gap-4">
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: "oklch(0.68 0.20 47 / 0.18)" }}
+                    style={{ background: "color-mix(in oklab, var(--color-primary) 18%, transparent)" }}
                   >
-                    <Icon className="h-4.5 w-4.5" style={{ color: "var(--color-sidebar-accent)" }} />
+                    <Icon className="h-4.5 w-4.5" style={{ color: "var(--color-primary)" }} />
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-white">
