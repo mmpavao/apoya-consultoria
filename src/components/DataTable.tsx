@@ -22,6 +22,7 @@ interface DataTableProps<T> {
   selected?: Set<string>;
   onToggleAll?: () => void;
   onToggleRow?: (key: string) => void;
+  onRowClick?: (row: T) => void;
   emptyIcon?: ReactNode;
   emptyText?: string;
   toolbar?: ReactNode;
@@ -32,7 +33,7 @@ export function DataTable<T>({
   rows, cols, getKey,
   selected, onToggleAll, onToggleRow,
   emptyIcon, emptyText = "Nenhum resultado",
-  toolbar, rowClassName,
+  toolbar, rowClassName, onRowClick,
 }: DataTableProps<T>) {
   const hasSelection = selected !== undefined && !!onToggleAll && !!onToggleRow;
   const allChecked   = hasSelection && rows.length > 0 && selected!.size === rows.length;
@@ -83,7 +84,18 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
-                    className={cn("group", isSelected && "bg-primary/[0.04]", rowClassName?.(row))}
+                    className={cn(
+                      "group",
+                      isSelected && "bg-primary/[0.04]",
+                      rowClassName?.(row),
+                      onRowClick && "cursor-pointer hover:bg-muted/40 transition-colors",
+                    )}
+                    onClick={onRowClick ? (e) => {
+                      // Não navegar se clicou no checkbox ou em botões/links internos
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button, a, input, [role="menuitem"], [data-no-rowclick]')) return;
+                      onRowClick(row);
+                    } : undefined}
                   >
                     {hasSelection && (
                       <td className="w-10 pl-5">

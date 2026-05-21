@@ -1,8 +1,15 @@
+/**
+ * Página de detalhes do cliente — padrão contábil completo
+ * Tabs: Visão Geral | Fiscal | Financeiro | Contato | Histórico
+ */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, Building2, Calendar, DollarSign, Edit, FileText,
-  Mail, MapPin, MessageSquare, Phone, Save, Trash2, User, X,
+  ArrowLeft, Building2, Calendar, CheckCircle2, Clock, DollarSign,
+  Edit, FileText, Mail, MapPin, MessageSquare, Phone, Save, Trash2,
+  User, X, AlertTriangle, Briefcase, CreditCard, Hash, Home,
+  Info, ReceiptText, ShieldCheck, Users, Zap, ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,49 +19,127 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
-  useClientes,
-  REGIME_LABEL,
-  STATUS_LABEL,
-  type Cliente,
-  type Regime,
-  type Status,
-  type FormaPagamento,
+  useClientes, REGIME_LABEL, STATUS_LABEL,
+  type Cliente, type Regime, type Status, type FormaPagamento,
 } from "@/hooks/use-clientes";
+import { useCobrancas } from "@/hooks/use-cobrancas";
+import { useObrigacoes } from "@/hooks/use-obrigacoes";
 
 export const Route = createFileRoute("/_app/clientes/$id")({
   component: ClienteDetailPage,
   head: () => ({ meta: [{ title: "Cliente · APOYA Gestão" }] }),
 });
 
-const STATUS_COLOR: Record<Status, string> = {
-  ativo:       "bg-emerald-50 text-emerald-700 border-emerald-200",
-  inadimplente:"bg-amber-50   text-amber-700   border-amber-200",
-  suspenso:    "bg-red-50     text-red-700     border-red-200",
-  inativo:     "bg-slate-50   text-slate-500   border-slate-200",
-  em_analise:  "bg-blue-50    text-blue-700    border-blue-200",
+// ── Helpers visuais ────────────────────────────────────────────────────────
+
+const STATUS_CFG: Record<Status, { label: string; cls: string; dot: string }> = {
+  ativo:       { label: "Ativo",       cls: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  inadimplente:{ label: "Inadimplente",cls: "bg-amber-50   text-amber-700   border-amber-200",  dot: "bg-amber-500"   },
+  suspenso:    { label: "Suspenso",    cls: "bg-red-50     text-red-700     border-red-200",     dot: "bg-red-500"     },
+  inativo:     { label: "Inativo",     cls: "bg-slate-50   text-slate-500   border-slate-200",   dot: "bg-slate-400"   },
+  em_analise:  { label: "Em análise",  cls: "bg-blue-50    text-blue-700    border-blue-200",    dot: "bg-blue-500"    },
 };
 
-function Field({ label, value }: { label: string; value?: string | number | null }) {
+const REGIME_CFG: Record<string, string> = {
+  MEI:              "bg-violet-50 text-violet-700 border-violet-200",
+  Simples:          "bg-blue-50 text-blue-700 border-blue-200",
+  "Lucro Presumido":"bg-orange-50 text-orange-700 border-orange-200",
+  "Lucro Real":     "bg-rose-50 text-rose-700 border-rose-200",
+  Doméstica:        "bg-teal-50 text-teal-700 border-teal-200",
+};
+
+const fmtBRL = (v?: number | null) =>
+  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+
+function Avatar({ nome, regime }: { nome: string; regime: string }) {
+  const initials = nome.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const colors: Record<string, string> = {
+    MEI: "from-violet-500 to-violet-700",
+    Simples: "from-blue-500 to-blue-700",
+    "Lucro Presumido": "from-orange-500 to-orange-700",
+    "Lucro Real": "from-rose-500 to-rose-700",
+    Doméstica: "from-teal-500 to-teal-700",
+  };
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-foreground">{value ?? "—"}</p>
+    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${colors[regime] ?? "from-slate-500 to-slate-700"} text-white font-bold text-lg shadow-sm`}>
+      {initials}
     </div>
   );
 }
+
+function InfoRow({ icon: Icon, label, value, href }: { icon: any; label: string; value?: string | null; href?: string }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">{label}</p>
+        {href ? (
+          <a href={href} className="text-sm text-primary hover:underline break-all">{value}</a>
+        ) : (
+          <p className="text-sm text-foreground break-words">{value}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <div className="surface-card overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border/60 bg-muted/20">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      </div>
+      <div className="px-5 py-1">{children}</div>
+    </div>
+  );
+}
+
+function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value: string | number; sub?: string; tone?: "neutral" | "success" | "warning" | "danger" }) {
+  const tones = {
+    neutral: "text-foreground",
+    success: "text-emerald-600",
+    warning: "text-amber-600",
+    danger:  "text-red-600",
+  };
+  return (
+    <div className="surface-card flex flex-col gap-0.5 px-4 py-3.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`text-xl font-bold tabular-nums ${tones[tone]}`}>{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+
+type Tab = "geral" | "fiscal" | "financeiro" | "contato" | "historico";
+const TABS: { id: Tab; label: string; icon: any }[] = [
+  { id: "geral",      label: "Visão Geral", icon: Building2   },
+  { id: "fiscal",     label: "Fiscal",      icon: FileText    },
+  { id: "financeiro", label: "Financeiro",  icon: DollarSign  },
+  { id: "contato",    label: "Contato",     icon: User        },
+  { id: "historico",  label: "Histórico",   icon: Clock       },
+];
+
+// ── Componente principal ──────────────────────────────────────────────────
 
 function ClienteDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { clientes, loading, updateCliente, deleteCliente } = useClientes();
-  const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [form, setForm] = useState<Partial<Cliente>>({});
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const { cobrancas } = useCobrancas();
+  const { obrigacoes } = useObrigacoes();
 
-  // Sincronizar quando clientes carregam
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [tab, setTab]         = useState<Tab>("geral");
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm]         = useState<Partial<Cliente>>({});
+  const [saving, setSaving]     = useState(false);
+
   useEffect(() => {
     if (!loading) {
       const found = clientes.find((c) => c.id === id) ?? null;
@@ -63,164 +148,408 @@ function ClienteDetailPage() {
     }
   }, [id, clientes, loading]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+    </div>
+  );
 
-  if (!cliente) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Cliente não encontrado.</p>
-        <Link to="/clientes">
-          <Button variant="outline" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button>
-        </Link>
-      </div>
-    );
-  }
+  if (!cliente) return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+      <AlertTriangle className="h-10 w-10 text-muted-foreground/40" />
+      <p className="text-muted-foreground">Cliente não encontrado.</p>
+      <Link to="/clientes"><Button variant="outline" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button></Link>
+    </div>
+  );
+
+  // Dados derivados
+  const cobCliente  = cobrancas.filter(c => c.clienteId === id);
+  const obgCliente  = obrigacoes.filter(o => o.clienteId === id);
+  const totalDevido = cobCliente.filter(c => c.status === "pendente" || c.status === "vencida").reduce((s, c) => s + c.valor, 0);
+  const totalPago   = cobCliente.filter(c => c.status === "paga").reduce((s, c) => s + c.valor, 0);
+  const obgPendente = obgCliente.filter(o => o.status === "pendente" || o.status === "atrasada").length;
+  const obgAtrasada = obgCliente.filter(o => o.status === "atrasada").length;
+  const st          = STATUS_CFG[cliente.status];
 
   async function handleSave() {
-    if (!form || !cliente) return;
     setSaving(true);
     try {
-      await updateCliente(cliente.id, form);
+      await updateCliente(cliente!.id, form);
       setEditMode(false);
-      toast.success("Cliente atualizado com sucesso");
-    } catch {
-      toast.error("Erro ao salvar cliente");
-    } finally {
-      setSaving(false);
-    }
+      setCliente(c => c ? { ...c, ...form } as Cliente : c);
+    } catch { toast.error("Erro ao salvar"); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete() {
-    if (!confirm(`Deseja excluir o cliente "${cliente?.razaoSocial}"? Esta ação é irreversível.`)) return;
-    setDeleting(true);
-    try {
-      await deleteCliente(cliente!.id);
-      toast.success("Cliente excluído");
-      navigate({ to: "/clientes" });
-    } catch {
-      toast.error("Erro ao excluir cliente");
-      setDeleting(false);
-    }
+    if (!confirm(`Excluir "${cliente?.razaoSocial}"? Esta ação é irreversível.`)) return;
+    await deleteCliente(cliente!.id);
+    toast.success("Cliente excluído");
+    navigate({ to: "/clientes" });
   }
 
   const f = (field: keyof Cliente) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((p) => ({ ...p, [field]: e.target.value }));
+    setForm(p => ({ ...p, [field]: e.target.value }));
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="animate-fade-up space-y-5 pb-12">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/clientes">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{cliente.razaoSocial}</h1>
-            <p className="text-sm text-muted-foreground">{cliente.cnpj}</p>
+      {/* ── Breadcrumb ── */}
+      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/clientes" className="hover:text-foreground transition-colors">Clientes</Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="text-foreground font-medium truncate max-w-[200px]">{cliente.razaoSocial}</span>
+      </nav>
+
+      {/* ── Hero card ── */}
+      <div className="surface-card px-6 py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Identidade */}
+          <div className="flex items-start gap-4">
+            <Avatar nome={cliente.razaoSocial} regime={cliente.regime} />
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-foreground leading-tight">{cliente.razaoSocial}</h1>
+              {cliente.nomeFantasia && (
+                <p className="text-sm text-muted-foreground mt-0.5">{cliente.nomeFantasia}</p>
+              )}
+              <p className="font-mono text-xs text-muted-foreground mt-1">{cliente.cnpj}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${st.cls}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
+                  {st.label}
+                </span>
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${REGIME_CFG[cliente.regime] ?? "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                  {REGIME_LABEL[cliente.regime]}
+                </span>
+                {cliente.regimeHibrido && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                    <Zap className="h-3 w-3" />Híbrido
+                  </span>
+                )}
+                {cliente.temEmpregados && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+                    <Users className="h-3 w-3" />eSocial
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Ações */}
+          <div className="flex shrink-0 items-center gap-2">
+            {editMode ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setForm(cliente); }}>
+                  <X className="mr-1.5 h-3.5 w-3.5" />Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={saving}>
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {saving ? "Salvando…" : "Salvar"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:border-destructive" onClick={handleDelete}>
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
+                </Button>
+                <Button size="sm" onClick={() => setEditMode(true)}>
+                  <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
+                </Button>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex gap-2">
-          {editMode ? (
-            <>
-              <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setForm(cliente); }}>
-                <X className="mr-1.5 h-3.5 w-3.5" />Cancelar
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="mr-1.5 h-3.5 w-3.5" />
-                {saving ? "Salvando..." : "Salvar"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete} disabled={deleting}>
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
-              </Button>
-              <Button size="sm" onClick={() => setEditMode(true)}>
-                <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
-              </Button>
-            </>
-          )}
+
+        {/* KPIs rápidos */}
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiMini label="Honorário"     value={fmtBRL(cliente.valorHonorario)} sub={`Venc. dia ${cliente.diaVencimento ?? "—"}`} />
+          <KpiMini label="Em aberto"     value={fmtBRL(totalDevido)} tone={totalDevido > 0 ? "warning" : "neutral"} sub={`${cobCliente.filter(c=>c.status==="pendente"||c.status==="vencida").length} cobranças`} />
+          <KpiMini label="Total pago"    value={fmtBRL(totalPago)} tone="success" sub={`${cobCliente.filter(c=>c.status==="paga").length} pagas`} />
+          <KpiMini label="Obrigações"    value={obgPendente} tone={obgAtrasada > 0 ? "danger" : obgPendente > 0 ? "warning" : "success"} sub={obgAtrasada > 0 ? `${obgAtrasada} atrasada${obgAtrasada>1?"s":""}` : "Em dia"} />
         </div>
       </div>
 
-      {/* ── Status badge ── */}
-      <div className="flex items-center gap-3">
-        <Badge className={`${STATUS_COLOR[cliente.status]} border text-xs`}>
-          {STATUS_LABEL[cliente.status]}
-        </Badge>
-        <span className="text-xs text-muted-foreground">{REGIME_LABEL[cliente.regime]}</span>
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 border-b border-border/60 overflow-x-auto">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+            }`}
+          >
+            <t.icon className="h-3.5 w-3.5" />
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {editMode ? (
-        /* ── Formulário de edição ── */
+      {/* ═════════════════════ ABA: VISÃO GERAL ═════════════════════ */}
+      {tab === "geral" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {/* Dados cadastrais */}
+          <SectionCard title="Dados Cadastrais" icon={Building2}>
+            <InfoRow icon={Hash}         label="CNPJ / CPF"          value={cliente.cnpj} />
+            <InfoRow icon={Briefcase}    label="Razão Social"         value={cliente.razaoSocial} />
+            <InfoRow icon={Building2}    label="Nome Fantasia"        value={cliente.nomeFantasia} />
+            <InfoRow icon={FileText}     label="Atividade Principal"  value={cliente.atividadePrincipal} />
+            <InfoRow icon={Hash}         label="Insc. Municipal"      value={cliente.inscricaoMunicipal} />
+            <InfoRow icon={Hash}         label="Insc. Estadual"       value={cliente.inscricaoEstadual} />
+          </SectionCard>
+
+          {/* Regime e características */}
+          <SectionCard title="Regime Tributário" icon={ShieldCheck}>
+            <InfoRow icon={ShieldCheck}  label="Regime"               value={REGIME_LABEL[cliente.regime]} />
+            <InfoRow icon={Zap}          label="Regime Híbrido"       value={cliente.regimeHibrido ? "Sim" : undefined} />
+            <InfoRow icon={ReceiptText}  label="Cód. Serviço NFS-e"   value={cliente.codigoServicoNfse} />
+            <InfoRow icon={Users}        label="Tem Empregados (eSocial)" value={cliente.temEmpregados ? "Sim" : "Não"} />
+            <InfoRow icon={Zap}          label="Incentivo Fiscal"     value={cliente.temIncentivoFiscal ? "Sim" : "Não"} />
+            <InfoRow icon={User}         label="Responsável APOYA"    value={cliente.responsavel} />
+          </SectionCard>
+
+          {/* Endereço */}
+          <SectionCard title="Endereço" icon={MapPin}>
+            <InfoRow icon={Home}         label="Logradouro"   value={[cliente.endereco?.logradouro, cliente.endereco?.numero].filter(Boolean).join(", ")} />
+            <InfoRow icon={MapPin}       label="Bairro"       value={cliente.endereco?.bairro} />
+            <InfoRow icon={MapPin}       label="CEP"          value={cliente.endereco?.cep} />
+            <InfoRow icon={MapPin}       label="Município/UF" value={[cliente.endereco?.municipio ?? cliente.municipio, cliente.endereco?.uf ?? cliente.uf].filter(Boolean).join(" / ")} />
+          </SectionCard>
+
+          {/* Observações */}
+          {cliente.observacoes && (
+            <SectionCard title="Observações" icon={Info}>
+              <p className="py-3 text-sm text-foreground leading-relaxed whitespace-pre-wrap">{cliente.observacoes}</p>
+            </SectionCard>
+          )}
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: FISCAL ═════════════════════ */}
+      {tab === "fiscal" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Obrigações Fiscais" icon={FileText}>
+            {obgCliente.length === 0 ? (
+              <p className="py-4 text-sm text-center text-muted-foreground">Nenhuma obrigação cadastrada</p>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {obgCliente.slice(0, 10).map(o => (
+                  <div key={o.id} className="flex items-center justify-between py-2.5">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{o.tipo}</p>
+                      <p className="text-xs text-muted-foreground">Venc. {new Date(o.vencimento).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                      o.status === "concluida"  ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                      o.status === "atrasada"   ? "bg-red-50 text-red-700 border-red-200" :
+                      o.status === "em_andamento"?"bg-blue-50 text-blue-700 border-blue-200" :
+                                                  "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
+                      {o.status === "concluida" ? "Concluída" : o.status === "atrasada" ? "Atrasada" : o.status === "em_andamento" ? "Em andamento" : "Pendente"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Dados para NFS-e" icon={ReceiptText}>
+            <InfoRow icon={Hash}        label="Código de Serviço"  value={cliente.codigoServicoNfse} />
+            <InfoRow icon={MapPin}      label="Município"          value={cliente.endereco?.municipio ?? cliente.municipio} />
+            <InfoRow icon={MapPin}      label="UF"                 value={cliente.endereco?.uf ?? cliente.uf} />
+            <InfoRow icon={Hash}        label="Insc. Municipal"    value={cliente.inscricaoMunicipal} />
+            <InfoRow icon={Zap}         label="Incentivo Fiscal"   value={cliente.temIncentivoFiscal ? "Sim — redução de alíquota aplicável" : "Não"} />
+          </SectionCard>
+
+          <SectionCard title="Configuração DAS" icon={Calendar}>
+            <InfoRow icon={Calendar}    label="Regime"             value={REGIME_LABEL[cliente.regime]} />
+            <InfoRow icon={Calendar}    label="Vencimento DAS"     value="Todo dia 20 do mês seguinte" />
+            <InfoRow icon={ShieldCheck} label="Tipo"               value={cliente.regime === "MEI" ? "DASMEI (Carnê MEI)" : "DAS — Simples Nacional"} />
+            <InfoRow icon={Zap}         label="Híbrido"            value={cliente.regimeHibrido ? "Sim — alíquotas separadas (Simples + ISS próprio)" : undefined} />
+          </SectionCard>
+
+          <SectionCard title="eSocial / Folha" icon={Users}>
+            <InfoRow icon={Users}       label="Tem Empregados"     value={cliente.temEmpregados ? "Sim — sujeito ao eSocial" : "Não"} />
+            {cliente.temEmpregados && <>
+              <InfoRow icon={Calendar}  label="DCTFWeb"            value="Mensal — até dia 15" />
+              <InfoRow icon={Calendar}  label="EFD-Contribuições"  value="Mensal — até o 2º dia útil do 2º mês seguinte" />
+            </>}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: FINANCEIRO ═════════════════════ */}
+      {tab === "financeiro" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Configuração Financeira" icon={DollarSign}>
+            <InfoRow icon={DollarSign}  label="Honorário Mensal"   value={fmtBRL(cliente.valorHonorario)} />
+            <InfoRow icon={Calendar}    label="Dia de Vencimento"  value={cliente.diaVencimento ? `Todo dia ${cliente.diaVencimento}` : undefined} />
+            <InfoRow icon={CreditCard}  label="Forma de Pagamento" value={cliente.formaPagamento} />
+            <InfoRow icon={User}        label="Responsável"        value={cliente.responsavel} />
+          </SectionCard>
+
+          <SectionCard title="Cobranças" icon={ReceiptText}>
+            {cobCliente.length === 0 ? (
+              <p className="py-4 text-sm text-center text-muted-foreground">Nenhuma cobrança registrada</p>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {cobCliente.slice(0, 8).map(c => (
+                  <div key={c.id} className="flex items-center justify-between py-2.5">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{fmtBRL(c.valor)}</p>
+                      <p className="text-xs text-muted-foreground">Venc. {new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                      c.status === "paga"     ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                      c.status === "vencida"  ? "bg-red-50 text-red-700 border-red-200" :
+                      c.status === "cancelada"? "bg-slate-50 text-slate-500 border-slate-200" :
+                                                "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
+                      {c.status === "paga" ? "Paga" : c.status === "vencida" ? "Vencida" : c.status === "cancelada" ? "Cancelada" : "Em aberto"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* Resumo financeiro */}
+          <div className="lg:col-span-2 grid gap-3 sm:grid-cols-4">
+            <KpiMini label="Honorário/mês"  value={fmtBRL(cliente.valorHonorario)} />
+            <KpiMini label="Total pago"     value={fmtBRL(totalPago)} tone="success" />
+            <KpiMini label="Em aberto"      value={fmtBRL(totalDevido)} tone={totalDevido > 0 ? "warning" : "neutral"} />
+            <KpiMini label="Cobranças"      value={cobCliente.length} sub={`${cobCliente.filter(c=>c.status==="paga").length} pagas`} />
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: CONTATO ═════════════════════ */}
+      {tab === "contato" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Dados de Contato" icon={User}>
+            <InfoRow icon={Mail}        label="E-mail"       value={cliente.email} href={cliente.email ? `mailto:${cliente.email}` : undefined} />
+            <InfoRow icon={Phone}       label="Telefone"     value={cliente.telefone} href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
+            <InfoRow icon={MessageSquare} label="WhatsApp"   value={cliente.whatsapp} href={cliente.whatsapp ? `https://wa.me/${cliente.whatsapp.replace(/\D/g,"")}` : undefined} />
+            <InfoRow icon={User}        label="Responsável APOYA" value={cliente.responsavel} />
+          </SectionCard>
+
+          <SectionCard title="Endereço Completo" icon={MapPin}>
+            <InfoRow icon={Home}        label="Logradouro / Número" value={[cliente.endereco?.logradouro, cliente.endereco?.numero].filter(Boolean).join(", ")} />
+            <InfoRow icon={MapPin}      label="Bairro"              value={cliente.endereco?.bairro} />
+            <InfoRow icon={Hash}        label="CEP"                 value={cliente.endereco?.cep} />
+            <InfoRow icon={Building2}   label="Município"           value={cliente.endereco?.municipio ?? cliente.municipio} />
+            <InfoRow icon={MapPin}      label="Estado (UF)"         value={cliente.endereco?.uf ?? cliente.uf} />
+          </SectionCard>
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: HISTÓRICO ═════════════════════ */}
+      {tab === "historico" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Linha do Tempo" icon={Clock}>
+            <div className="divide-y divide-border/50">
+              <div className="flex items-start gap-3 py-2.5">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Cliente cadastrado</p>
+                  <p className="text-xs text-muted-foreground">{new Date(cliente.createdAt).toLocaleDateString("pt-BR", { day:"2-digit",month:"long",year:"numeric" })}</p>
+                </div>
+              </div>
+              {cobCliente.filter(c=>c.status==="paga").slice(0,5).map(c => (
+                <div key={c.id} className="flex items-start gap-3 py-2.5">
+                  <DollarSign className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Pagamento recebido — {fmtBRL(c.valor)}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+              {cobCliente.filter(c=>c.status==="vencida").slice(0,3).map(c => (
+                <div key={c.id} className="flex items-start gap-3 py-2.5">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Cobrança vencida — {fmtBRL(c.valor)}</p>
+                    <p className="text-xs text-muted-foreground">Venceu em {new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+              {obgCliente.filter(o=>o.status==="concluida").slice(0,5).map(o => (
+                <div key={o.id} className="flex items-start gap-3 py-2.5">
+                  <FileText className="h-4 w-4 mt-0.5 text-blue-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{o.tipo} — concluída</p>
+                    <p className="text-xs text-muted-foreground">{new Date(o.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Resumo Geral" icon={Info}>
+            <InfoRow icon={Calendar}    label="Cadastro em"         value={new Date(cliente.createdAt).toLocaleDateString("pt-BR")} />
+            <InfoRow icon={DollarSign}  label="Total arrecadado"    value={fmtBRL(totalPago)} />
+            <InfoRow icon={AlertTriangle} label="Em aberto"         value={totalDevido > 0 ? fmtBRL(totalDevido) : "Sem pendências"} />
+            <InfoRow icon={FileText}    label="Obrigações totais"   value={String(obgCliente.length)} />
+            <InfoRow icon={CheckCircle2} label="Obrigações concluídas" value={String(obgCliente.filter(o=>o.status==="concluida").length)} />
+            <InfoRow icon={AlertTriangle} label="Obrigações atrasadas" value={obgAtrasada > 0 ? String(obgAtrasada) : "Nenhuma"} />
+          </SectionCard>
+        </div>
+      )}
+
+      {/* ═════════════════════ FORMULÁRIO DE EDIÇÃO ═════════════════════ */}
+      {editMode && (
         <div className="surface-card p-6 space-y-6">
+          <h3 className="font-semibold text-base flex items-center gap-2"><Edit className="h-4 w-4" />Editar dados do cliente</h3>
+          <Separator />
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Razão Social</Label>
-              <Input value={form.razaoSocial ?? ""} onChange={f("razaoSocial")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Nome Fantasia</Label>
-              <Input value={form.nomeFantasia ?? ""} onChange={f("nomeFantasia")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>CNPJ</Label>
-              <Input value={form.cnpj ?? ""} onChange={f("cnpj")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Responsável</Label>
-              <Input value={form.responsavel ?? ""} onChange={f("responsavel")} />
-            </div>
+            {[
+              ["Razão Social", "razaoSocial"],
+              ["Nome Fantasia", "nomeFantasia"],
+              ["CNPJ / CPF", "cnpj"],
+              ["Atividade Principal", "atividadePrincipal"],
+              ["Insc. Municipal", "inscricaoMunicipal"],
+              ["Insc. Estadual", "inscricaoEstadual"],
+              ["Cód. Serviço NFS-e", "codigoServicoNfse"],
+              ["E-mail", "email"],
+              ["Telefone", "telefone"],
+              ["WhatsApp", "whatsapp"],
+            ].map(([label, field]) => (
+              <div key={field} className="space-y-1.5">
+                <Label>{label}</Label>
+                <Input value={(form as any)[field] ?? ""} onChange={f(field as keyof Cliente)} />
+              </div>
+            ))}
             <div className="space-y-1.5">
               <Label>Regime</Label>
-              <Select value={form.regime ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, regime: v as Regime }))}>
+              <Select value={form.regime ?? ""} onValueChange={(v) => setForm(p => ({ ...p, regime: v as Regime }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(REGIME_LABEL)).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
+                  {Object.entries(REGIME_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
-              <Select value={form.status ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, status: v as Status }))}>
+              <Select value={form.status ?? ""} onValueChange={(v) => setForm(p => ({ ...p, status: v as Status }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(STATUS_LABEL)).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
+                  {Object.entries(STATUS_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>E-mail</Label>
-              <Input value={form.email ?? ""} onChange={f("email")} type="email" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Telefone</Label>
-              <Input value={form.telefone ?? ""} onChange={f("telefone")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>WhatsApp</Label>
-              <Input value={form.whatsapp ?? ""} onChange={f("whatsapp")} />
             </div>
             <div className="space-y-1.5">
               <Label>Valor Honorário (R$)</Label>
               <Input value={form.valorHonorario ?? ""} onChange={f("valorHonorario")} type="number" />
             </div>
             <div className="space-y-1.5">
+              <Label>Dia de Vencimento</Label>
+              <Input value={form.diaVencimento ?? ""} onChange={f("diaVencimento")} type="number" min={1} max={28} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Forma de Pagamento</Label>
-              <Select value={form.formaPagamento ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, formaPagamento: v as FormaPagamento }))}>
+              <Select value={form.formaPagamento ?? ""} onValueChange={(v) => setForm(p => ({ ...p, formaPagamento: v as FormaPagamento }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PIX">PIX</SelectItem>
@@ -230,89 +559,54 @@ function ClienteDetailPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Dia de Vencimento</Label>
-              <Input value={form.diaVencimento ?? ""} onChange={f("diaVencimento")} type="number" min={1} max={28} />
+              <Label>Responsável APOYA</Label>
+              <Input value={form.responsavel ?? ""} onChange={f("responsavel")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Município</Label>
+              <Input value={form.endereco?.municipio ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, municipio: e.target.value } }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>UF</Label>
+              <Input value={form.endereco?.uf ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, uf: e.target.value } }))} maxLength={2} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>CEP</Label>
+              <Input value={form.endereco?.cep ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, cep: e.target.value } }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Logradouro</Label>
+              <Input value={form.endereco?.logradouro ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, logradouro: e.target.value } }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Número</Label>
+              <Input value={form.endereco?.numero ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, numero: e.target.value } }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bairro</Label>
+              <Input value={form.endereco?.bairro ?? ""} onChange={e => setForm(p => ({ ...p, endereco: { ...p.endereco, bairro: e.target.value } }))} />
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch checked={form.temEmpregados ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, temEmpregados: v }))} />
+              <Label>Tem empregados (eSocial)</Label>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch checked={form.regimeHibrido ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, regimeHibrido: v }))} />
+              <Label>Regime Híbrido</Label>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch checked={form.temIncentivoFiscal ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, temIncentivoFiscal: v }))} />
+              <Label>Tem incentivo fiscal</Label>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Observações</Label>
-              <Textarea value={form.observacoes ?? ""} onChange={f("observacoes")} rows={3} />
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={form.temEmpregados ?? false}
-                onCheckedChange={(v) => setForm((p) => ({ ...p, temEmpregados: v }))}
-              />
-              <Label>Tem empregados (eSocial)</Label>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={form.temIncentivoFiscal ?? false}
-                onCheckedChange={(v) => setForm((p) => ({ ...p, temIncentivoFiscal: v }))}
-              />
-              <Label>Tem incentivo fiscal</Label>
+              <Textarea value={form.observacoes ?? ""} onChange={f("observacoes")} rows={4} />
             </div>
           </div>
-        </div>
-      ) : (
-        /* ── Visualização ── */
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="surface-card p-5 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" />Dados Fiscais
-            </p>
-            <Field label="Razão Social" value={cliente.razaoSocial} />
-            <Field label="Nome Fantasia" value={cliente.nomeFantasia} />
-            <Field label="CNPJ" value={cliente.cnpj} />
-            <Field label="Regime" value={REGIME_LABEL[cliente.regime]} />
-            <Field label="Insc. Municipal" value={cliente.inscricaoMunicipal} />
-            <Field label="Insc. Estadual" value={cliente.inscricaoEstadual} />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setEditMode(false); setForm(cliente); }}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
           </div>
-
-          <div className="surface-card p-5 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" />Contato
-            </p>
-            <Field label="Responsável" value={cliente.responsavel} />
-            <Field label="E-mail" value={cliente.email} />
-            <Field label="Telefone" value={cliente.telefone} />
-            <Field label="WhatsApp" value={cliente.whatsapp} />
-          </div>
-
-          <div className="surface-card p-5 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <DollarSign className="h-3.5 w-3.5" />Financeiro
-            </p>
-            <Field label="Honorário" value={cliente.valorHonorario ? `R$ ${cliente.valorHonorario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
-            <Field label="Forma de Pagamento" value={cliente.formaPagamento} />
-            <Field label="Dia de Vencimento" value={cliente.diaVencimento ? `Dia ${cliente.diaVencimento}` : undefined} />
-          </div>
-
-          <div className="surface-card p-5 space-y-4 sm:col-span-2 lg:col-span-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />Endereço
-            </p>
-            <Field label="Município" value={cliente.endereco?.municipio} />
-            <Field label="UF" value={cliente.endereco?.uf} />
-            <Field label="CEP" value={cliente.endereco?.cep} />
-            <Field label="Logradouro" value={cliente.endereco?.logradouro} />
-          </div>
-
-          <div className="surface-card p-5 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5" />Obrigações
-            </p>
-            <Field label="Tem empregados" value={cliente.temEmpregados ? "Sim" : "Não"} />
-            <Field label="Incentivo fiscal" value={cliente.temIncentivoFiscal ? "Sim" : "Não"} />
-            <Field label="Cód. Serviço NFS-e" value={cliente.codigoServicoNfse} />
-            <Field label="Atividade principal" value={cliente.atividadePrincipal} />
-          </div>
-
-          {cliente.observacoes && (
-            <div className="surface-card p-5 space-y-2 sm:col-span-2 lg:col-span-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Observações</p>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{cliente.observacoes}</p>
-            </div>
-          )}
         </div>
       )}
     </div>

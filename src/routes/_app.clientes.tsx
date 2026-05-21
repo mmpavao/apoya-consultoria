@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Clock,
@@ -47,6 +47,7 @@ function Initials({nome, regime}:{nome:string; regime:Regime}){
 const PAGE_SIZE=25;
 
 function ClientesPage(){
+  const navigate = useNavigate();
   const {clientes, loading, error, deleteCliente} = useClientes();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState("todos");
@@ -161,7 +162,7 @@ function ClientesPage(){
             </a>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild data-no-rowclick>
               <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5"/></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -222,6 +223,7 @@ function ClientesPage(){
       {!loading && (
         <>
           <DataTable
+            onRowClick={(c) => navigate({ to: "/clientes/$id", params: { id: c.id } })}
             rows={pageItems}
             cols={cols}
             getKey={c=>c.id}
