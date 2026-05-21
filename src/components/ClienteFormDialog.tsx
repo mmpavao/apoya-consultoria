@@ -34,6 +34,7 @@ const empty: Omit<Cliente, "id" | "createdAt"> = {
 };
 
 export function ClienteFormDialog({ open, onOpenChange, cliente }: Props) {
+  const { clientes, createCliente, updateCliente } = useClientes();
   const [form, setForm] = useState<Omit<Cliente, "id" | "createdAt">>(empty);
   const [looking, setLooking] = useState(false);
 
