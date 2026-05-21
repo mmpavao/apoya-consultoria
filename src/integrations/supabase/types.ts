@@ -322,6 +322,48 @@ export type Database = {
           },
         ]
       }
+      convites: {
+        Row: {
+          cancelado_em: string | null
+          criado_em: string
+          criado_por: string | null
+          email: string
+          expira_em: string
+          id: string
+          mensagem: string | null
+          role: string
+          setores_ids: string[] | null
+          token: string
+          usado_em: string | null
+        }
+        Insert: {
+          cancelado_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email: string
+          expira_em?: string
+          id?: string
+          mensagem?: string | null
+          role?: string
+          setores_ids?: string[] | null
+          token: string
+          usado_em?: string | null
+        }
+        Update: {
+          cancelado_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          email?: string
+          expira_em?: string
+          id?: string
+          mensagem?: string | null
+          role?: string
+          setores_ids?: string[] | null
+          token?: string
+          usado_em?: string | null
+        }
+        Relationships: []
+      }
       das_guias: {
         Row: {
           cliente_id: string
@@ -800,6 +842,41 @@ export type Database = {
           },
         ]
       }
+      permissoes: {
+        Row: {
+          criado_em: string
+          descricao: string | null
+          id: string
+          label: string
+          setor_id: string
+          slug: string
+        }
+        Insert: {
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          label: string
+          setor_id: string
+          slug: string
+        }
+        Update: {
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          label?: string
+          setor_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permissoes_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -827,6 +904,45 @@ export type Database = {
         }
         Relationships: []
       }
+      setores: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          cor: string | null
+          criado_em: string
+          descricao: string | null
+          icone: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          slug: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          cor?: string | null
+          criado_em?: string
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          slug: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          cor?: string | null
+          criado_em?: string
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          slug?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -847,6 +963,48 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_setor_permissoes: {
+        Row: {
+          concedido_em: string
+          concedido_por: string | null
+          id: string
+          permissao_id: string
+          setor_id: string
+          user_id: string
+        }
+        Insert: {
+          concedido_em?: string
+          concedido_por?: string | null
+          id?: string
+          permissao_id: string
+          setor_id: string
+          user_id: string
+        }
+        Update: {
+          concedido_em?: string
+          concedido_por?: string | null
+          id?: string
+          permissao_id?: string
+          setor_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_setor_permissoes_permissao_id_fkey"
+            columns: ["permissao_id"]
+            isOneToOne: false
+            referencedRelation: "permissoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_setor_permissoes_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wa_conversa: {
         Row: {
@@ -974,6 +1132,7 @@ export type Database = {
     }
     Functions: {
       current_cliente_id: { Args: never; Returns: string }
+      has_permission: { Args: { p_slug: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -981,10 +1140,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_setor: { Args: { s_slug: string }; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "contador" | "assistente" | "cliente"
+      app_role:
+        | "admin"
+        | "contador"
+        | "assistente"
+        | "cliente"
+        | "agente"
+        | "supervisor"
       cliente_status:
         | "ativo"
         | "inadimplente"
@@ -1141,7 +1308,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "contador", "assistente", "cliente"],
+      app_role: [
+        "admin",
+        "contador",
+        "assistente",
+        "cliente",
+        "agente",
+        "supervisor",
+      ],
       cliente_status: [
         "ativo",
         "inadimplente",
