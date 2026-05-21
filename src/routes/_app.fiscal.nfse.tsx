@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({

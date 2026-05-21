@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
