@@ -263,13 +263,12 @@
   }
 
   .ds-table td {
-    padding: 0.875rem 1rem;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--color-border);
-    /* Células que podem truncar */
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* overflow: visível para badges/dropdowns inline */
+    max-width: 260px;
+    overflow: visible;
+    /* truncate via .truncate nas células que precisam */
   }
 
   .ds-table tr:last-child td { border-bottom: none; }
@@ -278,7 +277,7 @@
     transition: background 100ms;
   }
   .ds-table tbody tr:hover {
-    background: var(--color-muted) / 60%;
+    background: oklch(0.95 0.005 250 / 0.6);
   }
 
   /* Card-list — alternativa a tabelas em mobile */

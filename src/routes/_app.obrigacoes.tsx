@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, Calendar, CheckCircle2, Clock,
-  LayoutGrid, List, RefreshCw, Search, Sparkles,
-  TrendingUp, XCircle,
+  AlertTriangle, Calendar, CheckCircle2, Clock, Loader2,
+  RefreshCw, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
@@ -19,354 +17,224 @@ export const Route = createFileRoute("/_app/obrigacoes")({
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-const STATUS_CFG: Record<ObrigacaoStatus, { bg: string; text: string; border: string; Icon: React.ElementType; label: string }> = {
-  pendente:     { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    Icon: Clock,         label: "Pendente"     },
-  em_andamento: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   Icon: TrendingUp,    label: "Em andamento" },
-  concluida:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", Icon: CheckCircle2,  label: "Concluída"    },
-  atrasada:     { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     Icon: AlertTriangle, label: "Atrasada"     },
+const S_C: Record<ObrigacaoStatus, BadgeColor> = {
+  pendente:"blue", em_andamento:"amber" as BadgeColor, concluida:"green", atrasada:"red",
+};
+const S_L: Record<ObrigacaoStatus,string> = {
+  pendente:"Pendente", em_andamento:"Em andamento", concluida:"Concluída", atrasada:"Atrasada",
 };
 
-const TIPO_COLOR: Record<string, string> = {
-  DAS:                "bg-blue-100 text-blue-800",
-  "DASN-Simei":       "bg-violet-100 text-violet-800",
-  DCTFWeb:            "bg-orange-100 text-orange-800",
-  "EFD-Contribuições":"bg-cyan-100 text-cyan-800",
-  "EFD-ICMS/IPI":     "bg-indigo-100 text-indigo-800",
-  "EFD-Reinf":        "bg-pink-100 text-pink-800",
-  ECF:                "bg-rose-100 text-rose-800",
-  ECD:                "bg-purple-100 text-purple-800",
-  DIRBI:              "bg-amber-100 text-amber-800",
-  DEFIS:              "bg-lime-100 text-lime-800",
-  NFSe:               "bg-teal-100 text-teal-800",
-  "FGTS Digital":     "bg-green-100 text-green-800",
-  eSocial:            "bg-sky-100 text-sky-800",
+const TIPO_BADGE: Record<string, BadgeColor> = {
+  DAS:"blue", "DASN-Simei":"violet", DCTFWeb:"indigo", "EFD-Contribuições":"cyan",
+  "EFD-ICMS/IPI":"cyan", "EFD-Reinf":"indigo", ECF:"orange", ECD:"orange",
+  DIRBI:"amber" as BadgeColor, DEFIS:"blue", NFSe:"green", "FGTS Digital":"indigo", eSocial:"violet",
 };
 
-const KANBAN_COLS: { key: ObrigacaoStatus; label: string }[] = [
-  { key: "pendente",     label: "A fazer"      },
-  { key: "em_andamento", label: "Em andamento" },
-  { key: "concluida",    label: "Concluídas"   },
-  { key: "atrasada",     label: "Atrasadas"    },
-];
+const fmtBRL  = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const fmtDate = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
-function fmt(v: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-}
-
-function diasRestantes(venc: string) {
-  const diff = Math.ceil((new Date(venc).getTime() - Date.now()) / 86400000);
-  return diff;
-}
-
-function ObrigacoesPage() {
+function ObrigacoesPage(){
   const now = new Date();
-  const [items, setItems]     = useState<Obrigacao[]>([]);
-  const [ano, setAno]         = useState(now.getFullYear());
-  const [mes, setMes]         = useState(now.getMonth() + 1);
-  const [query, setQuery]     = useState("");
-  const [regime, setRegime]   = useState("todos");
-  const [status, setStatus]   = useState("todos");
-  const [resp, setResp]       = useState("todos");
-  const [view, setView]       = useState<"lista" | "kanban">("lista");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ano, setAno]       = useState(now.getFullYear());
+  const [mes, setMes]       = useState(now.getMonth()+1);
+  const [items, setItems]   = useState<Obrigacao[]>([]);
+  const [query, setQuery]   = useState("");
+  const [status, setStatus] = useState<"todos"|ObrigacaoStatus>("todos");
+  const [tipo, setTipo]     = useState("todos");
+  const [sel, setSel]       = useState<Set<string>>(new Set());
+  const [busy, setBusy]     = useState(false);
+  const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
-  useEffect(() => {
-    const fn = () => setItems(obrigacoesStore.list());
+  useEffect(()=>{
+    const fn=()=>setItems(obrigacoesStore.listByCompetencia(comp));
     fn();
-    window.addEventListener("apoya:obrigacoes:changed", fn);
-    window.addEventListener("apoya:clientes:changed", fn);
-    return () => {
-      window.removeEventListener("apoya:obrigacoes:changed", fn);
-      window.removeEventListener("apoya:clientes:changed", fn);
-    };
-  }, []);
+    window.addEventListener("apoya:obrigacoes:changed",fn);
+    window.addEventListener("apoya:clientes:changed",fn);
+    return ()=>{ window.removeEventListener("apoya:obrigacoes:changed",fn); window.removeEventListener("apoya:clientes:changed",fn); };
+  },[comp]);
+  useEffect(()=>setSel(new Set()),[comp]);
 
-  const competencia = `${ano}-${mes.toString().padStart(2, "0")}`;
-  const responsaveis = useMemo(() => Array.from(new Set(items.map((o) => o.responsavel))), [items]);
+  const tipos = useMemo(()=>Array.from(new Set(items.map(o=>o.tipo))).sort(),[items]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const filtered = useMemo(()=>{
+    const q=query.trim().toLowerCase();
     return items
-      .filter((o) => o.competencia === competencia)
-      .filter((o) => q ? `${o.clienteNome} ${o.tipo} ${o.descricao}`.toLowerCase().includes(q) : true)
-      .filter((o) => regime === "todos" || o.regime === regime)
-      .filter((o) => status === "todos" || o.status === status)
-      .filter((o) => resp   === "todos" || o.responsavel === resp)
-      .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-  }, [items, competencia, query, regime, status, resp]);
+      .filter(o=>q?`${o.clienteNome} ${o.tipo} ${o.responsavel}`.toLowerCase().includes(q):true)
+      .filter(o=>status==="todos"||o.status===status)
+      .filter(o=>tipo==="todos"||o.tipo===tipo)
+      .sort((a,b)=>{
+        const order:Record<ObrigacaoStatus,number>={atrasada:0,pendente:1,em_andamento:2,concluida:3};
+        return (order[a.status]??4)-(order[b.status]??4)||new Date(a.vencimento).getTime()-new Date(b.vencimento).getTime();
+      });
+  },[items,query,status,tipo]);
 
-  const counts = useMemo(() => {
-    const m = items.filter((o) => o.competencia === competencia);
-    return {
-      total:    m.length,
-      pendente: m.filter((o) => o.status === "pendente").length,
-      atrasada: m.filter((o) => o.status === "atrasada").length,
-      concluida:m.filter((o) => o.status === "concluida").length,
-    };
-  }, [items, competencia]);
+  const kpi = useMemo(()=>({
+    total:    items.length,
+    pendente: items.filter(o=>o.status==="pendente").length,
+    atrasada: items.filter(o=>o.status==="atrasada").length,
+    andamento:items.filter(o=>o.status==="em_andamento").length,
+    concluida:items.filter(o=>o.status==="concluida").length,
+  }),[items]);
 
-  function markSelected(newStatus: ObrigacaoStatus) {
-    selected.forEach((id) => obrigacoesStore.updateStatus(id, newStatus));
-    toast.success(`${selected.size} obrigação(ões) marcadas como "${STATUS_CFG[newStatus].label}"`);
-    setSelected(new Set());
+  const toggleAll=()=>setSel(sel.size===filtered.length?new Set():new Set(filtered.map(o=>o.id)));
+  const toggleOne=(id:string)=>{ const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
+
+  async function concluirLote(){
+    const ids=filtered.filter(o=>sel.has(o.id)&&o.status!=="concluida").map(o=>o.id);
+    if(!ids.length){ toast.error("Selecione obrigações não concluídas"); return; }
+    setBusy(true);
+    ids.forEach(id=>obrigacoesStore.atualizarStatus(id,"concluida"));
+    await new Promise(r=>setTimeout(r,400));
+    toast.success(`${ids.length} obrigação(ões) concluída(s)!`);
+    setBusy(false); setSel(new Set());
   }
 
-  function gerarMes() {
-    obrigacoesStore.generateForMonth(competencia);
-    toast.success(`Obrigações de ${MESES[mes - 1]}/${ano} geradas!`);
-  }
-
-  function toggleOne(id: string) {
-    const s = new Set(selected);
-    s.has(id) ? s.delete(id) : s.add(id);
-    setSelected(s);
-  }
-
-  function toggleAll() {
-    setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map((o) => o.id)));
-  }
+  const cols: ColDef<Obrigacao>[] = [
+    {
+      key:"cliente", header:"Cliente",
+      cell: o=>(
+        <div style={{overflow:"visible",whiteSpace:"normal"}}>
+          <div className="font-medium text-foreground leading-tight">{o.clienteNome}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">{o.regime}</div>
+        </div>
+      ),
+    },
+    {
+      key:"tipo", header:"Tipo",
+      cell: o=>(
+        <InlineBadge color={TIPO_BADGE[o.tipo]??"gray"}>{o.tipo}</InlineBadge>
+      ),
+    },
+    {
+      key:"descricao", header:"Descrição",
+      headerClassName:"hidden lg:table-cell", className:"hidden lg:table-cell text-sm text-muted-foreground",
+      cell: o=><span className="line-clamp-1 max-w-[200px]">{o.descricao}</span>,
+    },
+    {
+      key:"vencimento", header:"Vencimento",
+      headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
+      cell: o=>{
+        const late=o.status==="atrasada";
+        const multa=late&&o.valor?calcularMulta(o.valor,o.vencimento):null;
+        return (
+          <div style={{overflow:"visible",whiteSpace:"normal"}}>
+            <div className={late?"font-semibold text-red-600":""}>{fmtDate(o.vencimento)}</div>
+            {multa&&multa.dias>0&&(
+              <div className="text-[10px] text-red-500">+{multa.dias}d · multa {fmtBRL(multa.multa)}</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key:"responsavel", header:"Resp.",
+      headerClassName:"hidden sm:table-cell", className:"hidden sm:table-cell text-sm text-muted-foreground",
+      cell: o=>o.responsavel,
+    },
+    {
+      key:"status", header:"Status",
+      cell: o=><InlineBadge color={S_C[o.status]} dot>{S_L[o.status]}</InlineBadge>,
+    },
+    {
+      key:"acoes", header:"", headerClassName:"w-16 text-right", className:"w-16 text-right",
+      cell: o=>(
+        o.status!=="concluida" ? (
+          <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 opacity-0 group-hover:opacity-100 transition-all"
+            title="Marcar como concluída"
+            onClick={()=>{ obrigacoesStore.atualizarStatus(o.id,"concluida"); toast.success("Concluída!"); }}>
+            <CheckCircle2 className="h-3.5 w-3.5"/>
+          </button>
+        ) : null
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header + nav mês */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Obrigações Fiscais</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {counts.total} obrigações em {MESES[mes - 1]}/{ano}
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">Obrigações</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Calendário fiscal · {MESES[mes-1]} {ano}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-xl gap-1" onClick={gerarMes}>
-            <RefreshCw className="h-3.5 w-3.5" /> Gerar mês
-          </Button>
-          <Button size="sm" className="rounded-xl gap-1">
-            <Sparkles className="h-3.5 w-3.5" /> Marcar em lote
-          </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
+            onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
+          <span className="min-w-[110px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-muted-foreground"
+            onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* KPI */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
-          { label: "Total",     v: counts.total,     bg: "bg-muted",      text: "text-foreground"    },
-          { label: "Pendentes", v: counts.pendente,  bg: "bg-blue-50",    text: "text-blue-700"      },
-          { label: "Atrasadas", v: counts.atrasada,  bg: "bg-red-50",     text: "text-red-700"       },
-          { label: "Concluídas",v: counts.concluida, bg: "bg-emerald-50", text: "text-emerald-700"   },
-        ].map(({ label, v, bg, text }) => (
-          <div key={label} className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${bg}`}>
-            <span className={`text-2xl font-bold ${text}`}>{v}</span>
-            <span className={`text-xs font-medium ${text} opacity-70`}>{label}</span>
+          {icon:Calendar,     label:"Total",       val:kpi.total,    color:"text-foreground",  bg:"bg-card"},
+          {icon:Clock,        label:"Pendente",    val:kpi.pendente, color:"text-blue-600",    bg:"bg-blue-50"},
+          {icon:AlertTriangle,label:"Atrasadas",   val:kpi.atrasada, color:"text-red-600",     bg:"bg-red-50"},
+          {icon:TrendingUp,   label:"Em andamento",val:kpi.andamento,color:"text-amber-600",   bg:"bg-amber-50"},
+          {icon:CheckCircle2, label:"Concluídas",  val:kpi.concluida,color:"text-emerald-600", bg:"bg-emerald-50"},
+        ].map(({icon:Icon,label,val,color,bg})=>(
+          <div key={label} className={`ds-card flex items-center gap-3 p-3 ${bg}`}>
+            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
+              <Icon className="h-4 w-4 m-auto"/>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+              <p className={`text-base font-bold tabular-nums leading-tight ${color}`}>{val}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Nav mês */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl"
-          onClick={() => { let m = mes - 1, a = ano; if (m < 1) { m = 12; a--; } setMes(m); setAno(a); }}>
-          ‹
-        </Button>
-        <span className="min-w-[110px] text-center text-sm font-semibold">
-          {MESES[mes - 1]} {ano}
-        </span>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl"
-          onClick={() => { let m = mes + 1, a = ano; if (m > 12) { m = 1; a++; } setMes(m); setAno(a); }}>
-          ›
-        </Button>
-        <div className="h-4 w-px bg-border mx-1" />
-
-        {/* Filtros */}
-        <div className="relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar cliente ou tipo…" className="h-8 rounded-xl pl-8 text-sm w-52" />
-        </div>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-8 rounded-xl text-xs w-36">
-            <SelectValue>{status === "todos" ? "Todos status" : STATUS_CFG[status as ObrigacaoStatus]?.label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos status</SelectItem>
-            {(["pendente","em_andamento","concluida","atrasada"] as ObrigacaoStatus[]).map((s) => (
-              <SelectItem key={s} value={s}>{STATUS_CFG[s].label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="ml-auto flex items-center gap-1 rounded-xl border bg-card p-1">
-          <button onClick={() => setView("lista")}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${view === "lista" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            <List className="h-3.5 w-3.5" />
-          </button>
-          <button onClick={() => setView("kanban")}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${view === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-            <LayoutGrid className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Ações em lote */}
-      {selected.size > 0 && (
+      {/* Barra ações em lote */}
+      {sel.size>0 && (
         <div className="flex items-center gap-3 rounded-xl border bg-primary/5 px-4 py-2.5">
-          <span className="text-sm font-medium">{selected.size} selecionada(s)</span>
-          <div className="flex gap-2 ml-auto">
-            <Button size="sm" variant="outline" className="rounded-xl h-7 text-xs gap-1"
-              onClick={() => markSelected("em_andamento")}>
-              <TrendingUp className="h-3 w-3" /> Em andamento
+          <span className="text-sm font-medium">{sel.size} selecionada(s)</span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" className="h-7 rounded-xl text-xs gap-1" disabled={busy} onClick={concluirLote}>
+              {busy?<Loader2 className="h-3 w-3 animate-spin"/>:<CheckCircle2 className="h-3 w-3"/>} Concluir
             </Button>
-            <Button size="sm" variant="outline" className="rounded-xl h-7 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-              onClick={() => markSelected("concluida")}>
-              <CheckCircle2 className="h-3 w-3" /> Concluir
-            </Button>
-            <Button size="sm" variant="ghost" className="rounded-xl h-7 text-xs"
-              onClick={() => setSelected(new Set())}>Cancelar</Button>
+            <Button size="sm" variant="ghost" className="h-7 rounded-xl text-xs" onClick={()=>setSel(new Set())}>Cancelar</Button>
           </div>
         </div>
       )}
 
-      {/* Vista lista */}
-      {view === "lista" && (
-        <div className="space-y-2">
-          {/* Cabeçalho lista */}
-          {filtered.length > 0 && (
-            <div className="flex items-center gap-3 px-4 text-xs font-medium text-muted-foreground pb-1">
-              <Checkbox checked={selected.size === filtered.length && filtered.length > 0}
-                onCheckedChange={toggleAll} className="rounded" />
-              <span className="flex-1">Obrigação</span>
-              <span className="hidden w-28 sm:block">Vencimento</span>
-              <span className="hidden w-24 sm:block">Status</span>
-              <span className="w-20 text-right">Valor</span>
-            </div>
-          )}
-
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-card py-16 text-center">
-              <Calendar className="h-8 w-8 text-muted-foreground/40 mb-3" />
-              <p className="text-sm font-medium">Nenhuma obrigação para este mês</p>
-              <p className="text-xs text-muted-foreground mt-1">Clique em "Gerar mês" para criar automaticamente</p>
-            </div>
-          ) : (
-            filtered.map((o) => <ObrCard key={o.id} ob={o} selected={selected.has(o.id)} onToggle={() => toggleOne(o.id)} />)
-          )}
-        </div>
-      )}
-
-      {/* Vista kanban */}
-      {view === "kanban" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {KANBAN_COLS.map(({ key, label }) => {
-            const col = filtered.filter((o) => o.status === key);
-            const cfg = STATUS_CFG[key];
-            return (
-              <div key={key} className="space-y-2">
-                <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${cfg.bg}`}>
-                  <cfg.Icon className={`h-3.5 w-3.5 ${cfg.text}`} />
-                  <span className={`text-xs font-semibold ${cfg.text}`}>{label}</span>
-                  <span className={`ml-auto text-xs font-bold ${cfg.text}`}>{col.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {col.map((o) => <KanbanCard key={o.id} ob={o} />)}
-                  {col.length === 0 && (
-                    <div className="rounded-xl border border-dashed bg-card p-4 text-center text-xs text-muted-foreground">
-                      Nenhuma
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── ObrCard (lista) ─────────────────────────────────────────── */
-function ObrCard({ ob, selected, onToggle }: { ob: Obrigacao; selected: boolean; onToggle: () => void }) {
-  const cfg  = STATUS_CFG[ob.status];
-  const dias = diasRestantes(ob.vencimento);
-  const multa = ob.status === "atrasada" && ob.valor ? calcularMulta(ob.valor, ob.vencimento) : null;
-
-  const urgencia = dias <= 0 ? "border-l-red-500" : dias <= 3 ? "border-l-amber-400" : "border-l-transparent";
-
-  return (
-    <div className={`group flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm transition-all hover:shadow-md border-l-4 ${urgencia} ${selected ? "ring-2 ring-primary/30" : ""}`}>
-      <Checkbox checked={selected} onCheckedChange={onToggle} className="rounded shrink-0" />
-
-      {/* Tipo badge */}
-      <span className={`shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-bold ${TIPO_COLOR[ob.tipo] ?? "bg-gray-100 text-gray-700"}`}>
-        {ob.tipo}
-      </span>
-
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold">{ob.clienteNome}</span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">· {ob.descricao}</span>
-        </div>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{ob.responsavel}</span>
-          {multa && multa.dias > 0 && (
-            <span className="text-red-600 font-medium">
-              +{multa.dias}d atraso · multa ~{new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(multa.multa)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Vencimento */}
-      <div className="hidden shrink-0 text-right sm:block">
-        <div className="text-sm font-medium">
-          {new Date(ob.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}
-        </div>
-        {ob.status !== "concluida" && (
-          <div className={`text-[11px] ${dias < 0 ? "text-red-600 font-semibold" : dias <= 3 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
-            {dias < 0 ? `${Math.abs(dias)}d atrasado` : dias === 0 ? "Vence hoje!" : `${dias}d restantes`}
-          </div>
-        )}
-      </div>
-
-      {/* Status */}
-      <span className={`hidden shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold sm:inline-flex ${cfg.bg} ${cfg.text}`}>
-        <cfg.Icon className="h-3 w-3" />{cfg.label}
-      </span>
-
-      {/* Valor */}
-      {ob.valor ? (
-        <div className="shrink-0 text-right">
-          <div className="text-sm font-semibold tabular-nums">{fmt(ob.valor)}</div>
-        </div>
-      ) : (
-        <div className="w-16 shrink-0" />
-      )}
-    </div>
-  );
-}
-
-/* ── KanbanCard ─────────────────────────────────────────────── */
-function KanbanCard({ ob }: { ob: Obrigacao }) {
-  const dias = diasRestantes(ob.vencimento);
-  return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${TIPO_COLOR[ob.tipo] ?? "bg-gray-100 text-gray-700"}`}>
-          {ob.tipo}
-        </span>
-        {ob.valor && <span className="text-xs font-semibold tabular-nums">{fmt(ob.valor)}</span>}
-      </div>
-      <p className="text-xs font-semibold leading-snug truncate">{ob.clienteNome}</p>
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {new Date(ob.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}
-        </span>
-        {ob.status !== "concluida" && (
-          <span className={`text-[11px] font-medium ${dias < 0 ? "text-red-600" : dias <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
-            {dias < 0 ? `${Math.abs(dias)}d atraso` : `${dias}d`}
-          </span>
-        )}
-      </div>
+      <DataTable
+        rows={filtered}
+        cols={cols}
+        getKey={o=>o.id}
+        selected={sel}
+        onToggleAll={toggleAll}
+        onToggleRow={toggleOne}
+        emptyIcon={<Calendar className="h-8 w-8"/>}
+        emptyText="Nenhuma obrigação para os filtros selecionados"
+        rowClassName={o=>o.status==="atrasada"?"bg-red-50/30 border-l-2 border-l-red-400":""}
+        toolbar={
+          <>
+            <TableSearch value={query} onChange={setQuery} placeholder="Cliente, tipo ou responsável…"/>
+            <Select value={status} onValueChange={v=>setStatus(v as typeof status)}>
+              <SelectTrigger className="h-8 w-36 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="em_andamento">Em andamento</SelectItem>
+                <SelectItem value="atrasada">Atrasada</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={tipo} onValueChange={setTipo}>
+              <SelectTrigger className="h-8 w-40 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                {tipos.map(t=><SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
+      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
     </div>
   );
 }

@@ -1,17 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, CheckCircle2, Copy, Download, FileText, Loader2,
-  MessageCircle, RefreshCw, Send, Wallet,
+  CheckCircle2, Download, FileText, Loader2,
+  MessageCircle, RefreshCw, Send, Wallet, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader } from "@/components/PagePlaceholder";
+import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
@@ -19,309 +15,235 @@ export const Route = createFileRoute("/_app/fiscal/das")({
   head: () => ({ meta: [{ title: "DAS em Lote · APOYA Gestão" }] }),
 });
 
-const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+const S_COLOR: Record<DasStatus, "gray"|"blue"|"green"|"red"> = {
+  pendente: "blue", gerada: "amber" as "green", paga: "green", erro: "red",
+};
+const S_LABEL: Record<DasStatus, string> = {
+  pendente:"Pendente", gerada:"Gerada", paga:"Paga", erro:"Erro",
+};
+
+const fmtBRL  = (v: number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const fmtDate = (d: string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
 function DasPage() {
   const now = new Date();
-  // competência padrão = mês anterior
   const def = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const [ano, setAno] = useState(def.getFullYear());
-  const [mes, setMes] = useState(def.getMonth() + 1);
-  const [items, setItems] = useState<DasGuia[]>([]);
-  const [query, setQuery] = useState("");
-  const [regime, setRegime] = useState<"todos" | "MEI" | "Simples">("todos");
-  const [status, setStatus] = useState<"todos" | DasStatus>("todos");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-
-  const competencia = `${ano}-${mes.toString().padStart(2, "0")}`;
+  const [ano, setAno]       = useState(def.getFullYear());
+  const [mes, setMes]       = useState(def.getMonth() + 1);
+  const [items, setItems]   = useState<DasGuia[]>([]);
+  const [query, setQuery]   = useState("");
+  const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
+  const [status, setStatus] = useState<"todos"|DasStatus>("todos");
+  const [sel, setSel]       = useState<Set<string>>(new Set());
+  const [busy, setBusy]     = useState(false);
+  const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(() => {
-    const refresh = () => setItems(dasStore.listByCompetencia(competencia));
-    refresh();
-    window.addEventListener("apoya:das:changed", refresh);
-    window.addEventListener("apoya:clientes:changed", refresh);
-    return () => {
-      window.removeEventListener("apoya:das:changed", refresh);
-      window.removeEventListener("apoya:clientes:changed", refresh);
-    };
-  }, [competencia]);
-
-  useEffect(() => setSelected(new Set()), [competencia]);
+    const fn = () => setItems(dasStore.listByCompetencia(comp));
+    fn();
+    window.addEventListener("apoya:das:changed", fn);
+    window.addEventListener("apoya:clientes:changed", fn);
+    return () => { window.removeEventListener("apoya:das:changed", fn); window.removeEventListener("apoya:clientes:changed", fn); };
+  }, [comp]);
+  useEffect(() => setSel(new Set()), [comp]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
-      .filter((g) => (q ? `${g.clienteNome} ${g.cnpj}`.toLowerCase().includes(q) : true))
-      .filter((g) => regime === "todos" || g.regime === regime)
-      .filter((g) => status === "todos" || g.status === status)
-      .sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
+      .filter(g => q ? `${g.clienteNome} ${g.cnpj}`.toLowerCase().includes(q) : true)
+      .filter(g => regime === "todos" || g.regime === regime)
+      .filter(g => status === "todos" || g.status === status)
+      .sort((a,b) => a.clienteNome.localeCompare(b.clienteNome));
   }, [items, query, regime, status]);
 
-  const counts = useMemo(() => ({
-    total: items.length,
-    pendente: items.filter((g) => g.status === "pendente").length,
-    gerada: items.filter((g) => g.status === "gerada").length,
-    paga: items.filter((g) => g.status === "paga").length,
-    erro: items.filter((g) => g.status === "erro").length,
-    valorTotal: items.reduce((s, g) => s + g.valor, 0),
+  const kpi = useMemo(() => ({
+    total:    items.length,
+    pendente: items.filter(g => g.status==="pendente").length,
+    gerada:   items.filter(g => g.status==="gerada").length,
+    paga:     items.filter(g => g.status==="paga").length,
+    valor:    items.reduce((s,g) => s+g.valor, 0),
   }), [items]);
 
-  function toggleAll() {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((g) => g.id)));
-  }
-
-  function toggleOne(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelected(next);
-  }
+  const toggleAll = () => setSel(sel.size===filtered.length ? new Set() : new Set(filtered.map(g=>g.id)));
+  const toggleOne = (id:string) => { const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
 
   async function gerarLote() {
-    const ids = filtered
-      .filter((g) => selected.has(g.id) && (g.status === "pendente" || g.status === "erro"))
-      .map((g) => g.id);
-    if (ids.length === 0) { toast.error("Selecione pelo menos 1 DAS pendente"); return; }
-    setLoading(true);
-    toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, { id: "das-lote" });
+    const ids = filtered.filter(g=>sel.has(g.id)&&(g.status==="pendente"||g.status==="erro")).map(g=>g.id);
+    if(!ids.length){ toast.error("Selecione ao menos 1 DAS pendente"); return; }
+    setBusy(true);
+    toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, {id:"das-lote"});
     await dasStore.gerarLote(ids);
-    setLoading(false);
-    toast.success(`${ids.length} DAS processado(s)`, { id: "das-lote" });
+    setBusy(false);
+    toast.success(`${ids.length} DAS processado(s)`, {id:"das-lote"});
   }
-
-  async function gerarUm(id: string) {
-    toast.loading("Gerando DAS via SERPRO…", { id: `das-${id}` });
-    await dasStore.gerar(id);
-    toast.success("DAS atualizado", { id: `das-${id}` });
-  }
-
   function enviarWhats() {
-    const elig = filtered.filter((g) => selected.has(g.id) && g.status === "gerada");
-    if (elig.length === 0) { toast.error("Selecione DAS já geradas"); return; }
-    dasStore.enviarWhatsapp(elig.map((g) => g.id));
-    toast.success(`${elig.length} mensagem(s) enviada(s) por WhatsApp (mock)`);
+    const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");
+    if(!elig.length){ toast.error("Selecione DAS já geradas"); return; }
+    dasStore.enviarWhatsapp(elig.map(g=>g.id));
+    toast.success(`${elig.length} mensagem(ns) enviada(s)`);
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="DAS em Lote"
-        subtitle="Geração via SERPRO e envio em massa para clientes MEI e Simples"
-      />
+  const cols: ColDef<DasGuia>[] = [
+    {
+      key:"cliente", header:"Cliente",
+      cell: g => (
+        <div style={{overflow:"visible", whiteSpace:"normal"}}>
+          <div className="font-medium text-foreground leading-tight">{g.clienteNome}</div>
+          <div className="font-mono text-[11px] text-muted-foreground mt-0.5">{g.cnpj}</div>
+        </div>
+      ),
+    },
+    {
+      key:"regime", header:"Regime",
+      headerClassName:"hidden sm:table-cell", className:"hidden sm:table-cell",
+      cell: g => <InlineBadge color={g.regime==="MEI"?"violet":"blue"} dot>{g.regime==="Simples"?"Simples Nacional":g.regime}</InlineBadge>,
+    },
+    {
+      key:"vencimento", header:"Vencimento",
+      headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
+      cell: g => {
+        const late = g.status!=="paga" && new Date(g.vencimento) < new Date();
+        return (
+          <span className={late ? "font-semibold text-red-600" : ""}>
+            {fmtDate(g.vencimento)}
+            {late && <span className="ml-1 text-[10px] opacity-70">atrasado</span>}
+          </span>
+        );
+      },
+    },
+    {
+      key:"valor", header:"Valor",
+      headerClassName:"text-right", className:"text-right tabular-nums font-semibold",
+      cell: g => fmtBRL(g.valor),
+    },
+    {
+      key:"status", header:"Status",
+      cell: g => (
+        <div style={{overflow:"visible", whiteSpace:"normal"}}>
+          <InlineBadge color={S_COLOR[g.status]} dot>{S_LABEL[g.status]}</InlineBadge>
+          {g.enviadoWhatsappEm && <div className="text-[10px] text-emerald-600 mt-0.5">✓ WhatsApp</div>}
+        </div>
+      ),
+    },
+    {
+      key:"acoes", header:"", headerClassName:"w-20 text-right", className:"w-20 text-right",
+      cell: g => (
+        <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {(g.status==="pendente"||g.status==="erro") && (
+            <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Gerar DAS"
+              onClick={() => { toast.loading("Gerando…",{id:`das-${g.id}`}); dasStore.gerar(g.id).then(()=>toast.success("DAS gerada",{id:`das-${g.id}`})); }}>
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {g.codigoBarras && (
+            <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Copiar código"
+              onClick={() => { navigator.clipboard.writeText(g.codigoBarras!); toast.success("Copiado!"); }}>
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {g.pdfUrl && (
+            <a href={g.pdfUrl} target="_blank" rel="noopener noreferrer"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors" title="PDF">
+              <FileText className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </div>
+      ),
+    },
+  ];
 
-      {/* KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Clientes" value={counts.total.toString()} tone="default" icon={FileText} />
-        <Kpi label="Pendentes" value={counts.pendente.toString()} tone="info" icon={Loader2} />
-        <Kpi label="Geradas" value={counts.gerada.toString()} tone="success" icon={CheckCircle2} />
-        <Kpi label="Pagas" value={counts.paga.toString()} tone="success" icon={Wallet} />
-        <Kpi label="Total no mês" value={counts.valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} tone="default" icon={Wallet} />
+  return (
+    <div className="space-y-5">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">DAS em Lote</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Geração via SERPRO · MEI e Simples Nacional</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-8"
+            onClick={enviarWhats} disabled={sel.size===0}>
+            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+          </Button>
+          <Button size="sm" className="rounded-xl gap-1.5 h-8"
+            onClick={gerarLote} disabled={busy||sel.size===0}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Send className="h-3.5 w-3.5"/>}
+            Gerar ({sel.size})
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b p-4">
-          <Select value={mes.toString()} onValueChange={(v) => setMes(parseInt(v, 10))}>
-            <SelectTrigger className="w-[130px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MESES.map((m, i) => <SelectItem key={m} value={(i + 1).toString()}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={ano.toString()} onValueChange={(v) => setAno(parseInt(v, 10))}>
-            <SelectTrigger className="w-[110px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            placeholder="Buscar por cliente ou CNPJ"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="min-w-[220px] flex-1 rounded-xl"
-          />
-
-          <Select value={regime} onValueChange={(v) => setRegime(v as typeof regime)}>
-            <SelectTrigger className="w-[150px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Regime: todos</SelectItem>
-              <SelectItem value="MEI">MEI</SelectItem>
-              <SelectItem value="Simples">Simples</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-            <SelectTrigger className="w-[160px] rounded-xl"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Status: todos</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="gerada">Gerada</SelectItem>
-              <SelectItem value="paga">Paga</SelectItem>
-              <SelectItem value="erro">Erro</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={enviarWhats} disabled={selected.size === 0}>
-              <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
-            </Button>
-            <Button className="rounded-xl" onClick={gerarLote} disabled={loading || selected.size === 0}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Gerar em lote ({selected.size})
-            </Button>
+      {/* ── KPI strip ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          {icon:FileText,     label:"Total",    val:kpi.total,        color:"text-foreground",  bg:"bg-card"},
+          {icon:Loader2,      label:"Pendente", val:kpi.pendente,     color:"text-blue-600",    bg:"bg-blue-50"},
+          {icon:CheckCircle2, label:"Geradas",  val:kpi.gerada,       color:"text-amber-600",   bg:"bg-amber-50"},
+          {icon:Wallet,       label:"Pagas",    val:kpi.paga,         color:"text-emerald-600", bg:"bg-emerald-50"},
+          {icon:AlertTriangle,label:"Total R$", val:fmtBRL(kpi.valor),color:"text-foreground",  bg:"bg-muted"},
+        ].map(({icon:Icon,label,val,color,bg}) => (
+          <div key={label} className={`ds-card flex items-center gap-3 p-3 ${bg}`}>
+            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
+              <Icon className="h-4 w-4 m-auto" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+              <p className={`text-base font-bold tabular-nums leading-tight ${color}`}>{val}</p>
+            </div>
           </div>
-        </div>
-
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[44px]">
-                <Checkbox
-                  checked={filtered.length > 0 && selected.size === filtered.length}
-                  onCheckedChange={toggleAll}
-                  aria-label="Selecionar todos"
-                />
-              </TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>CNPJ</TableHead>
-              <TableHead>Regime</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} className="py-16 text-center text-sm text-muted-foreground">
-                  <FileText className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                  Nenhum DAS para os filtros selecionados
-                </TableCell>
-              </TableRow>
-            )}
-            {filtered.map((g) => {
-              const venc = new Date(g.vencimento);
-              const today = new Date();
-              const overdue = g.status !== "paga" && venc < today;
-              const diasAtraso = overdue ? Math.floor((today.getTime() - venc.getTime()) / 86400000) : 0;
-              const pctMulta = Math.min(0.2, diasAtraso * 0.0033);
-              const multa = overdue ? g.valor * (pctMulta + (diasAtraso / 30) * 0.01) : 0;
-              return (
-              <TableRow key={g.id} className={g.status === "paga" ? "opacity-60" : ""}>
-                <TableCell>
-                  <Checkbox checked={selected.has(g.id)} onCheckedChange={() => toggleOne(g.id)} />
-                </TableCell>
-                <TableCell className="font-medium">
-                  {g.clienteNome}
-                  {g.enviadoWhatsappEm && (
-                    <div className="mt-1 text-xs text-success">WhatsApp enviado ✓</div>
-                  )}
-                  {g.erro && <div className="mt-1 text-xs text-destructive">{g.erro}</div>}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{g.cnpj}</TableCell>
-                <TableCell><Badge variant="outline" className="rounded-full">{g.regime}</Badge></TableCell>
-                <TableCell className="text-sm">
-                  {formatDate(g.vencimento)}
-                  {overdue && (
-                    <div className="text-xs text-destructive">{diasAtraso}d atraso</div>
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm">
-                  {g.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  {multa > 0 && (
-                    <div className="text-[10px] font-normal text-destructive">
-                      +{multa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} multa
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={g.status} overdue={overdue} />
-                  {g.status === "paga" && g.pagoEm && (
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                      em {new Date(g.pagoEm).toLocaleDateString("pt-BR")}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    {(g.status === "pendente" || g.status === "erro") && (
-                      <Button size="sm" variant="ghost" className="h-8 rounded-lg" onClick={() => gerarUm(g.id)}>
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {g.status === "gerada" && (
-                      <>
-                        <Button size="sm" variant="ghost" className="h-8 rounded-lg"
-                          onClick={() => { navigator.clipboard.writeText(g.codigoBarras ?? ""); toast.success("Código de barras copiado"); }}>
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 rounded-lg"
-                          onClick={() => toast.info("Download do PDF (mock)")}>
-                          <Download className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 rounded-lg"
-                          onClick={() => { dasStore.marcarPaga(g.id); toast.success("DAS marcado como pago"); }}>
-                          <Wallet className="h-3.5 w-3.5" /> Pago
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        ))}
       </div>
+
+      {/* ── Tabela ── */}
+      <DataTable
+        rows={filtered}
+        cols={cols}
+        getKey={g => g.id}
+        selected={sel}
+        onToggleAll={toggleAll}
+        onToggleRow={toggleOne}
+        emptyIcon={<FileText className="h-8 w-8"/>}
+        emptyText="Nenhum DAS para os filtros selecionados"
+        rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
+        toolbar={
+          <>
+            <Select value={mes.toString()} onValueChange={v=>setMes(+v)}>
+              <SelectTrigger className="h-8 w-28 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>{MESES.map((m,i)=><SelectItem key={m} value={(i+1).toString()}>{m}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={ano.toString()} onValueChange={v=>setAno(+v)}>
+              <SelectTrigger className="h-8 w-24 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>{[now.getFullYear()-1,now.getFullYear(),now.getFullYear()+1].map(y=><SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+            <div className="h-4 w-px bg-border shrink-0"/>
+            <TableSearch value={query} onChange={setQuery} placeholder="Buscar cliente ou CNPJ…"/>
+            <Select value={regime} onValueChange={v=>setRegime(v as typeof regime)}>
+              <SelectTrigger className="h-8 w-36 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os regimes</SelectItem>
+                <SelectItem value="MEI">MEI</SelectItem>
+                <SelectItem value="Simples">Simples Nacional</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={v=>setStatus(v as typeof status)}>
+              <SelectTrigger className="h-8 w-32 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="gerada">Gerada</SelectItem>
+                <SelectItem value="paga">Paga</SelectItem>
+                <SelectItem value="erro">Erro</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
+      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
     </div>
   );
 }
-
-function formatDate(iso: string) {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function StatusBadge({ status, overdue }: { status: DasStatus; overdue?: boolean }) {
-  if (overdue && status !== "paga") {
-    return <Badge variant="outline" className="rounded-full border bg-destructive/10 text-destructive border-destructive/20">Atrasada</Badge>;
-  }
-  const map: Record<DasStatus, { cls: string; label: string }> = {
-    pendente: { cls: "bg-muted text-muted-foreground border-border", label: "Pendente" },
-    gerada: { cls: "bg-info/10 text-info border-info/20", label: "Gerada" },
-    paga: { cls: "bg-success/10 text-success border-success/20", label: "Paga" },
-    erro: { cls: "bg-destructive/10 text-destructive border-destructive/20", label: "Erro" },
-  };
-  const { cls, label } = map[status];
-  return <Badge variant="outline" className={`rounded-full border ${cls}`}>{label}</Badge>;
-}
-
-function Kpi({ icon: Icon, label, value, tone }: {
-  icon: typeof FileText; label: string; value: string;
-  tone: "default" | "info" | "destructive" | "success";
-}) {
-  const toneCls = {
-    default: "bg-muted text-foreground",
-    info: "bg-info/10 text-info",
-    destructive: "bg-destructive/10 text-destructive",
-    success: "bg-success/10 text-success",
-  }[tone];
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneCls}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-xl font-semibold leading-tight">{value}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// silence unused import warnings for icons reserved for future status mapping
-void AlertTriangle;
