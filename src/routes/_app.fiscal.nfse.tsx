@@ -173,39 +173,30 @@ function NfsePage() {
   return (
     <div className="space-y-5">
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">NFS-e em Lote</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Emissão via NFE.io · Reforma Tributária (CBS/IBS)</p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-8"
-            onClick={enviarWhats} disabled={sel.size===0}>
-            <MessageCircle className="h-3.5 w-3.5"/> WhatsApp
-          </Button>
-          <Button size="sm" className="rounded-xl gap-1.5 h-8"
-            onClick={emitirLote} disabled={busy||sel.size===0}>
-            {busy?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<Send className="h-3.5 w-3.5"/>}
-            Emitir ({sel.size})
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="NFS-e em Lote"
+        subtitle="Emissão via NFE.io · Reforma Tributária (CBS/IBS)"
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
+              onClick={enviarWhats} disabled={sel.size===0}>
+              <MessageCircle className="h-4 w-4"/> WhatsApp
+            </Button>
+            <Button size="sm" className="rounded-xl gap-1.5 h-9"
+              onClick={emitirLote} disabled={busy||sel.size===0}>
+              {busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}
+              Emitir ({sel.size})
+            </Button>
+          </>
+        }
+      />
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {kpiList.map(({icon:Icon,label,val,color,bg})=>(
-          <div key={label} className={`ds-card flex items-center gap-3 p-3 ${bg}`}>
-            <div className={`ds-icon-pill bg-white/60 shadow-sm ${color}`} style={{width:"2rem",height:"2rem",borderRadius:"0.5rem"}}>
-              <Icon className="h-4 w-4 m-auto"/>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-              <p className={`truncate text-base font-bold tabular-nums leading-tight ${color}`}>{val}</p>
-            </div>
-          </div>
+      <KpiGrid cols={6}>
+        {kpiList.map(({icon:Icon,label,val,tone})=>(
+          <KpiCard key={label} icon={Icon} tone={tone} label={label} value={val} />
         ))}
-      </div>
+      </KpiGrid>
+
 
       {/* Tabela */}
       <DataTable
