@@ -129,6 +129,10 @@ async function simulaAsaas(c: Cobranca): Promise<Cobranca> {
 export const financeiroStore = {
   listByCompetencia: (competencia: string) => ensureForCompetencia(competencia),
   list: () => recompute(read()),
+  update(id: string, patch: Partial<Cobranca>) {
+    const list = read().map((c) => (c.id === id ? { ...c, ...patch } : c));
+    write(list);
+  },
   async gerarLote(ids: string[]) {
     const list = read();
     const updated = await Promise.all(
