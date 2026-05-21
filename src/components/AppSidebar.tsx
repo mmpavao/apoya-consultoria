@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 type NavItem = {
   to: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   /** Match exato — só ativo se pathname === to */
   exact?: boolean;
 };
