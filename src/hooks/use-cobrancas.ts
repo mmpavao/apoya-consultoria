@@ -93,7 +93,7 @@ export function useCobrancas(competencia?: string) {
     if (patch.ultimoEnvioWhatsapp !== undefined) dbPatch.ultimo_envio_whatsapp = patch.ultimoEnvioWhatsapp;
     if (patch.status              !== undefined) dbPatch.status                = patch.status;
 
-    const { error: err } = await supabase.from("cobrancas").update(dbPatch).eq("id", id);
+    const { error: err } = await supabase.from("cobrancas").update(dbPatch as any).eq("id", id);
     if (err) toast.error("Erro ao atualizar cobrança: " + err.message);
   }, []);
 

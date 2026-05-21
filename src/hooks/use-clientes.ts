@@ -149,14 +149,14 @@ export function useClientes() {
   }, [fetch]);
 
   const createCliente = useCallback(async (c: Omit<Cliente, "id" | "createdAt">) => {
-    const { data, error: err } = await supabase.from("clientes").insert(toDb(c)).select().single();
+    const { data, error: err } = await supabase.from("clientes").insert(toDb(c) as any).select().single();
     if (err) { toast.error("Erro ao criar cliente: " + err.message); return null; }
     toast.success(`${c.razaoSocial} cadastrado!`);
     return fromDb(data);
   }, []);
 
   const updateCliente = useCallback(async (id: string, patch: Partial<Cliente>) => {
-    const { error: err } = await supabase.from("clientes").update(toDb(patch)).eq("id", id);
+    const { error: err } = await supabase.from("clientes").update(toDb(patch) as any).eq("id", id);
     if (err) { toast.error("Erro ao atualizar: " + err.message); return false; }
     toast.success("Cliente atualizado");
     return true;

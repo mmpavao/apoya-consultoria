@@ -145,6 +145,7 @@ function write(list: Obrigacao[]) {
 
 export const obrigacoesStore = {
   list: () => read(),
+  listByCompetencia: (competencia: string) => read().filter((o) => o.competencia === competencia),
   toggle: (id: string) => {
     const list = read().map((o) => {
       if (o.id !== id) return o;
@@ -168,6 +169,7 @@ export const obrigacoesStore = {
     });
     write(list);
   },
+  atualizarStatus: (id: string, status: ObrigacaoStatus) => obrigacoesStore.setStatus(id, status),
   regenerate: (ano: number, mes: number) => {
     const existing = read().filter((o) => o.competencia !== `${ano}-${pad(mes)}`);
     const novos = genForMonth(clientesStore.list(), ano, mes);

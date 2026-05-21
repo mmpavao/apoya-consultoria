@@ -18,10 +18,10 @@ export const Route = createFileRoute("/_app/fiscal/nfse")({
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 const S_COLOR: Record<NfseStatus, BadgeColor> = {
-  rascunho:"blue", emitida:"green", enviada:"amber" as BadgeColor, cancelada:"gray", erro:"red",
+  rascunho:"blue", emitida:"green", cancelada:"gray", erro:"red",
 };
 const S_LABEL: Record<NfseStatus,string> = {
-  rascunho:"Rascunho", emitida:"Emitida", enviada:"Enviada", cancelada:"Cancelada", erro:"Erro",
+  rascunho:"Rascunho", emitida:"Emitida", cancelada:"Cancelada", erro:"Erro",
 };
 const R_COLOR: Record<string, BadgeColor> = {
   MEI:"violet", Simples:"blue", "Lucro Presumido":"cyan", "Lucro Real":"indigo", "Doméstica":"green",
@@ -115,7 +115,7 @@ function NfsePage() {
     {
       key:"servico", header:"Cód. Serv.",
       headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
-      cell: n=><span className="font-mono text-xs text-muted-foreground">{n.codigoServico}</span>,
+      cell: n=><span className="font-mono text-xs text-muted-foreground line-clamp-1 max-w-[140px]">{n.descricaoServico}</span>,
     },
     {
       key:"valor", header:"Valor",
