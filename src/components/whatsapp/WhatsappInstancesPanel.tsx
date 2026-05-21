@@ -91,11 +91,11 @@ export function WhatsappInstancesPanel() {
         onCreate={async (name, deps) => {
           try {
             const r = await create(name, deps);
-            toast.success("Instância criada. Escaneie o QR code para conectar.");
+            toast.success("Instância criada. Gerando QR code…");
             setOpen(false);
-            const inst = (await refresh(r.id), instances.find(i => i.id === r.id));
-            if (inst) setQrInstance(inst);
-            else setQrInstance({ id: r.id, nome: r.nome, display_name: name, departamentos: deps, numero: null, status: "connecting", qr_code: null, last_qr_at: null, last_connected_at: null, created_at: "" });
+            const placeholder: WaInstance = { id: r.id, nome: r.nome, display_name: name, departamentos: deps, numero: null, status: "connecting", qr_code: null, last_qr_at: null, last_connected_at: null, created_at: "" };
+            setQrInstance(placeholder);
+            try { await connect(r.id); } catch (e: any) { toast.error(e?.message ?? "Falha ao gerar QR"); }
           } catch (e: any) {
             toast.error(e?.message ?? "Falha ao criar instância");
           }
