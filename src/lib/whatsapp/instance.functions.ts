@@ -132,9 +132,6 @@ export const createInstance = createServerFn({ method: "POST" })
       }).eq("id", row.id);
       if (upd.error) throw new Error(upd.error.message);
 
-      // garante webhook persistido na Evolution (alguns servidores ignoram no /create)
-      await setEvolutionWebhook(slug, webhookUrl, evoApiKey);
-
       return { id: row.id, nome: slug, webhookUrl };
     } catch (e) {
       // rollback

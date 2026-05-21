@@ -11,8 +11,8 @@ import { phoneToJid, upsertConversa } from "./wa.server";
 async function loadCtx(sb: WaSupabaseClient, conversaId: string, userId: string) {
   const c = await sb.from("wa_conversa").select("*, wa_instance:instance_id (id, nome, evolution_apikey)").eq("id", conversaId).single();
   if (c.error || !c.data) throw new Error("Conversa não encontrada");
-  const u = await sb.from("profiles").select("nome").eq("id", userId).single();
-  return { conv: c.data, instance: c.data.wa_instance, agenteNome: u.data?.nome ?? "Agente" };
+  const u = await sb.from("profiles").select("full_name").eq("id", userId).single();
+  return { conv: c.data, instance: c.data.wa_instance, agenteNome: u.data?.full_name ?? "Agente" };
 }
 
 function withTag(content: string, departamento: string | null, agenteNome: string): string {
