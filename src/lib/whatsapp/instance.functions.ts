@@ -6,7 +6,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evo, publicBaseUrlFromRequest } from "@/integrations/evolution/client.server";
-import { sbFromContext, type WaSupabaseClient } from "./sb.server";
+import { sb, sbFromContext, type WaSupabaseClient } from "./sb.server";
 import { INSTANCE_NAME_RE, slugifyInstanceName } from "./wa.server";
 
 const WEBHOOK_EVENTS = [
@@ -49,18 +49,19 @@ export const createInstance = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
-    await ensureAdmin(sb, context.userId);
+    const authSb = sbFromContext(context);
+    await ensureAdmin(authSb, context.userId);
+    const db = sb;
 
     const slug = slugifyInstanceName(data.displayName);
     if (!INSTANCE_NAME_RE.test(slug)) throw new Error("Nome inválido. Use 3-40 caracteres alfanuméricos.");
 
     // checa duplicidade
-    const dup = await sb.from("wa_instance").select("id").eq("nome", slug).maybeSingle();
+    const dup = await db.from("wa_instance").select("id").eq("nome", slug).maybeSingle();
     if (dup.data) throw new Error("Já existe uma instância com esse nome. Escolha outro.");
 
     // pré-cria no banco para obter webhook_token
-    const ins = await sb
+    const ins = await db
       .from("wa_instance")
       .insert({
         nome: slug,
@@ -99,17 +100,18 @@ export const createInstance = createServerFn({ method: "POST" })
       const evoApiKey = evoRes?.hash?.apikey ?? null;
       const qrBase64 = evoRes?.qrcode?.base64 ?? evoRes?.qrcode?.code ?? null;
 
-      await sb.from("wa_instance").update({
+      const upd = await db.from("wa_instance").update({
         status: "connecting",
         evolution_apikey: evoApiKey,
         qr_code: qrBase64,
         last_qr_at: qrBase64 ? new Date().toISOString() : null,
       }).eq("id", row.id);
+      if (upd.error) throw new Error(upd.error.message);
 
       return { id: row.id, nome: slug, webhookUrl };
     } catch (e) {
       // rollback
-      await sb.from("wa_instance").delete().eq("id", row.id);
+      await db.from("wa_instance").delete().eq("id", row.id);
       throw e;
     }
   });
@@ -121,8 +123,8 @@ export const connectInstance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
-    await ensureAdmin(sb, context.userId);
+    const authSb = sbFromContext(context);
+    await ensureAdmin(authSb, context.userId);
     const r = await sb.from("wa_instance").select("*").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const inst = r.data;
@@ -130,11 +132,12 @@ export const connectInstance = createServerFn({ method: "POST" })
     const res = await evo<any>("GET", `/instance/connect/${encodeURIComponent(inst.nome)}`);
     const qr = res?.base64 ?? res?.code ?? null;
     const already = res?.instance?.state === "open";
-    await sb.from("wa_instance").update({
+    const upd = await sb.from("wa_instance").update({
       status: already ? "connected" : "connecting",
       qr_code: qr,
       last_qr_at: qr ? new Date().toISOString() : null,
     }).eq("id", inst.id);
+    if (upd.error) throw new Error(upd.error.message);
     return { qr, connected: already };
   });
 
