@@ -185,6 +185,14 @@ function DasPage() {
         }
       />
 
+      <PageTabs
+        items={[
+          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
+          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
+          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
+        ]}
+      />
+
       <KpiGrid cols={5}>
         <KpiCard icon={FileText}      tone="neutral" label="Total"    value={kpi.total} />
         <KpiCard icon={Loader2}       tone="info"    label="Pendente" value={kpi.pendente} />
