@@ -67,11 +67,13 @@ export function useObrigacoes(competencia?: string) {
 
   useEffect(() => {
     const ch = supabase
-      .channel("obrigacoes-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "obrigacoes" }, () => fetch())
+      .channel("apoya-obrigacoes-static")
+      .on("postgres_changes", { event: "*", schema: "public", table: "obrigacoes" }, () => {
+        window.dispatchEvent(new Event("apoya:obrigacoes:changed"));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetch]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateStatus = useCallback(async (id: string, status: ObrigacaoStatus) => {
     const patch: Record<string, unknown> = { status };

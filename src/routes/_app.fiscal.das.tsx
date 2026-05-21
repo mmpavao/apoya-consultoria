@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, Download, FileText, Loader2,
   MessageCircle, RefreshCw, Send, Wallet, AlertTriangle,
-  Receipt, Activity,
-} from "lucide-react";
+  Receipt, Activity, Plus} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { DasGerarDialog } from "@/components/DasGerarDialog";
 // import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
@@ -38,6 +38,7 @@ function DasPage() {
   const { guias: items, loading: dasLoading, refresh } = useDas();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
+  const [dialogDas, setDialogDas] = useState(false);
   const [status, setStatus] = useState<"todos"|DasStatus>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
@@ -251,6 +252,12 @@ function DasPage() {
         <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
+
+      <DasGerarDialog
+        open={dialogDas}
+        onClose={() => setDialogDas(false)}
+        onCreated={() => {}}
+      />
     </div>
   );
 }

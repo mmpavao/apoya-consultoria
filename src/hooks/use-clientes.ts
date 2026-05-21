@@ -142,11 +142,13 @@ export function useClientes() {
   // Realtime subscription
   useEffect(() => {
     const ch = supabase
-      .channel("clientes-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => fetch())
+      .channel("apoya-clientes-static")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => {
+        window.dispatchEvent(new Event("apoya:clientes:changed"));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetch]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createCliente = useCallback(async (c: Omit<Cliente, "id" | "createdAt">) => {
     const { data, error: err } = await supabase.from("clientes").insert(toDb(c) as any).select().single();

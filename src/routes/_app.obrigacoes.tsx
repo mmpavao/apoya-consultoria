@@ -3,13 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Calendar, CheckCircle2, Clock, Loader2,
-  RefreshCw, TrendingUp,
-} from "lucide-react";
+  RefreshCw, TrendingUp, Plus} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { ObrigacaoFormDialog } from "@/components/ObrigacaoFormDialog";
 // import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
@@ -42,6 +42,7 @@ function ObrigacoesPage(){
   const { obrigacoes: items, loading: obgLoading, refetch: refresh } = useObrigacoes();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|ObrigacaoStatus>("todos");
+  const [dialogOb, setDialogOb] = useState(false);
   const [tipo, setTipo]     = useState("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
@@ -233,6 +234,12 @@ function ObrigacoesPage(){
         <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
+
+      <ObrigacaoFormDialog
+        open={dialogOb}
+        onClose={() => setDialogOb(false)}
+        onCreated={() => {}}
+      />
     </div>
   );
 }

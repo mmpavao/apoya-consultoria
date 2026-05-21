@@ -78,11 +78,13 @@ export function useCobrancas(competencia?: string) {
 
   useEffect(() => {
     const ch = supabase
-      .channel("cobrancas-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "cobrancas" }, () => fetch())
+      .channel("apoya-cobrancas-static")
+      .on("postgres_changes", { event: "*", schema: "public", table: "cobrancas" }, () => {
+        window.dispatchEvent(new Event("apoya:cobrancas:changed"));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [fetch]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateCobranca = useCallback(async (id: string, patch: Partial<{
     asaasId: string; linkPagamento: string; ultimoEnvioWhatsapp: string; status: CobrancaStatus;

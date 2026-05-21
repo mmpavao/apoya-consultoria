@@ -3,13 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
-  Link2, Loader2, MessageCircle, ShieldAlert, Wallet,
-} from "lucide-react";
+  Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { CobrancaFormDialog } from "@/components/CobrancaFormDialog";
 // import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -33,6 +33,7 @@ function FinanceiroPage(){
   const { cobrancas: items, loading: cobLoading, refetch: refresh } = useCobrancas();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
+  const [dialogCob, setDialogCob] = useState(false);
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
@@ -229,6 +230,12 @@ function FinanceiroPage(){
         <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
+
+      <CobrancaFormDialog
+        open={dialogCob}
+        onClose={() => setDialogCob(false)}
+        onCreated={() => {}}
+      />
     </div>
   );
 }

@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Download,
   FileText, Loader2, MessageCircle, Receipt, Send,
-  Wallet, Activity,
-} from "lucide-react";
+  Wallet, Activity, Plus} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { NfseFormDialog } from "@/components/NfseFormDialog";
 // import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
@@ -41,6 +41,7 @@ function NfsePage() {
   const items = notas as any[];
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|string>("todos");
+  const [dialogNfse, setDialogNfse] = useState(false);
   const [status, setStatus] = useState<"todos"|NfseStatus|string>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
@@ -267,6 +268,12 @@ function NfsePage() {
         <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
+
+      <NfseFormDialog
+        open={dialogNfse}
+        onClose={() => setDialogNfse(false)}
+        onCreated={() => {}}
+      />
     </div>
   );
 }
