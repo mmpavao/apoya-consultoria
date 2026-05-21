@@ -7,3 +7,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sb: any = supabaseAdmin;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WaSupabaseClient = any;
+
+export function sbFromContext(context: { supabase?: unknown }): WaSupabaseClient {
+  return (context.supabase ?? supabaseAdmin) as WaSupabaseClient;
+}
