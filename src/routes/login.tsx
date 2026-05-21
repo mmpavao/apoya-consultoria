@@ -96,7 +96,7 @@ function LoginPage() {
         />
 
         {/* Logo */}
-        <ApoyaLogo variant="on-dark" size="lg" withTagline={false} className="max-w-[180px] relative z-10" />
+        <ApoyaLogo variant="on-dark" size="xl" withTagline={false} className="max-w-[260px] relative z-10" />
 
         {/* Conteúdo central */}
         <div className="relative z-10 space-y-8 max-w-md">
