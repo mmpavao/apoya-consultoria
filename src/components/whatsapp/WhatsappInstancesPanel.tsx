@@ -15,6 +15,7 @@ export function WhatsappInstancesPanel() {
   const { instances, loading, creating, create, connect, refresh, logout, remove } = useWaInstances();
   const [open, setOpen] = useState(false);
   const [qrInstance, setQrInstance] = useState<WaInstance | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WaInstance | null>(null);
 
   const activeQr = qrInstance ? instances.find(i => i.id === qrInstance.id) ?? qrInstance : null;
 
