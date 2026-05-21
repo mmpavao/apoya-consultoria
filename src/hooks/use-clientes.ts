@@ -1,0 +1,190 @@
+/**
+ * Hook: useClientes
+ * Substitui clientes-store.ts (localStorage) pelo Supabase real.
+ */
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export type Regime = "MEI" | "Simples" | "Lucro Presumido" | "Lucro Real" | "Doméstica";
+export type Status = "ativo" | "inadimplente" | "suspenso" | "inativo" | "em_analise";
+export type TierServico = "MEI" | "Simples" | "Empresarial" | "Doméstica";
+export type FormaPagamento = "PIX" | "Boleto" | "Débito automático";
+
+export interface Cliente {
+  id: string;
+  razaoSocial: string;
+  nomeFantasia?: string;
+  cnpj: string;
+  regime: Regime;
+  regimeHibrido?: boolean;
+  tier?: TierServico;
+  status: Status;
+  responsavel: string;
+  email?: string;
+  telefone?: string;
+  whatsapp?: string;
+  inscricaoMunicipal?: string;
+  inscricaoEstadual?: string;
+  codigoServicoNfse?: string;
+  diaVencimento?: number;
+  valorHonorario?: number;
+  formaPagamento?: FormaPagamento;
+  temEmpregados?: boolean;
+  temIncentivoFiscal?: boolean;
+  municipio?: string;
+  uf?: string;
+  endereco?: { municipio?: string; uf?: string; cep?: string; logradouro?: string; numero?: string; bairro?: string };
+  atividadePrincipal?: string;
+  observacoes?: string;
+  createdAt: string;
+}
+
+// Mapear snake_case do Supabase → camelCase local
+function fromDb(row: Record<string, unknown>): Cliente {
+  return {
+    id:                row.id as string,
+    razaoSocial:       row.razao_social as string,
+    nomeFantasia:      row.nome_fantasia as string | undefined,
+    cnpj:              row.cnpj as string,
+    regime:            (row.regime as string).replace("Simples Nacional", "Simples") as Regime,
+    regimeHibrido:     row.regime_hibrido as boolean,
+    tier:              row.tier as TierServico | undefined,
+    status:            row.status as Status,
+    responsavel:       row.responsavel as string,
+    email:             row.email as string | undefined,
+    telefone:          row.telefone as string | undefined,
+    whatsapp:          row.whatsapp as string | undefined,
+    inscricaoMunicipal:row.inscricao_municipal as string | undefined,
+    inscricaoEstadual: row.inscricao_estadual as string | undefined,
+    codigoServicoNfse: row.codigo_servico_nfse as string | undefined,
+    diaVencimento:     row.dia_vencimento as number | undefined,
+    valorHonorario:    row.valor_honorario ? Number(row.valor_honorario) : undefined,
+    formaPagamento:    row.forma_pagamento as FormaPagamento | undefined,
+    temEmpregados:     row.tem_empregados as boolean,
+    temIncentivoFiscal:row.tem_incentivo_fiscal as boolean,
+    municipio:         row.municipio as string | undefined,
+    uf:                row.uf as string | undefined,
+    endereco: {
+      municipio: row.municipio as string | undefined,
+      uf:        row.uf as string | undefined,
+      cep:       row.cep as string | undefined,
+      logradouro:row.logradouro as string | undefined,
+      numero:    row.numero as string | undefined,
+      bairro:    row.bairro as string | undefined,
+    },
+    atividadePrincipal:row.atividade_principal as string | undefined,
+    observacoes:       row.observacoes as string | undefined,
+    createdAt:         row.created_at as string,
+  };
+}
+
+// camelCase local → snake_case Supabase
+function toDb(c: Partial<Cliente>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (c.razaoSocial       !== undefined) out.razao_social        = c.razaoSocial;
+  if (c.nomeFantasia      !== undefined) out.nome_fantasia       = c.nomeFantasia;
+  if (c.cnpj              !== undefined) out.cnpj                = c.cnpj;
+  if (c.regime            !== undefined) out.regime              = c.regime === "Simples" ? "Simples" : c.regime;
+  if (c.regimeHibrido     !== undefined) out.regime_hibrido      = c.regimeHibrido;
+  if (c.tier              !== undefined) out.tier                = c.tier;
+  if (c.status            !== undefined) out.status              = c.status;
+  if (c.responsavel       !== undefined) out.responsavel         = c.responsavel;
+  if (c.email             !== undefined) out.email               = c.email;
+  if (c.telefone          !== undefined) out.telefone            = c.telefone;
+  if (c.whatsapp          !== undefined) out.whatsapp            = c.whatsapp;
+  if (c.inscricaoMunicipal!==undefined)  out.inscricao_municipal = c.inscricaoMunicipal;
+  if (c.inscricaoEstadual !== undefined) out.inscricao_estadual  = c.inscricaoEstadual;
+  if (c.codigoServicoNfse !== undefined) out.codigo_servico_nfse = c.codigoServicoNfse;
+  if (c.diaVencimento     !== undefined) out.dia_vencimento      = c.diaVencimento;
+  if (c.valorHonorario    !== undefined) out.valor_honorario     = c.valorHonorario;
+  if (c.formaPagamento    !== undefined) out.forma_pagamento     = c.formaPagamento;
+  if (c.temEmpregados     !== undefined) out.tem_empregados      = c.temEmpregados;
+  if (c.temIncentivoFiscal!==undefined)  out.tem_incentivo_fiscal= c.temIncentivoFiscal;
+  if (c.atividadePrincipal!==undefined)  out.atividade_principal = c.atividadePrincipal;
+  if (c.observacoes       !== undefined) out.observacoes         = c.observacoes;
+  if (c.endereco) {
+    if (c.endereco.municipio !== undefined) out.municipio  = c.endereco.municipio;
+    if (c.endereco.uf        !== undefined) out.uf         = c.endereco.uf;
+    if (c.endereco.cep       !== undefined) out.cep        = c.endereco.cep;
+    if (c.endereco.logradouro!==undefined)  out.logradouro = c.endereco.logradouro;
+    if (c.endereco.numero    !== undefined) out.numero     = c.endereco.numero;
+    if (c.endereco.bairro    !== undefined) out.bairro     = c.endereco.bairro;
+  }
+  return out;
+}
+
+export function useClientes() {
+  const [clientes, setClientes]   = useState<Cliente[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+
+  const fetch = useCallback(async () => {
+    try {
+      const { data, error: err } = await supabase
+        .from("clientes")
+        .select("*")
+        .order("razao_social");
+      if (err) throw err;
+      setClientes((data ?? []).map(fromDb));
+      setError(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar clientes";
+      setError(msg);
+      console.error("[useClientes]", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  // Realtime subscription
+  useEffect(() => {
+    const ch = supabase
+      .channel("clientes-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => fetch())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [fetch]);
+
+  const createCliente = useCallback(async (c: Omit<Cliente, "id" | "createdAt">) => {
+    const { data, error: err } = await supabase.from("clientes").insert(toDb(c)).select().single();
+    if (err) { toast.error("Erro ao criar cliente: " + err.message); return null; }
+    toast.success(`${c.razaoSocial} cadastrado!`);
+    return fromDb(data);
+  }, []);
+
+  const updateCliente = useCallback(async (id: string, patch: Partial<Cliente>) => {
+    const { error: err } = await supabase.from("clientes").update(toDb(patch)).eq("id", id);
+    if (err) { toast.error("Erro ao atualizar: " + err.message); return false; }
+    toast.success("Cliente atualizado");
+    return true;
+  }, []);
+
+  const deleteCliente = useCallback(async (id: string) => {
+    const { error: err } = await supabase.from("clientes").delete().eq("id", id);
+    if (err) { toast.error("Erro ao excluir: " + err.message); return false; }
+    return true;
+  }, []);
+
+  return { clientes, loading, error, refetch: fetch, createCliente, updateCliente, deleteCliente };
+}
+
+export const REGIME_LABEL: Record<Regime, string> = {
+  MEI: "MEI",
+  Simples: "Simples Nacional",
+  "Lucro Presumido": "Lucro Presumido",
+  "Lucro Real": "Lucro Real",
+  Doméstica: "Doméstica",
+};
+
+export const STATUS_LABEL: Record<Status, string> = {
+  ativo:        "Ativo",
+  inadimplente: "Inadimplente",
+  suspenso:     "Suspenso",
+  inativo:      "Inativo",
+  em_analise:   "Em análise",
+};
+
+export const RESPONSAVEIS = ["Ana Souza", "Carlos Lima", "Marcos Pinto"];
