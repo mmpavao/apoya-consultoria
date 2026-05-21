@@ -55,7 +55,7 @@ function AppShell() {
 
       {/* ─── SIDEBAR — Desktop (fixed) ─────────────────── */}
       <aside className="app-sidebar hidden md:flex flex-col">
-        <AppSidebar />
+        <AppSidebar onLogout={handleLogout} />
       </aside>
 
       {/* ─── DRAWER — Mobile (overlay) ─────────────────── */}
@@ -66,7 +66,7 @@ function AppShell() {
             onClick={() => setMobileOpen(false)}
           />
           <aside className="relative z-10 app-sidebar flex flex-col">
-            <AppSidebar onNavigate={() => setMobileOpen(false)} />
+            <AppSidebar onNavigate={() => setMobileOpen(false)} onLogout={handleLogout} />
           </aside>
         </div>
       )}

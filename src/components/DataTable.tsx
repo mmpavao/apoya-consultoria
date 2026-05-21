@@ -1,7 +1,5 @@
 /**
- * DataTable — Tabela densa estilo Linear / Prodexa
- * Usa as classes ds-table do design system (styles.css)
- * Sem shadcn Table — sem scroll horizontal.
+ * DataTable — estilo Figma-expert (rounded-3xl, sombras suaves, linhas leves)
  */
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search } from "lucide-react";
@@ -13,9 +11,7 @@ export interface ColDef<T> {
   key: string;
   header: ReactNode;
   cell: (row: T) => ReactNode;
-  /** classes para o <th> */
   headerClassName?: string;
-  /** classes para cada <td> */
   className?: string;
 }
 
@@ -23,50 +19,39 @@ interface DataTableProps<T> {
   rows: T[];
   cols: ColDef<T>[];
   getKey: (row: T) => string;
-  /** Habilita coluna de checkbox */
   selected?: Set<string>;
   onToggleAll?: () => void;
   onToggleRow?: (key: string) => void;
   emptyIcon?: ReactNode;
   emptyText?: string;
-  /** Barra de filtros — fica acima da tabela */
   toolbar?: ReactNode;
-  /** Classe extra aplicada a cada <tr> */
   rowClassName?: (row: T) => string;
 }
 
 export function DataTable<T>({
-  rows,
-  cols,
-  getKey,
-  selected,
-  onToggleAll,
-  onToggleRow,
-  emptyIcon,
-  emptyText = "Nenhum resultado",
-  toolbar,
-  rowClassName,
+  rows, cols, getKey,
+  selected, onToggleAll, onToggleRow,
+  emptyIcon, emptyText = "Nenhum resultado",
+  toolbar, rowClassName,
 }: DataTableProps<T>) {
   const hasSelection = selected !== undefined && !!onToggleAll && !!onToggleRow;
   const allChecked   = hasSelection && rows.length > 0 && selected!.size === rows.length;
   const someChecked  = hasSelection && selected!.size > 0 && selected!.size < rows.length;
 
   return (
-    <div className="ds-card overflow-hidden">
-      {/* ── Toolbar ── */}
+    <div className="surface-card overflow-hidden">
       {toolbar && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 px-5 py-4 border-b border-border/70">
           {toolbar}
         </div>
       )}
 
-      {/* ── Tabela ── */}
-      <div className="ds-table-wrapper">
-        <table className="ds-table">
+      <div className="w-full overflow-hidden">
+        <table className="ft-table">
           <thead>
             <tr>
               {hasSelection && (
-                <th className="w-10 pl-4">
+                <th className="w-10 pl-5">
                   <Checkbox
                     checked={allChecked}
                     // @ts-expect-error indeterminate via ref
@@ -86,14 +71,8 @@ export function DataTable<T>({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td
-                  colSpan={cols.length + (hasSelection ? 1 : 0)}
-                  className="py-16 text-center"
-                  style={{ overflow: "visible", whiteSpace: "normal" }}
-                >
-                  {emptyIcon && (
-                    <div className="mb-2 flex justify-center opacity-30">{emptyIcon}</div>
-                  )}
+                <td colSpan={cols.length + (hasSelection ? 1 : 0)} className="py-20 text-center">
+                  {emptyIcon && <div className="mb-3 flex justify-center opacity-30">{emptyIcon}</div>}
                   <p className="text-sm text-muted-foreground">{emptyText}</p>
                 </td>
               </tr>
@@ -104,14 +83,10 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
-                    className={cn(
-                      "group",
-                      isSelected && "bg-primary/5",
-                      rowClassName?.(row),
-                    )}
+                    className={cn("group", isSelected && "bg-primary/[0.04]", rowClassName?.(row))}
                   >
                     {hasSelection && (
-                      <td className="w-10 pl-4" style={{ overflow: "visible" }}>
+                      <td className="w-10 pl-5">
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => onToggleRow!(key)}
@@ -120,9 +95,7 @@ export function DataTable<T>({
                       </td>
                     )}
                     {cols.map((col) => (
-                      <td key={col.key} className={col.className}>
-                        {col.cell(row)}
-                      </td>
+                      <td key={col.key} className={col.className}>{col.cell(row)}</td>
                     ))}
                   </tr>
                 );
@@ -135,11 +108,9 @@ export function DataTable<T>({
   );
 }
 
-/* ─────────────────────────────────────────────
-   InlineBadge — badge dot colorido estilo Prodexa
-   ───────────────────────────────────────────── */
+/* ─── InlineBadge — pílula leve ─────────────────────────── */
 const PAL: Record<string, string> = {
-  gray:   "bg-gray-100   text-gray-600",
+  gray:   "bg-muted text-muted-foreground",
   blue:   "bg-blue-50    text-blue-700",
   green:  "bg-emerald-50 text-emerald-700",
   red:    "bg-red-50     text-red-700",
@@ -147,14 +118,14 @@ const PAL: Record<string, string> = {
   violet: "bg-violet-50  text-violet-700",
   cyan:   "bg-cyan-50    text-cyan-700",
   indigo: "bg-indigo-50  text-indigo-700",
-  orange: "bg-orange-50  text-orange-700",
+  orange: "bg-primary-soft text-accent-foreground",
 };
 const DOT: Record<string, string> = {
-  gray:   "bg-gray-400",   blue:   "bg-blue-500",
-  green:  "bg-emerald-500",red:    "bg-red-500",
-  amber:  "bg-amber-500",  violet: "bg-violet-500",
-  cyan:   "bg-cyan-500",   indigo: "bg-indigo-500",
-  orange: "bg-orange-500",
+  gray:   "bg-muted-foreground/60", blue:   "bg-blue-500",
+  green:  "bg-emerald-500",         red:    "bg-red-500",
+  amber:  "bg-amber-500",           violet: "bg-violet-500",
+  cyan:   "bg-cyan-500",            indigo: "bg-indigo-500",
+  orange: "bg-primary",
 };
 
 export type BadgeColor = keyof typeof PAL;
@@ -163,43 +134,36 @@ export function InlineBadge({
   children, color = "gray", dot = false,
 }: { children: ReactNode; color?: BadgeColor; dot?: boolean }) {
   return (
-    <span className={cn(
-      "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
-      PAL[color] ?? PAL.gray,
-    )}>
+    <span className={cn("pill", PAL[color] ?? PAL.gray)}>
       {dot && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[color] ?? DOT.gray)} />}
       {children}
     </span>
   );
 }
 
-/* ─── Search ── */
 export function TableSearch({
   value, onChange, placeholder = "Buscar…",
 }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div className="relative">
-      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-8 min-w-[180px] rounded-lg pl-8 text-sm"
+        className="h-10 min-w-[220px] rounded-full pl-9 pr-4 text-sm bg-muted/40 border-transparent focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-primary/15"
       />
     </div>
   );
 }
 
-/* ─── Footer ── */
 export function TableFooter({
   total, filtered, selected,
 }: { total: number; filtered: number; selected?: number }) {
   return (
-    <div className="flex items-center gap-3 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+    <div className="flex items-center gap-3 border-t border-border/70 px-5 py-3 text-xs text-muted-foreground">
       <span>{filtered} resultado{filtered !== 1 ? "s" : ""}</span>
-      {filtered !== total && (
-        <span className="text-muted-foreground/50">de {total} total</span>
-      )}
+      {filtered !== total && <span className="text-muted-foreground/50">de {total} total</span>}
       {!!selected && selected > 0 && (
         <span className="ml-auto font-semibold text-foreground">
           {selected} selecionado{selected !== 1 ? "s" : ""}
