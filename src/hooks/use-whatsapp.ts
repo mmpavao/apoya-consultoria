@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 export type MsgStatus = "enviada" | "entregue" | "lida" | "erro" | "pendente";
 export type MsgTipo   = "text" | "template" | "media" | "audio" | "document";
-export type MsgDirecao = "saida" | "entrada";
+export type MsgDirecao = "enviada" | "recebida";
 
 export interface MensagemWA {
   id: string;
@@ -29,7 +29,7 @@ function fromDb(r: Record<string, unknown>): MensagemWA {
     id:           r.id as string,
     clienteId:    r.cliente_id as string,
     telefone:     (r.telefone as string) ?? "—",
-    direcao:      (r.direcao as MsgDirecao) ?? "saida",
+    direcao:      (r.direcao as MsgDirecao) ?? "enviada",
     tipo:         (r.tipo as MsgTipo)      ?? "text",
     conteudo:     (r.conteudo as string)   ?? "",
     arquivoUrl:   r.arquivo_url as string | undefined,
@@ -88,7 +88,7 @@ export function useWhatsapp() {
           telefone,
           tipo,
           conteudo,
-          direcao: "saida",
+          direcao: "enviada",
           status: "pendente",
           eh_automatica: false,
         });

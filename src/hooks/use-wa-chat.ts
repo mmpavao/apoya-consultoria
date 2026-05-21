@@ -25,7 +25,7 @@ export interface WaConversa {
 export interface WaMensagem {
   id: string;
   conversa_id: string;
-  direcao: "entrada" | "saida";
+  direcao: "recebida" | "enviada";
   tipo: string;
   conteudo: string | null;
   arquivo_url: string | null;
@@ -89,7 +89,7 @@ export function useWaMensagens(conversaId: string | null) {
     return () => { supabase.removeChannel(ch); };
   }, [reload, conversaId]);
 
-  return { mensagens, loading, reload };
+  return { mensagens, loading, reload, setMensagens };
 }
 
 export function useWaActions() {

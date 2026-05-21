@@ -53,7 +53,7 @@ function WhatsappPage() {
   const active = useMemo(() => conversas.find(c => c.id === activeId) ?? null, [conversas, activeId]);
   const activeInstance = useMemo(() => instances.find(i => i.id === (active?.instance_id || instanceId)), [instances, active, instanceId]);
 
-  const { mensagens } = useWaMensagens(active?.id ?? null);
+  const { mensagens, reload: reloadMensagens, setMensagens: setMensagensLocal } = useWaMensagens(active?.id ?? null);
   const actions = useWaActions();
   const [draft, setDraft] = useState("");
   const [departamento, setDepartamento] = useState<string>("");
@@ -87,8 +87,38 @@ function WhatsappPage() {
     if (!active || !draft.trim()) return;
     const texto = draft.trim();
     setDraft("");
-    try { await actions.enviarTexto(active.id, texto); }
-    catch (e: any) { toast.error(e?.message ?? "Erro ao enviar"); setDraft(texto); }
+    // optimistic update — mensagem aparece imediatamente no chat
+    const tempId = `temp_${Date.now()}`;
+    const tempMsg = {
+      id: tempId,
+      conversa_id: active.id,
+      direcao: "enviada" as const,
+      tipo: "text",
+      conteudo: texto,
+      arquivo_url: null,
+      arquivo_nome: null,
+      mime_type: null,
+      evolution_id: null,
+      agente_nome: profile?.full_name ?? null,
+      departamento: active.departamento,
+      reply_to: null,
+      reaction: null,
+      reaction_to: null,
+      status: "enviando",
+      created_at: new Date().toISOString(),
+      lida_em: null,
+    };
+    setMensagensLocal(prev => [...prev, tempMsg]);
+    try {
+      await actions.enviarTexto(active.id, texto);
+      // reload para substituir a msg temporária pela definitiva do banco
+      setTimeout(() => reloadMensagens(), 1500);
+    } catch (e: any) {
+      // reverter optimistic update em caso de erro
+      setMensagensLocal(prev => prev.filter(m => m.id !== tempId));
+      toast.error(e?.message ?? "Erro ao enviar");
+      setDraft(texto);
+    }
   }
   async function uploadArquivo(f: File) {
     if (!active) return;
@@ -206,8 +236,8 @@ function WhatsappPage() {
                   <div className="mx-auto flex max-w-2xl flex-col gap-2">
                     {mensagens.map((m) => (
                       <div key={m.id} className={cn("flex max-w-[85%] flex-col gap-1 rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%]",
-                        m.direcao === "saida" ? "self-end bg-success/15 text-foreground" : "self-start bg-card")}>
-                        {m.agente_nome && m.direcao === "saida" && (
+                        m.direcao === "enviada" ? "self-end bg-success/15 text-foreground" : "self-start bg-card")}>
+                        {m.agente_nome && m.direcao === "enviada" && (
                           <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
                             <User className="h-3 w-3" />{m.agente_nome}{m.departamento ? ` · ${m.departamento}` : ""}
                           </div>
@@ -229,7 +259,7 @@ function WhatsappPage() {
                         {m.conteudo && <p className="whitespace-pre-wrap break-words leading-snug">{m.conteudo}</p>}
                         <div className="flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
                           {fmtTime(m.created_at)}
-                          {m.direcao === "saida" && (
+                          {m.direcao === "enviada" && (
                             m.status === "lida" ? <CheckCheck className="h-3 w-3 text-info" /> :
                             m.status === "entregue" ? <CheckCheck className="h-3 w-3" /> :
                             <Check className="h-3 w-3" />
