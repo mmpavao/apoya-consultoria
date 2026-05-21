@@ -9,7 +9,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 export type WaSupabaseClient = any;
 
 export function sbFromContext(context: { supabase?: unknown }): WaSupabaseClient {
-  return (context.supabase ?? supabaseAdmin) as WaSupabaseClient;
+  if (!context.supabase) {
+    throw new Error("Sessão autenticada não encontrada para acessar dados do WhatsApp.");
+  }
+  return context.supabase as WaSupabaseClient;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
