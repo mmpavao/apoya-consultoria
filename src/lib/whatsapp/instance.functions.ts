@@ -156,6 +156,11 @@ export const connectInstance = createServerFn({ method: "POST" })
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const inst = r.data;
 
+    // reforça o webhook antes de conectar
+    const baseUrl = publicBaseUrlFromRequest(getRequest());
+    const webhookUrl = buildWebhookUrl(baseUrl, inst.nome, inst.webhook_token);
+    try { await setEvolutionWebhook(inst.nome, webhookUrl, inst.evolution_apikey); } catch { /* ignore */ }
+
     const res = await evo<any>("GET", `/instance/connect/${encodeURIComponent(inst.nome)}`);
     const qr = res?.base64 ?? res?.code ?? null;
     const already = res?.instance?.state === "open";
