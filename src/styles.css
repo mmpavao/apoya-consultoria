@@ -4,18 +4,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Google Font ─────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&display=swap');
+/* ─── Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Figtree:wght@300;400;500;600;700&display=swap');
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit",  "Figtree", ui-sans-serif, system-ui, sans-serif;
 
-  --radius-sm:  calc(var(--radius) - 4px);
-  --radius-md:  calc(var(--radius) - 2px);
+  --radius-sm:  calc(var(--radius) - 8px);
+  --radius-md:  calc(var(--radius) - 4px);
   --radius-lg:  var(--radius);
   --radius-xl:  calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 14px);
+  --radius-3xl: calc(var(--radius) + 12px);
 
   --color-background:           var(--background);
   --color-foreground:           var(--foreground);
@@ -26,6 +27,7 @@
   --color-primary:              var(--primary);
   --color-primary-foreground:   var(--primary-foreground);
   --color-primary-soft:         var(--primary-soft);
+  --color-primary-glow:         var(--primary-glow);
   --color-secondary:            var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted:                var(--muted);
@@ -52,59 +54,72 @@
   --color-sidebar-muted:              var(--sidebar-muted);
 }
 
-/* ─── Design tokens — Light ────────────────────────────────── */
+/* ─── Design tokens ────────────────────────────────────── */
 :root {
-  --radius: 0.625rem;          /* 10px — levemente menor, mais profissional */
+  --radius: 1rem;          /* 16px — generoso, Figma style */
 
-  --background:     oklch(0.972 0.004 250);   /* cinza frio suave */
-  --foreground:     oklch(0.16 0.020 260);
+  --background:     oklch(0.985 0.006 60);   /* off-white quente */
+  --foreground:     oklch(0.18 0.020 260);
 
   --card:           oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.020 260);
+  --card-foreground: oklch(0.18 0.020 260);
   --popover:        oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.020 260);
+  --popover-foreground: oklch(0.18 0.020 260);
 
-  /* APOYA — laranja quente institucional */
+  /* APOYA — laranja institucional */
   --primary:          oklch(0.66 0.195 44);
   --primary-foreground: oklch(1 0 0);
   --primary-soft:     oklch(0.96 0.055 55);
+  --primary-glow:     oklch(0.72 0.195 48);
 
-  --secondary:        oklch(0.955 0.004 260);
+  --secondary:        oklch(0.96 0.008 60);
   --secondary-foreground: oklch(0.24 0.020 260);
-  --muted:            oklch(0.950 0.004 260);
-  --muted-foreground: oklch(0.50 0.016 260);
+  --muted:            oklch(0.965 0.006 60);
+  --muted-foreground: oklch(0.52 0.016 260);
   --accent:           oklch(0.96 0.055 55);
   --accent-foreground: oklch(0.36 0.155 44);
 
-  --destructive:      oklch(0.57 0.218 27);
+  --destructive:      oklch(0.62 0.218 27);
   --destructive-foreground: oklch(1 0 0);
-  --success:          oklch(0.61 0.155 152);
+  --success:          oklch(0.66 0.155 152);
   --success-foreground: oklch(1 0 0);
-  --warning:          oklch(0.74 0.155 82);
-  --warning-foreground: oklch(0.20 0.050 82);
-  --info:             oklch(0.58 0.155 232);
+  --warning:          oklch(0.78 0.155 82);
+  --warning-foreground: oklch(0.22 0.050 82);
+  --info:             oklch(0.62 0.155 232);
   --info-foreground:  oklch(1 0 0);
 
-  --border: oklch(0.90 0.005 260);
-  --input:  oklch(0.90 0.005 260);
+  --border: oklch(0.92 0.005 60);
+  --input:  oklch(0.92 0.005 60);
   --ring:   oklch(0.66 0.195 44);
 
-  /* Sidebar escura */
-  --sidebar:                   oklch(0.18 0.024 255);
+  /* Sidebar — quase preto, sutilmente azulado */
+  --sidebar:                   oklch(0.16 0.018 255);
   --sidebar-foreground:        oklch(0.88 0.010 260);
-  --sidebar-muted:             oklch(0.52 0.014 260);
-  --sidebar-accent:            oklch(0.66 0.195 44);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border:            oklch(0.25 0.020 258);
+  --sidebar-muted:             oklch(0.55 0.014 260);
+  --sidebar-accent:            oklch(0.24 0.025 255);
+  --sidebar-accent-foreground: oklch(0.96 0.010 260);
+  --sidebar-border:            oklch(0.22 0.020 258);
+
+  /* Sombras suaves estilo Figma */
+  --shadow-soft:     0 1px 2px oklch(0.30 0.02 260 / 0.04), 0 4px 16px -6px oklch(0.30 0.02 260 / 0.08);
+  --shadow-elevated: 0 2px 8px -2px oklch(0.20 0.02 260 / 0.06), 0 12px 32px -8px oklch(0.20 0.02 260 / 0.12);
+  --shadow-glow:     0 10px 30px -10px oklch(0.66 0.195 44 / 0.45);
+
+  /* Gradientes */
+  --gradient-primary: linear-gradient(135deg, oklch(0.66 0.195 44) 0%, oklch(0.74 0.190 50) 100%);
+  --gradient-hero:    linear-gradient(135deg, oklch(0.97 0.045 55) 0%, oklch(0.99 0.010 60) 100%);
+
+  --transition-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Layout */
-  --sidebar-width: 256px;
-  --header-height: 64px;
+  --sidebar-width: 80px;
+  --header-height: 80px;
 }
 
-/* ─── Base ─────────────────────────────────────────────────── */
+/* ─── Base ─────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
+  * { border-color: var(--color-border); }
 
   html {
     font-family: var(--font-sans);
@@ -116,219 +131,210 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    /* Impede scroll horizontal na página toda */
     overflow-x: hidden;
   }
 
-  /* Scrollbar fina e discreta */
-  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track  { background: transparent; }
   ::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
 }
 
-/* ─── App Shell Layout ─────────────────────────────────────── */
+/* ─── App Shell ────────────────────────────────────────── */
 @layer components {
 
-  /* Container raiz — full viewport */
   .app-shell {
     display: flex;
     min-height: 100vh;
     min-height: 100dvh;
-    overflow: hidden;           /* nada vaza para fora */
+    overflow: hidden;
+    position: relative;
   }
 
-  /* Sidebar fixa — nunca rola com a página */
+  /* Blobs decorativos no fundo */
+  .app-shell::before,
+  .app-shell::after {
+    content: "";
+    position: fixed;
+    pointer-events: none;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 0;
+  }
+  .app-shell::before {
+    width: 420px; height: 420px;
+    top: -120px; right: -80px;
+    background: oklch(0.66 0.195 44 / 0.10);
+  }
+  .app-shell::after {
+    width: 380px; height: 380px;
+    bottom: -100px; right: 200px;
+    background: oklch(0.66 0.195 44 / 0.12);
+  }
+
+  /* Sidebar fixa, estreita, icon-only */
   .app-sidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    top: 0; left: 0; bottom: 0;
     width: var(--sidebar-width);
     z-index: 40;
     background: var(--color-sidebar);
-    border-right: 1px solid var(--color-sidebar-border);
-    overflow: hidden;           /* scroll só DENTRO dela (via flex-1 + overflow-y-auto) */
+    overflow: hidden;
   }
 
-  /* Coluna principal — recua para dar espaço à sidebar */
   .app-main {
     flex: 1 1 0%;
     display: flex;
     flex-direction: column;
-    min-width: 0;               /* impede overflow */
+    min-width: 0;
     min-height: 100dvh;
-    /* Desktop: empurra para direita da sidebar */
     margin-left: var(--sidebar-width);
+    position: relative;
+    z-index: 1;
   }
 
-  /* Header sticky (dentro de .app-main) */
-  .app-header {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    height: var(--header-height);
-    background: oklch(1 0 0 / 0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  /* Área de conteúdo — scroll vertical aqui */
   .app-content {
     flex: 1 1 0%;
     overflow-y: auto;
     overflow-x: hidden;
   }
 
-  /* Wrapper interno com padding responsivo e max-width */
   .app-content-inner {
     width: 100%;
-    max-width: 1280px;
+    max-width: 1360px;
     margin: 0 auto;
-    padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem);
+    padding: clamp(1rem, 2.5vw, 1.5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem);
   }
 
-  /* Mobile: sidebar não ocupa espaço */
   @media (max-width: 767px) {
     .app-sidebar { display: none; }
     .app-main    { margin-left: 0; }
   }
 }
 
-/* ─── Design System Utilities ──────────────────────────────── */
+/* ─── Utilities ────────────────────────────────────────── */
 @layer utilities {
 
-  /* Card padrão */
-  .ds-card {
+  .font-display { font-family: var(--font-display); }
+
+  /* Sombras */
+  .shadow-soft     { box-shadow: var(--shadow-soft); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-glow     { box-shadow: var(--shadow-glow); }
+
+  /* Gradientes */
+  .bg-gradient-primary { background: var(--gradient-primary); }
+  .bg-gradient-hero    { background: var(--gradient-hero); }
+
+  /* Surface card padrão — Figma feel */
+  .surface-card {
     background: var(--color-card);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 1px 4px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-soft);
   }
 
-  .ds-card-hover {
-    transition: box-shadow 150ms, transform 150ms;
-  }
-  .ds-card-hover:hover {
-    box-shadow: 0 4px 14px oklch(0 0 0 / 0.09);
-    transform: translateY(-1px);
-  }
-
-  /* Pill de ícone */
-  .ds-icon-pill {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: var(--radius-lg);
-    flex-shrink: 0;
+  .surface-card-dark {
+    background: var(--color-sidebar);
+    color: var(--color-sidebar-foreground);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-elevated);
   }
 
-  /* Badge de status — substitui tabelas de status */
-  .ds-badge {
+  /* Sidebar item states */
+  .sidebar-item-active {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  /* Pill — substitui ds-badge */
+  .pill {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.6rem;
-    border-radius: 99px;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
     font-size: 0.7rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    line-height: 1;
     white-space: nowrap;
   }
 
-  /* Tabelas responsivas — sem scroll horizontal */
-  .ds-table-wrapper {
-    width: 100%;
-    overflow: hidden;           /* NUNCA scroll lateral */
-  }
-
-  .ds-table {
+  /* Tabela leve, estilo Figma */
+  .ft-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
   }
-
-  .ds-table th {
-    padding: 0.75rem 1rem;
+  .ft-table th {
+    padding: 0.875rem 1.25rem;
     text-align: left;
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     color: var(--color-muted-foreground);
-    border-bottom: 2px solid var(--color-border);
-    background: var(--color-muted);
+    background: oklch(0.97 0.006 60);
+    border-bottom: 1px solid var(--color-border);
     white-space: nowrap;
   }
-
-  .ds-table td {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-border);
-    /* overflow: visível para badges/dropdowns inline */
-    max-width: 260px;
-    overflow: visible;
-    /* truncate via .truncate nas células que precisam */
+  .ft-table th:first-child { border-top-left-radius: 0; }
+  .ft-table th:last-child  { border-top-right-radius: 0; text-align: right; }
+  .ft-table td {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid oklch(0.94 0.005 60);
+    vertical-align: middle;
+  }
+  .ft-table tbody tr {
+    transition: background 120ms;
+  }
+  .ft-table tbody tr:hover {
+    background: oklch(0.97 0.006 60 / 0.6);
   }
 
-  .ds-table tr:last-child td { border-bottom: none; }
-
-  .ds-table tbody tr {
-    transition: background 100ms;
-  }
-  .ds-table tbody tr:hover {
-    background: oklch(0.95 0.005 250 / 0.6);
-  }
-
-  /* Card-list — alternativa a tabelas em mobile */
-  .ds-list-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem 1rem;
-    border-bottom: 1px solid var(--color-border);
-  }
-  .ds-list-item:last-child { border-bottom: none; }
-
-  /* KPI section */
-  .ds-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-
-  /* Seção de página */
-  .ds-page-header {
-    margin-bottom: 1.5rem;
-  }
-  .ds-page-title {
-    font-size: 1.375rem;
+  /* Page header */
+  .page-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 2.5vw, 1.875rem);
     font-weight: 700;
+    letter-spacing: -0.025em;
     color: var(--color-foreground);
-    line-height: 1.25;
   }
-  .ds-page-subtitle {
+  .page-subtitle {
     margin-top: 0.25rem;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     color: var(--color-muted-foreground);
   }
 
-  /* Deltas */
-  .ds-delta-up   { color: var(--color-success); }
-  .ds-delta-down { color: var(--color-destructive); }
-
-  /* Sidebar active / hover */
-  .sidebar-item-active {
-    background: var(--color-sidebar-accent);
-    color: var(--color-sidebar-accent-foreground);
-    font-weight: 600;
+  /* Animations */
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  .sidebar-item-hover:hover {
-    background: oklch(1 0 0 / 0.07);
-    color: oklch(1 0 0);
-  }
+  .animate-fade-up { animation: fade-up 0.4s var(--transition-smooth) both; }
 
-  /* Animate spin */
   @keyframes spin { to { transform: rotate(360deg); } }
   .animate-spin { animation: spin 0.8s linear infinite; }
+
+  /* Legacy aliases — manter compat com código antigo */
+  .ds-card { @apply surface-card; }
+  .ds-card-hover { transition: box-shadow 150ms, transform 150ms; }
+  .ds-card-hover:hover { box-shadow: var(--shadow-elevated); transform: translateY(-1px); }
+  .ds-icon-pill { display: flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); flex-shrink: 0; }
+  .ds-badge { @apply pill; }
+  .ds-table-wrapper { width: 100%; overflow: hidden; }
+  .ds-table { @apply ft-table; }
+  .ds-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .ds-page-header { margin-bottom: 1.5rem; }
+  .ds-page-title { @apply page-title; }
+  .ds-page-subtitle { @apply page-subtitle; }
+  .ds-delta-up { color: var(--color-success); }
+  .ds-delta-down { color: var(--color-destructive); }
+  .ds-list-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); }
+  .ds-list-item:last-child { border-bottom: none; }
 }

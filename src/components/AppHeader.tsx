@@ -1,7 +1,5 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Bell, LogOut, Menu, Search } from "lucide-react";
+import { Bell, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ApoyaLogo } from "@/components/ApoyaLogo";
 
 type AppUser = {
   name: string;
@@ -10,29 +8,20 @@ type AppUser = {
 };
 
 const roleLabels: Record<AppUser["role"], string> = {
-  admin: "Administrador",
+  admin: "Admin",
   contador: "Contador",
   assistente: "Assistente",
-  cliente: "Portal do cliente",
-};
-
-const roleColors: Record<AppUser["role"], string> = {
-  admin:      "bg-destructive/15 text-destructive",
-  contador:   "bg-primary-soft text-primary",
-  assistente: "bg-info/15 text-info",
-  cliente:    "bg-success/15 text-success",
+  cliente: "Cliente",
 };
 
 export function AppHeader({
   user,
   onMenuClick,
-  onLogout,
 }: {
   user: AppUser;
   onMenuClick: () => void;
   onLogout?: () => void;
 }) {
-  const navigate = useNavigate();
   const initials = user.name
     .split(" ")
     .map((p) => p[0])
@@ -40,14 +29,9 @@ export function AppHeader({
     .join("")
     .toUpperCase();
 
-  const handleLogout = () => {
-    if (onLogout) onLogout();
-    else navigate({ to: "/login" });
-  };
-
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background/90 backdrop-blur-md px-4 md:px-8">
-      {/* Mobile: hamburger + logo */}
+    <header className="sticky top-0 z-30 flex h-20 items-center gap-4 bg-transparent px-4 md:px-8">
+      {/* Hambúrguer mobile */}
       <Button
         variant="ghost"
         size="icon"
@@ -56,75 +40,37 @@ export function AppHeader({
       >
         <Menu className="h-5 w-5" />
       </Button>
-      <div className="md:hidden">
-        <ApoyaLogo variant="on-light" size="sm" withTagline={false} className="max-w-[90px]" />
-      </div>
 
-      {/* Search bar — estilo Elegent */}
-      <div className="relative hidden md:flex flex-1 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/* Busca — pill, transparente sobre o fundo */}
+      <div className="relative hidden md:flex flex-1 max-w-md">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
-          placeholder="Buscar cliente, CNPJ, obrigação..."
-          className="h-10 w-full rounded-xl border border-input bg-muted/50 pl-10 pr-4 text-sm outline-none transition-colors focus:border-primary focus:bg-card focus:ring-1 focus:ring-ring"
+          placeholder="Buscar cliente, CNPJ, obrigação…"
+          className="h-12 w-full rounded-full border border-border bg-card pl-11 pr-4 text-sm shadow-soft outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/10"
         />
       </div>
 
-      {/* Right side */}
-      <div className="ml-auto flex items-center gap-2">
-        {/* Notification bell */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-muted-foreground hover:text-foreground"
+      <div className="ml-auto flex items-center gap-3">
+        {/* Sino */}
+        <button
+          className="relative grid h-11 w-11 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-soft transition-colors hover:text-foreground"
           aria-label="Notificações"
         >
-          <Bell className="h-5 w-5" />
-          {/* Dot de alerta */}
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
-        </Button>
+          <Bell className="h-[18px] w-[18px]" />
+          <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" />
+        </button>
 
-        {/* Divider */}
-        <div className="hidden sm:block h-8 w-px bg-border mx-1" />
-
-        {/* User info */}
-        <div className="hidden sm:flex items-center gap-3">
-          <div className="text-right leading-tight">
+        {/* User chip */}
+        <div className="flex items-center gap-3 rounded-full border border-border bg-card pl-4 pr-1.5 py-1.5 shadow-soft">
+          <div className="hidden text-right leading-tight sm:block">
             <div className="text-sm font-semibold text-foreground">{user.name}</div>
-            <span
-              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${roleColors[user.role]}`}
-            >
-              {roleLabels[user.role]}
-            </span>
+            <div className="text-[11px] text-muted-foreground">{roleLabels[user.role]}</div>
           </div>
-
-          {/* Avatar */}
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm"
-            style={{ background: "var(--color-primary)" }}
-          >
+          <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
             {initials}
           </div>
         </div>
-
-        {/* Mobile: só avatar */}
-        <div
-          className="flex sm:hidden h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
-          style={{ background: "var(--color-primary)" }}
-        >
-          {initials}
-        </div>
-
-        {/* Logout */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleLogout}
-          className="text-muted-foreground hover:text-destructive"
-          aria-label="Sair"
-        >
-          <LogOut className="h-4 w-4" />
-        </Button>
       </div>
     </header>
   );
