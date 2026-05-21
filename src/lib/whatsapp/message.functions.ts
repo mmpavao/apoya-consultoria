@@ -5,10 +5,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evo } from "@/integrations/evolution/client.server";
-import { sb } from "./sb.server";
+import { sbFromContext, type WaSupabaseClient } from "./sb.server";
 import { phoneToJid, upsertConversa } from "./wa.server";
 
-async function loadCtx(conversaId: string, userId: string) {
+async function loadCtx(sb: WaSupabaseClient, conversaId: string, userId: string) {
   const c = await sb.from("wa_conversa").select("*, wa_instance:instance_id (id, nome, evolution_apikey)").eq("id", conversaId).single();
   if (c.error || !c.data) throw new Error("Conversa não encontrada");
   const u = await sb.from("profiles").select("nome").eq("id", userId).single();
@@ -26,7 +26,8 @@ function withTag(content: string, departamento: string | null, agenteNome: strin
 export const listConversas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid().optional() }).parse(input ?? {}))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     let q = sb.from("wa_conversa").select("*").order("ultima_em", { ascending: false, nullsFirst: false });
     if (data.instanceId) q = q.eq("instance_id", data.instanceId);
     const r = await q;
@@ -37,7 +38,8 @@ export const listConversas = createServerFn({ method: "GET" })
 export const getMensagens = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid(), limit: z.number().min(1).max(200).default(100) }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("mensagem_whatsapp")
       .select("*")
       .eq("conversa_id", data.conversaId)
@@ -57,6 +59,7 @@ export const assumeConversa = createServerFn({ method: "POST" })
     departamento: z.string().min(1).max(40),
   }).parse(input))
   .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const r = await sb.from("wa_conversa").update({
       assigned_to: context.userId,
       assigned_at: new Date().toISOString(),
@@ -70,7 +73,8 @@ export const assumeConversa = createServerFn({ method: "POST" })
 export const liberarConversa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     await sb.from("wa_conversa").update({ assigned_to: null, assigned_at: null, departamento: null }).eq("id", data.conversaId);
     return { ok: true };
   });
@@ -78,7 +82,8 @@ export const liberarConversa = createServerFn({ method: "POST" })
 export const marcarLida = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     await sb.from("wa_conversa").update({ nao_lidas: 0 }).eq("id", data.conversaId);
     return { ok: true };
   });
