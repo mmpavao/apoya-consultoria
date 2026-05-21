@@ -69,6 +69,12 @@ function ObrigacoesPage(){
       });
   },[items,query,status,tipo]);
 
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,status,tipo,comp]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
   const kpi = useMemo(()=>({
     total:    items.length,
     pendente: items.filter(o=>o.status==="pendente").length,
@@ -190,7 +196,7 @@ function ObrigacoesPage(){
       )}
 
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={o=>o.id}
         selected={sel}
@@ -222,7 +228,10 @@ function ObrigacoesPage(){
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }

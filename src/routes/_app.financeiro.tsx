@@ -55,6 +55,12 @@ function FinanceiroPage(){
       .sort((a,b)=>b.diasAtraso-a.diasAtraso||a.clienteNome.localeCompare(b.clienteNome));
   },[items,query,status,stage]);
 
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,status,stage,comp]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
   const kpi = useMemo(()=>({
     total:   items.reduce((s,c)=>s+c.valor,0),
     pago:    items.filter(c=>c.status==="paga").reduce((s,c)=>s+c.valor,0),
@@ -182,7 +188,7 @@ function FinanceiroPage(){
       )}
 
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={c=>c.id}
         selected={sel}
@@ -218,7 +224,10 @@ function FinanceiroPage(){
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }

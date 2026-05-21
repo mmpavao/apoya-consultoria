@@ -59,6 +59,12 @@ function DasPage() {
       .sort((a,b) => a.clienteNome.localeCompare(b.clienteNome));
   }, [items, query, regime, status]);
 
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(()=>{ setPage(1); },[query,regime,status,mes,ano]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
   const kpi = useMemo(() => ({
     total:    items.length,
     pendente: items.filter(g => g.status==="pendente").length,
@@ -189,7 +195,7 @@ function DasPage() {
 
       {/* ── Tabela ── */}
       <DataTable
-        rows={filtered}
+        rows={pageRows}
         cols={cols}
         getKey={g => g.id}
         selected={sel}
@@ -231,7 +237,10 @@ function DasPage() {
           </>
         }
       />
-      <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+      </div>
     </div>
   );
 }
