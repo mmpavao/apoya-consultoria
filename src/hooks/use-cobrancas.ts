@@ -3,6 +3,7 @@
  * Substitui financeiro-store.ts pelo Supabase real.
  */
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeTable } from "@/lib/realtime-singleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -76,16 +77,8 @@ export function useCobrancas(competencia?: string) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  useEffect(() => {
-    const ch = supabase
-      .channel("apoya-cobrancas-static")
-      .on("postgres_changes", { event: "*", schema: "public", table: "cobrancas" }, () => {
-        window.dispatchEvent(new Event("apoya:cobrancas:changed"));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Realtime via singleton centralizado (evita conflito de channels)
+  useRealtimeTable("cobrancas", fetch);
   const updateCobranca = useCallback(async (id: string, patch: Partial<{
     asaasId: string; linkPagamento: string; ultimoEnvioWhatsapp: string; status: CobrancaStatus;
   }>) => {

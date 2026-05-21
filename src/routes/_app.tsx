@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
+import { initRealtime } from "@/lib/realtime-singleton";
 import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
@@ -15,6 +16,9 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppShell() {
+  // Inicializa o channel master de realtime (singleton — roda apenas 1x)
+  initRealtime();
+
   const navigate = useNavigate();
   const { loading, user, profile, roles, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);

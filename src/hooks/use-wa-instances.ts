@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeTable } from "@/lib/realtime-singleton";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -44,15 +45,8 @@ export function useWaInstances() {
     }
   }, [fnList]);
 
-  useEffect(() => {
-    reload();
-    const ch = supabase
-      .channel("wa_instance:all")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_instance" }, () => reload())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [reload]);
-
+  // Realtime via singleton centralizado (evita conflito de channels)
+  useRealtimeTable("wa_instance", reload);
   return {
     instances,
     loading,

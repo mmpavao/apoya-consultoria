@@ -3,6 +3,7 @@
  * Substitui obrigacoes-store.ts pelo Supabase real.
  */
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeTable } from "@/lib/realtime-singleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -65,16 +66,8 @@ export function useObrigacoes(competencia?: string) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  useEffect(() => {
-    const ch = supabase
-      .channel("apoya-obrigacoes-static")
-      .on("postgres_changes", { event: "*", schema: "public", table: "obrigacoes" }, () => {
-        window.dispatchEvent(new Event("apoya:obrigacoes:changed"));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Realtime via singleton centralizado (evita conflito de channels)
+  useRealtimeTable("obrigacoes", fetch);
   const updateStatus = useCallback(async (id: string, status: ObrigacaoStatus) => {
     const patch: Record<string, unknown> = { status };
     if (status === "concluida") patch.concluida_em = new Date().toISOString();

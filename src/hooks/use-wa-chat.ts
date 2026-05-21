@@ -56,7 +56,7 @@ export function useWaConversas(instanceId?: string) {
   useEffect(() => {
     reload();
     const ch = supabase
-      .channel(`wa_conversa:${instanceId ?? "all"}`)
+      .channel(`wa_conversa:${instanceId ?? "all"}:${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversa" }, () => reload())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -83,7 +83,7 @@ export function useWaMensagens(conversaId: string | null) {
     reload();
     if (!conversaId) return;
     const ch = supabase
-      .channel(`mensagem_whatsapp:${conversaId}`)
+      .channel(`mensagem_whatsapp:${conversaId}:${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "mensagem_whatsapp", filter: `conversa_id=eq.${conversaId}` }, () => reload())
       .subscribe();
     return () => { supabase.removeChannel(ch); };

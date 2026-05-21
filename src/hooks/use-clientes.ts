@@ -3,6 +3,7 @@
  * Substitui clientes-store.ts (localStorage) pelo Supabase real.
  */
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeTable } from "@/lib/realtime-singleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -139,16 +140,8 @@ export function useClientes() {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  // Realtime subscription
-  useEffect(() => {
-    const ch = supabase
-      .channel("apoya-clientes-static")
-      .on("postgres_changes", { event: "*", schema: "public", table: "clientes" }, () => {
-        window.dispatchEvent(new Event("apoya:clientes:changed"));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Realtime via singleton centralizado (evita múltiplos channels com mesmo nome)
+  useRealtimeTable("clientes", fetch);
 
   const createCliente = useCallback(async (c: Omit<Cliente, "id" | "createdAt">) => {
     const { data, error: err } = await supabase.from("clientes").insert(toDb(c) as any).select().single();

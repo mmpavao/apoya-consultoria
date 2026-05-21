@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, Bot, Check, CheckCheck, FileText, Loader2, MessageSquare,
-  Paperclip, Search, Send, User, UserPlus,
+  Mic, MicOff, Paperclip, Search, Send, User, UserPlus,
+  X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,13 @@ function WhatsappPage() {
   // ref para o sentinel (último elemento do chat)
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // ── Áudio: gravação via MediaRecorder ──────────────────────────────
+  const [gravando, setGravando] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl]   = useState<string | null>(null);
+  const mediaRef  = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   useEffect(() => {
     // duplo rAF garante que o DOM já foi pintado antes de scrollar
     requestAnimationFrame(() => {
@@ -89,6 +97,81 @@ function WhatsappPage() {
     try { await actions.assumir(active.id, departamento); toast.success("Conversa assumida"); }
     catch (e: any) { toast.error(e?.message ?? "Erro"); }
   }
+  // ── Funções de gravação de áudio ──────────────────────────────────
+  async function iniciarGravacao() {
+    if (!active || !isMine) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mr.start();
+      mediaRef.current = mr;
+      setGravando(true);
+    } catch {
+      toast.error("Sem permissão para acessar o microfone");
+    }
+  }
+
+  function pararGravacao() {
+    mediaRef.current?.stop();
+    setGravando(false);
+  }
+
+  function cancelarAudio() {
+    if (gravando) mediaRef.current?.stop();
+    setGravando(false);
+    setAudioBlob(null);
+    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null); }
+  }
+
+  async function enviarAudio() {
+    if (!active || !audioBlob) return;
+    const tempId = `temp_audio_${Date.now()}`;
+    const localUrl = audioUrl!;
+    const tempMsg = {
+      id: tempId,
+      conversa_id: active.id,
+      direcao: "enviada" as const,
+      tipo: "audio" as const,
+      conteudo: null,
+      arquivo_url: localUrl,
+      arquivo_nome: "audio.webm",
+      mime_type: "audio/webm",
+      evolution_id: null,
+      agente_nome: profile?.nome ?? null,
+      departamento: active.departamento,
+      reply_to: null,
+      reaction: null,
+      reaction_to: null,
+      status: "enviando",
+      created_at: new Date().toISOString(),
+      lida_em: null,
+    };
+    setMensagensLocal((prev) => [...prev, tempMsg]);
+    setAudioBlob(null);
+    setAudioUrl(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = String(reader.result).split(",")[1];
+        await actions.enviarAudio(active.id, base64);
+        setTimeout(() => reloadMensagens(), 2000);
+      };
+      reader.readAsDataURL(audioBlob);
+    } catch (e: any) {
+      setMensagensLocal((prev) => prev.filter((m) => m.id !== tempId));
+      toast.error(e?.message ?? "Erro ao enviar áudio");
+    }
+  }
+
   async function enviar() {
     if (!active || !draft.trim()) return;
     const texto = draft.trim();
@@ -105,7 +188,7 @@ function WhatsappPage() {
       arquivo_nome: null,
       mime_type: null,
       evolution_id: null,
-      agente_nome: profile?.full_name ?? null,
+      agente_nome: profile?.nome ?? null,
       departamento: active.departamento,
       reply_to: null,
       reaction: null,
@@ -277,7 +360,11 @@ function WhatsappPage() {
                         m.direcao === "enviada" ? "self-end bg-success/15 text-foreground" : "self-start bg-card")}>
                         {m.agente_nome && m.direcao === "enviada" && (
                           <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
-                            <User className="h-3 w-3" />{m.agente_nome}{m.departamento ? ` · ${m.departamento}` : ""}
+                            <User className="h-3 w-3" />
+                            {m.agente_nome.split(" ")[0]}
+                            {m.departamento ? (
+                              <><span className="opacity-40 mx-0.5">|</span>{m.departamento.charAt(0).toUpperCase() + m.departamento.slice(1).toLowerCase()}</>
+                            ) : null}
                           </div>
                         )}
                         {m.tipo === "reaction" ? (
@@ -334,25 +421,74 @@ function WhatsappPage() {
                   </div>
                 </div>
 
-                <footer className="flex shrink-0 items-center gap-2 border-t bg-card px-3 py-3 md:px-4">
-                  <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted">
-                    <Paperclip className="h-5 w-5" />
-                    <input type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadArquivo(f); e.target.value = ""; }} />
-                  </label>
-                  <Input
-                    value={draft}
-                    onChange={(e) => {
-                      setDraft(e.target.value);
-                      if (active && isMine) actions.sinalizarDigitando(active.id).catch(() => {});
-                    }}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                    placeholder={isMine ? "Digite uma mensagem…" : "Assuma a conversa para responder"}
-                    disabled={!isMine}
-                    className="h-10 flex-1 rounded-xl"
-                  />
-                  <Button onClick={enviar} disabled={!isMine || !draft.trim()} className="h-10 rounded-xl px-4">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                <footer className="flex shrink-0 flex-col border-t bg-card px-3 py-2 md:px-4">
+                  {/* Preview de áudio gravado */}
+                  {audioUrl && !gravando && (
+                    <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <audio controls src={audioUrl} className="h-8 flex-1" />
+                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-destructive" onClick={cancelarAudio}>
+                        <XIcon className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" onClick={enviarAudio} className="h-7 shrink-0 rounded-lg px-3">
+                        <Send className="h-3.5 w-3.5 mr-1" />Enviar
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Row principal: anexo + input + mic + send */}
+                  {!audioUrl && (
+                    <div className="flex items-center gap-2">
+                      <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted">
+                        <Paperclip className="h-5 w-5" />
+                        <input type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadArquivo(f); e.target.value = ""; }} />
+                      </label>
+                      <Input
+                        value={draft}
+                        onChange={(e) => {
+                          setDraft(e.target.value);
+                          if (active && isMine) actions.sinalizarDigitando(active.id).catch(() => {});
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                        placeholder={isMine ? "Digite uma mensagem…" : "Assuma a conversa para responder"}
+                        disabled={!isMine}
+                        className="h-10 flex-1 rounded-xl"
+                      />
+                      {/* Botão de microfone */}
+                      {isMine && !draft.trim() && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant={gravando ? "destructive" : "ghost"}
+                          className="h-10 w-10 shrink-0 rounded-xl"
+                          onClick={gravando ? pararGravacao : iniciarGravacao}
+                          title={gravando ? "Parar gravação" : "Gravar áudio"}
+                        >
+                          {gravando ? (
+                            <MicOff className="h-5 w-5 animate-pulse" />
+                          ) : (
+                            <Mic className="h-5 w-5" />
+                          )}
+                        </Button>
+                      )}
+                      {/* Botão de enviar (aparece só quando há texto) */}
+                      {(draft.trim() || !isMine) && (
+                        <Button onClick={enviar} disabled={!isMine || !draft.trim()} className="h-10 rounded-xl px-4">
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Indicador de gravação ativa */}
+                  {gravando && (
+                    <div className="mt-1 flex items-center justify-between px-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                        <span className="text-xs text-destructive font-medium">Gravando… toque no microfone para parar</span>
+                      </div>
+                      <button type="button" onClick={cancelarAudio} className="text-xs text-muted-foreground hover:text-destructive">Cancelar</button>
+                    </div>
+                  )}
                 </footer>
               </>
             )}
