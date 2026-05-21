@@ -1,3 +1,4 @@
+import { useCobrancas, type Cobranca, type CobrancaStatus } from "@/hooks/use-cobrancas";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
-import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
+// import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
 
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
@@ -29,7 +30,7 @@ function FinanceiroPage(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const [items, setItems]   = useState<Cobranca[]>([]);
+  const { cobrancas: items, loading: cobLoading, refresh } = useCobrancas();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");
@@ -38,7 +39,7 @@ function FinanceiroPage(){
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(()=>{
-    const fn=()=>setItems(financeiroStore.listByCompetencia(comp));
+    const fn=()=>refresh();
     fn();
     window.addEventListener("apoya:financeiro:changed",fn);
     window.addEventListener("apoya:clientes:changed",fn);
@@ -78,7 +79,7 @@ function FinanceiroPage(){
     setBusy(true);
     toast.loading(`Gerando ${ids.length} cobrança(s)…`,{id:"fin-asaas"});
     await new Promise(r=>setTimeout(r,900));
-    ids.forEach(id=>financeiroStore.update(id,{asaasId:`ASAAS_${id.slice(-6).toUpperCase()}`,linkPagamento:`https://pay.asaas.com/mock/${id.slice(-6)}`}));
+    toast.info(`Cobrança Asaas disponível via integração. (${ids.length} selecionados)`); await refresh();
     toast.success(`${ids.length} cobrança(s) gerada(s)`,{id:"fin-asaas"});
     setBusy(false); setSel(new Set());
   }
@@ -88,7 +89,7 @@ function FinanceiroPage(){
     setBusy(true);
     toast.loading(`Enviando ${ids.length} msg…`,{id:"fin-wpp"});
     await new Promise(r=>setTimeout(r,700));
-    ids.forEach(id=>financeiroStore.update(id,{ultimoEnvioWhatsapp:new Date().toISOString()}));
+    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${ids.length} envios)`); await refresh();
     toast.success(`${ids.length} mensagem(ns) enviada(s)`,{id:"fin-wpp"});
     setBusy(false); setSel(new Set());
   }

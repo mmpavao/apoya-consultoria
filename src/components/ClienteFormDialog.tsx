@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { clientesStore, RESPONSAVEIS, REGIME_LABEL, STATUS_LABEL, type Cliente, type Regime, type Status, type TierServico, type FormaPagamento } from "@/lib/clientes-store";
+import { useClientes, RESPONSAVEIS, REGIME_LABEL, STATUS_LABEL, type Cliente, type Regime, type Status, type TierServico, type FormaPagamento } from "@/hooks/use-clientes";
 import { formatCNPJ, isValidCNPJ, lookupCNPJ, onlyDigits } from "@/lib/cnpj";
 
 const REGIMES: Regime[] = ["MEI", "Simples", "Lucro Presumido", "Lucro Real", "Doméstica"];
@@ -71,19 +71,19 @@ export function ClienteFormDialog({ open, onOpenChange, cliente }: Props) {
     toast.success("Dados preenchidos pela Receita");
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.razaoSocial.trim()) return toast.error("Razão social obrigatória");
     if (!isValidCNPJ(form.cnpj)) return toast.error("CNPJ inválido");
     if (!form.whatsapp?.trim()) return toast.error("WhatsApp é obrigatório (canal principal)");
     // CNPJ único
-    const dup = clientesStore.list().find((c) => onlyDigits(c.cnpj) === onlyDigits(form.cnpj) && c.id !== cliente?.id);
+    const dup = clientes.find((c) => onlyDigits(c.cnpj) === onlyDigits(form.cnpj) && c.id !== cliente?.id);
     if (dup) return toast.error("Já existe cliente com este CNPJ");
     const payload = { ...form, cnpj: formatCNPJ(form.cnpj) };
     if (cliente) {
-      clientesStore.update(cliente.id, payload);
+      await updateCliente(cliente.id, payload);
       toast.success("Cliente atualizado");
     } else {
-      clientesStore.create(payload);
+      await createCliente(payload);
       toast.success("Cliente criado");
     }
     onOpenChange(false);

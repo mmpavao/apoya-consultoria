@@ -1,3 +1,4 @@
+import { useDas } from "@/hooks/use-das";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Activity, CheckCircle2, RefreshCw, Server, Shield, XCircle, Wallet, Receipt } from "lucide-react";
@@ -49,7 +50,7 @@ function SerproPage() {
   }, []);
 
   // Últimas consultas: deriva das DAS geradas/erradas mais recentes
-  const consultas = dasStore.list()
+  const { guias: consultas } = useDas()
     .filter((g) => g.geradoEm || g.erro)
     .sort((a, b) => (b.geradoEm ?? "").localeCompare(a.geradoEm ?? ""))
     .slice(0, 10);

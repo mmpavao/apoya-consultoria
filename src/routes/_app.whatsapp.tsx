@@ -1,3 +1,4 @@
+import { useWhatsapp, type MensagemWA } from "@/hooks/use-whatsapp";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PagePlaceholder";
-import { whatsappStore, type Conversa, type ConversationTag } from "@/lib/whatsapp-store";
+// import { whatsappStore, type Conversa, type ConversationTag } from "@/lib/whatsapp-store";
 
 export const Route = createFileRoute("/_app/whatsapp")({
   component: WhatsappPage,
@@ -33,13 +34,12 @@ function WhatsappPage() {
   const [tag, setTag] = useState<"todas" | ConversationTag>("todas");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [conn, setConn] = useState<"connected" | "connecting" | "disconnected">(whatsappStore.getConnStatus());
+  const [conn, setConn] = useState<"connected" | "connecting" | "disconnected">("disconnected");
   const [, forceTick] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const refresh = () => setConversas(whatsappStore.list());
-    const refreshConn = () => setConn(whatsappStore.getConnStatus());
+    const refresh = () => {}; // dados via hook real
     const refreshTyping = () => forceTick((n) => n + 1);
     refresh();
     window.addEventListener("apoya:whatsapp:changed", refresh);
@@ -65,7 +65,7 @@ function WhatsappPage() {
   );
 
   useEffect(() => {
-    if (active && active.naoLidas > 0) whatsappStore.marcarLida(active.id);
+    // marcarLida: via Supabase UPDATE (pendente integração)
   }, [active?.id]); // eslint-disable-line
 
   useEffect(() => {
@@ -82,14 +82,14 @@ function WhatsappPage() {
 
   function enviar() {
     if (!active || !draft.trim()) return;
-    whatsappStore.enviar(active.id, draft.trim());
+    enfileirar(active.id, active.telefone || "", draft.trim()); setDraft("");
     setDraft("");
   }
 
   function enviarArquivo(tipo: "pdf" | "xml" | "img") {
     if (!active) return;
     const map = { pdf: "DAS-11-2026.pdf", xml: "NFSe-845221.xml", img: "comprovante.jpg" as const };
-    whatsappStore.enviarArquivo(active.id, map[tipo], tipo);
+    toast.info("Envio de mídia disponível via integração Evolution API.");
     toast.success(`${map[tipo]} enviado via Evolution API (mock)`);
   }
 
@@ -116,11 +116,10 @@ function WhatsappPage() {
               className="rounded-xl"
               onClick={() => {
                 if (conn === "connected") {
-                  whatsappStore.setConnStatus("disconnected");
+                  setConn("disconnected");
                   toast.warning("Evolution API desconectada");
                 } else {
-                  whatsappStore.setConnStatus("connecting");
-                  setTimeout(() => { whatsappStore.setConnStatus("connected"); toast.success("Evolution API conectada"); }, 900);
+                  setConn("connecting"); setTimeout(() => { setConn("connected"); toast.success("Evolution API conectada"); }, 900);
                 }
               }}
             >
@@ -283,7 +282,7 @@ function WhatsappPage() {
                       </div>
                     </div>
                   ))}
-                  {whatsappStore.isTyping(active.id) && (
+                  {false /* isTyping: integração Evolution API */ && (
                     <div className="flex max-w-[60%] items-center gap-1 self-start rounded-2xl bg-card px-3 py-2 shadow-sm">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />

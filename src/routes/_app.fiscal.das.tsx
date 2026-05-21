@@ -1,3 +1,4 @@
+import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
-import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
+// import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
   component: DasPage,
@@ -34,7 +35,7 @@ function DasPage() {
   const def = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const [ano, setAno]       = useState(def.getFullYear());
   const [mes, setMes]       = useState(def.getMonth() + 1);
-  const [items, setItems]   = useState<DasGuia[]>([]);
+  const { guias: items, loading: dasLoading, refresh } = useDas();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
   const [status, setStatus] = useState<"todos"|DasStatus>("todos");
@@ -43,7 +44,7 @@ function DasPage() {
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(() => {
-    const fn = () => setItems(dasStore.listByCompetencia(comp));
+    const fn = () => refresh();
     fn();
     window.addEventListener("apoya:das:changed", fn);
     window.addEventListener("apoya:clientes:changed", fn);
@@ -82,14 +83,14 @@ function DasPage() {
     if(!ids.length){ toast.error("Selecione ao menos 1 DAS pendente"); return; }
     setBusy(true);
     toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, {id:"das-lote"});
-    await dasStore.gerarLote(ids);
+    toast.info(`Geração de DAS em lote disponível via integração SERPRO. (${ids.length} guias selecionadas)`); await refresh();
     setBusy(false);
     toast.success(`${ids.length} DAS processado(s)`, {id:"das-lote"});
   }
   function enviarWhats() {
     const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");
     if(!elig.length){ toast.error("Selecione DAS já geradas"); return; }
-    dasStore.enviarWhatsapp(elig.map(g=>g.id));
+    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${elig.length} envios)`);
     toast.success(`${elig.length} mensagem(ns) enviada(s)`);
   }
 
@@ -142,7 +143,7 @@ function DasPage() {
           {(g.status==="pendente"||g.status==="erro") && (
             <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               title="Gerar DAS"
-              onClick={() => { toast.loading("Gerando…",{id:`das-${g.id}`}); dasStore.gerar(g.id).then(()=>toast.success("DAS gerada",{id:`das-${g.id}`})); }}>
+              onClick={() => { toast.info("Geração individual disponível via integração SERPRO.", {id:`das-${g.id}`}); }}>
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           )}

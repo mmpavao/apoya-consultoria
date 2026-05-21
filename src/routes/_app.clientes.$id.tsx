@@ -1,290 +1,320 @@
-import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeft, Pencil } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft, Building2, Calendar, DollarSign, Edit, FileText,
+  Mail, MapPin, MessageSquare, Phone, Save, Trash2, User, X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ClienteFormDialog } from "@/components/ClienteFormDialog";
-import { clientesStore, REGIME_LABEL, STATUS_LABEL, type Cliente } from "@/lib/clientes-store";
-import { obrigacoesStore, type Obrigacao } from "@/lib/obrigacoes-store";
-import { financeiroStore, type Cobranca } from "@/lib/financeiro-store";
-import { nfseStore, type NfseNota } from "@/lib/nfse-store";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  useClientes,
+  REGIME_LABEL,
+  STATUS_LABEL,
+  type Cliente,
+  type Regime,
+  type Status,
+  type FormaPagamento,
+} from "@/hooks/use-clientes";
 
 export const Route = createFileRoute("/_app/clientes/$id")({
-  component: ClienteDetalhe,
-  head: ({ params }) => ({ meta: [{ title: `Cliente · APOYA Gestão` }] }),
-  loader: ({ params }) => {
-    if (typeof window === "undefined") return { id: params.id };
-    const c = clientesStore.get(params.id);
-    if (!c) throw notFound();
-    return { id: params.id };
-  },
+  component: ClienteDetailPage,
+  head: () => ({ meta: [{ title: "Cliente · APOYA Gestão" }] }),
 });
 
-function fmtMoney(v?: number) {
-  if (v == null) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-function fmtDate(iso?: string) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("pt-BR");
+const STATUS_COLOR: Record<Status, string> = {
+  ativo:       "bg-emerald-50 text-emerald-700 border-emerald-200",
+  inadimplente:"bg-amber-50   text-amber-700   border-amber-200",
+  suspenso:    "bg-red-50     text-red-700     border-red-200",
+  inativo:     "bg-slate-50   text-slate-500   border-slate-200",
+  em_analise:  "bg-blue-50    text-blue-700    border-blue-200",
+};
+
+function Field({ label, value }: { label: string; value?: string | number | null }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-sm text-foreground">{value ?? "—"}</p>
+    </div>
+  );
 }
 
-function ClienteDetalhe() {
+function ClienteDetailPage() {
   const { id } = Route.useParams();
-  const router = useRouter();
+  const navigate = useNavigate();
+  const { clientes, loading, updateCliente, deleteCliente } = useClientes();
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm] = useState<Partial<Cliente>>({});
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  // Sincronizar quando clientes carregam
   useEffect(() => {
-    const load = () => setCliente(clientesStore.get(id) ?? null);
-    load();
-    window.addEventListener("apoya:clientes:changed", load);
-    return () => window.removeEventListener("apoya:clientes:changed", load);
-  }, [id]);
+    if (!loading) {
+      const found = clientes.find((c) => c.id === id) ?? null;
+      setCliente(found);
+      if (found) setForm(found);
+    }
+  }, [id, clientes, loading]);
 
-  if (!cliente) {
+  if (loading) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => router.navigate({ to: "/clientes" })}>
-          <ArrowLeft className="h-4 w-4" /> Voltar
-        </Button>
-        <p className="text-sm text-muted-foreground">Cliente não encontrado.</p>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
 
+  if (!cliente) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <p className="text-muted-foreground">Cliente não encontrado.</p>
+        <Link to="/clientes">
+          <Button variant="outline" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  async function handleSave() {
+    if (!form || !cliente) return;
+    setSaving(true);
+    try {
+      await updateCliente(cliente.id, form);
+      setEditMode(false);
+      toast.success("Cliente atualizado com sucesso");
+    } catch {
+      toast.error("Erro ao salvar cliente");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Deseja excluir o cliente "${cliente?.razaoSocial}"? Esta ação é irreversível.`)) return;
+    setDeleting(true);
+    try {
+      await deleteCliente(cliente!.id);
+      toast.success("Cliente excluído");
+      navigate({ to: "/clientes" });
+    } catch {
+      toast.error("Erro ao excluir cliente");
+      setDeleting(false);
+    }
+  }
+
+  const f = (field: keyof Cliente) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((p) => ({ ...p, [field]: e.target.value }));
+
   return (
-    <div className="space-y-6">
-      {cliente.status === "suspenso" && (
-        <div className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertTriangle className="h-5 w-5 shrink-0" />
+    <div className="space-y-6 pb-10">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/clientes">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
           <div>
-            <div className="font-medium">Cliente suspenso</div>
-            <div className="text-xs">O atendimento foi suspenso por inadimplência ou solicitação interna.</div>
+            <h1 className="text-xl font-semibold tracking-tight">{cliente.razaoSocial}</h1>
+            <p className="text-sm text-muted-foreground">{cliente.cnpj}</p>
           </div>
+        </div>
+        <div className="flex gap-2">
+          {editMode ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setForm(cliente); }}>
+                <X className="mr-1.5 h-3.5 w-3.5" />Cancelar
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete} disabled={deleting}>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
+              </Button>
+              <Button size="sm" onClick={() => setEditMode(true)}>
+                <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Status badge ── */}
+      <div className="flex items-center gap-3">
+        <Badge className={`${STATUS_COLOR[cliente.status]} border text-xs`}>
+          {STATUS_LABEL[cliente.status]}
+        </Badge>
+        <span className="text-xs text-muted-foreground">{REGIME_LABEL[cliente.regime]}</span>
+      </div>
+
+      {editMode ? (
+        /* ── Formulário de edição ── */
+        <div className="surface-card p-6 space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Razão Social</Label>
+              <Input value={form.razaoSocial ?? ""} onChange={f("razaoSocial")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome Fantasia</Label>
+              <Input value={form.nomeFantasia ?? ""} onChange={f("nomeFantasia")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>CNPJ</Label>
+              <Input value={form.cnpj ?? ""} onChange={f("cnpj")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Responsável</Label>
+              <Input value={form.responsavel ?? ""} onChange={f("responsavel")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Regime</Label>
+              <Select value={form.regime ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, regime: v as Regime }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(REGIME_LABEL)).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={form.status ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, status: v as Status }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(STATUS_LABEL)).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>E-mail</Label>
+              <Input value={form.email ?? ""} onChange={f("email")} type="email" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Telefone</Label>
+              <Input value={form.telefone ?? ""} onChange={f("telefone")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>WhatsApp</Label>
+              <Input value={form.whatsapp ?? ""} onChange={f("whatsapp")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Valor Honorário (R$)</Label>
+              <Input value={form.valorHonorario ?? ""} onChange={f("valorHonorario")} type="number" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Forma de Pagamento</Label>
+              <Select value={form.formaPagamento ?? ""} onValueChange={(v) => setForm((p) => ({ ...p, formaPagamento: v as FormaPagamento }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="Boleto">Boleto</SelectItem>
+                  <SelectItem value="Débito automático">Débito automático</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dia de Vencimento</Label>
+              <Input value={form.diaVencimento ?? ""} onChange={f("diaVencimento")} type="number" min={1} max={28} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Observações</Label>
+              <Textarea value={form.observacoes ?? ""} onChange={f("observacoes")} rows={3} />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={form.temEmpregados ?? false}
+                onCheckedChange={(v) => setForm((p) => ({ ...p, temEmpregados: v }))}
+              />
+              <Label>Tem empregados (eSocial)</Label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={form.temIncentivoFiscal ?? false}
+                onCheckedChange={(v) => setForm((p) => ({ ...p, temIncentivoFiscal: v }))}
+              />
+              <Label>Tem incentivo fiscal</Label>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── Visualização ── */
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="surface-card p-5 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" />Dados Fiscais
+            </p>
+            <Field label="Razão Social" value={cliente.razaoSocial} />
+            <Field label="Nome Fantasia" value={cliente.nomeFantasia} />
+            <Field label="CNPJ" value={cliente.cnpj} />
+            <Field label="Regime" value={REGIME_LABEL[cliente.regime]} />
+            <Field label="Insc. Municipal" value={cliente.inscricaoMunicipal} />
+            <Field label="Insc. Estadual" value={cliente.inscricaoEstadual} />
+          </div>
+
+          <div className="surface-card p-5 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" />Contato
+            </p>
+            <Field label="Responsável" value={cliente.responsavel} />
+            <Field label="E-mail" value={cliente.email} />
+            <Field label="Telefone" value={cliente.telefone} />
+            <Field label="WhatsApp" value={cliente.whatsapp} />
+          </div>
+
+          <div className="surface-card p-5 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <DollarSign className="h-3.5 w-3.5" />Financeiro
+            </p>
+            <Field label="Honorário" value={cliente.valorHonorario ? `R$ ${cliente.valorHonorario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} />
+            <Field label="Forma de Pagamento" value={cliente.formaPagamento} />
+            <Field label="Dia de Vencimento" value={cliente.diaVencimento ? `Dia ${cliente.diaVencimento}` : undefined} />
+          </div>
+
+          <div className="surface-card p-5 space-y-4 sm:col-span-2 lg:col-span-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5" />Endereço
+            </p>
+            <Field label="Município" value={cliente.endereco?.municipio} />
+            <Field label="UF" value={cliente.endereco?.uf} />
+            <Field label="CEP" value={cliente.endereco?.cep} />
+            <Field label="Logradouro" value={cliente.endereco?.logradouro} />
+          </div>
+
+          <div className="surface-card p-5 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" />Obrigações
+            </p>
+            <Field label="Tem empregados" value={cliente.temEmpregados ? "Sim" : "Não"} />
+            <Field label="Incentivo fiscal" value={cliente.temIncentivoFiscal ? "Sim" : "Não"} />
+            <Field label="Cód. Serviço NFS-e" value={cliente.codigoServicoNfse} />
+            <Field label="Atividade principal" value={cliente.atividadePrincipal} />
+          </div>
+
+          {cliente.observacoes && (
+            <div className="surface-card p-5 space-y-2 sm:col-span-2 lg:col-span-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Observações</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{cliente.observacoes}</p>
+            </div>
+          )}
         </div>
       )}
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link to="/clientes" className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Clientes
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight">{cliente.razaoSocial}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-mono">{cliente.cnpj}</span>
-            <span>·</span>
-            <Badge variant="outline" className="rounded-full">{REGIME_LABEL[cliente.regime]}</Badge>
-            <Badge variant="outline" className="rounded-full">{STATUS_LABEL[cliente.status]}</Badge>
-            {cliente.regimeHibrido && <Badge variant="outline" className="rounded-full border-primary/30 bg-primary-soft text-primary">Regime Híbrido</Badge>}
-            {cliente.tier && <Badge variant="outline" className="rounded-full">Tier: {cliente.tier}</Badge>}
-          </div>
-        </div>
-        <Button onClick={() => setEditOpen(true)} className="rounded-xl">
-          <Pencil className="h-4 w-4" /> Editar
-        </Button>
-      </div>
-
-      <Tabs defaultValue="dados">
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="dados">Dados Cadastrais</TabsTrigger>
-          <TabsTrigger value="obrigacoes">Obrigações</TabsTrigger>
-          <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-          <TabsTrigger value="nfse">NFS-e</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="contratos">Contratos</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="dados" className="mt-4">
-          <DadosCadastrais cliente={cliente} />
-        </TabsContent>
-        <TabsContent value="obrigacoes" className="mt-4">
-          <ObrigacoesTab clienteId={cliente.id} />
-        </TabsContent>
-        <TabsContent value="financeiro" className="mt-4">
-          <FinanceiroTab clienteId={cliente.id} />
-        </TabsContent>
-        <TabsContent value="nfse" className="mt-4">
-          <NfseTab clienteId={cliente.id} />
-        </TabsContent>
-        <TabsContent value="whatsapp" className="mt-4">
-          <EmptyTab title="Histórico WhatsApp" hint="Visualize o histórico de mensagens em WhatsApp → conversa do cliente." />
-        </TabsContent>
-        <TabsContent value="contratos" className="mt-4">
-          <EmptyTab title="Contratos" hint="Esta seção ficará disponível na Fase B (Supabase Storage)." />
-        </TabsContent>
-      </Tabs>
-
-      <ClienteFormDialog open={editOpen} onOpenChange={setEditOpen} cliente={cliente} />
-    </div>
-  );
-}
-
-function DadosCadastrais({ cliente }: { cliente: Cliente }) {
-  const rows: [string, React.ReactNode][] = [
-    ["Razão Social", cliente.razaoSocial],
-    ["Nome Fantasia", cliente.nomeFantasia ?? "—"],
-    ["CNPJ", <span className="font-mono">{cliente.cnpj}</span>],
-    ["Regime", REGIME_LABEL[cliente.regime]],
-    ["Tier", cliente.tier ?? "—"],
-    ["Regime Híbrido", cliente.regimeHibrido ? "Sim" : "Não"],
-    ["Status", STATUS_LABEL[cliente.status]],
-    ["Responsável interno", cliente.responsavel],
-    ["Atividade principal", cliente.atividadePrincipal ?? "—"],
-    ["E-mail", cliente.email ?? "—"],
-    ["Telefone", cliente.telefone ?? "—"],
-    ["WhatsApp", cliente.whatsapp ?? "—"],
-    ["Inscrição Municipal", cliente.inscricaoMunicipal ?? "—"],
-    ["Inscrição Estadual", cliente.inscricaoEstadual ?? "—"],
-    ["Código de serviço NFS-e", cliente.codigoServicoNfse ?? "—"],
-    ["Dia de vencimento", cliente.diaVencimento ? `Dia ${cliente.diaVencimento}` : "—"],
-    ["Honorário mensal", fmtMoney(cliente.valorHonorario)],
-    ["Forma de pagamento", cliente.formaPagamento ?? "—"],
-    ["Tem empregados", cliente.temEmpregados ? "Sim" : "Não"],
-    ["Tem incentivo fiscal", cliente.temIncentivoFiscal ? "Sim" : "Não"],
-    ["Endereço", cliente.endereco?.municipio ? `${cliente.endereco.logradouro ?? ""} ${cliente.endereco.numero ?? ""} · ${cliente.endereco.bairro ?? ""} · ${cliente.endereco.municipio}/${cliente.endereco.uf ?? ""}` : "—"],
-    ["Observações", cliente.observacoes ?? "—"],
-  ];
-  return (
-    <div className="rounded-2xl border bg-card shadow-sm">
-      <dl className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-y-0">
-        {rows.map(([label, value], i) => (
-          <div key={label} className={`flex flex-col gap-1 p-4 sm:border-b ${i % 2 === 0 ? "sm:border-r" : ""}`}>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-            <dd className="text-sm">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-function ObrigacoesTab({ clienteId }: { clienteId: string }) {
-  const [items, setItems] = useState<Obrigacao[]>([]);
-  useEffect(() => {
-    const load = () => {
-      const comp = new Date().toISOString().slice(0, 7);
-      setItems(obrigacoesStore.list().filter((o: Obrigacao) => o.clienteId === clienteId && o.competencia === comp));
-    };
-    load();
-    window.addEventListener("apoya:obrigacoes:changed", load);
-    window.addEventListener("apoya:clientes:changed", load);
-    return () => {
-      window.removeEventListener("apoya:obrigacoes:changed", load);
-      window.removeEventListener("apoya:clientes:changed", load);
-    };
-  }, [clienteId]);
-  return (
-    <div className="rounded-2xl border bg-card shadow-sm overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Obrigação</TableHead>
-            <TableHead>Competência</TableHead>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 && <TableRow><TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">Sem obrigações no mês atual.</TableCell></TableRow>}
-          {items.map((o) => (
-            <TableRow key={o.id}>
-              <TableCell><div className="font-medium">{o.tipo}</div><div className="text-xs text-muted-foreground">{o.descricao}</div></TableCell>
-              <TableCell>{o.competencia}</TableCell>
-              <TableCell>{fmtDate(o.vencimento)}</TableCell>
-              <TableCell><Badge variant="outline" className="rounded-full capitalize">{o.status}</Badge></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function FinanceiroTab({ clienteId }: { clienteId: string }) {
-  const [items, setItems] = useState<Cobranca[]>([]);
-  useEffect(() => {
-    const load = () => setItems(financeiroStore.list().filter((c) => c.clienteId === clienteId));
-    load();
-    window.addEventListener("apoya:financeiro:changed", load);
-    return () => window.removeEventListener("apoya:financeiro:changed", load);
-  }, [clienteId]);
-  const total = useMemo(() => items.reduce((s, c) => s + c.valor, 0), [items]);
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border bg-card p-4 text-sm shadow-sm">Total faturado para este cliente: <strong>{fmtMoney(total)}</strong> · {items.length} cobranças</div>
-      <div className="rounded-2xl border bg-card shadow-sm overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Competência</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Forma</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.length === 0 && <TableRow><TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">Sem cobranças.</TableCell></TableRow>}
-            {items.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell>{c.competencia}</TableCell>
-                <TableCell>{fmtDate(c.vencimento)}</TableCell>
-                <TableCell>{fmtMoney(c.valor)}</TableCell>
-                <TableCell>{c.forma}</TableCell>
-                <TableCell><Badge variant="outline" className="rounded-full capitalize">{c.status}</Badge></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-}
-
-function NfseTab({ clienteId }: { clienteId: string }) {
-  const [items, setItems] = useState<NfseNota[]>([]);
-  useEffect(() => {
-    const load = () => setItems(nfseStore.list().filter((n) => n.clienteId === clienteId));
-    load();
-    window.addEventListener("apoya:nfse:changed", load);
-    return () => window.removeEventListener("apoya:nfse:changed", load);
-  }, [clienteId]);
-  return (
-    <div className="rounded-2xl border bg-card shadow-sm overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Número</TableHead>
-            <TableHead>Competência</TableHead>
-            <TableHead>Valor</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 && <TableRow><TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">Sem NFS-e emitidas.</TableCell></TableRow>}
-          {items.map((n) => (
-            <TableRow key={n.id}>
-              <TableCell className="font-mono text-xs">{n.numero ?? "—"}</TableCell>
-              <TableCell>{n.competencia}</TableCell>
-              <TableCell>{fmtMoney(n.valorServico)}</TableCell>
-              <TableCell><Badge variant="outline" className="rounded-full capitalize">{n.status}</Badge></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function EmptyTab({ title, hint }: { title: string; hint: string }) {
-  return (
-    <div className="rounded-2xl border bg-card p-10 text-center shadow-sm">
-      <h3 className="text-sm font-medium">{title}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }

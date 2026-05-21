@@ -1,4 +1,4 @@
-import type { Cliente, Regime } from "./clientes-store";
+import type { Cliente, Regime } from "@/hooks/use-clientes";
 
 export function onlyDigits(v: string) {
   return (v || "").replace(/\D/g, "");

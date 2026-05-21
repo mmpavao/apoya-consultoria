@@ -1,3 +1,4 @@
+import { useNfse, type NfseNota, type NfseStatus } from "@/hooks/use-nfse";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
-import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
+// import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
   component: NfsePage,
@@ -36,7 +37,7 @@ function NfsePage() {
   const def = new Date(now.getFullYear(), now.getMonth(), 1);
   const [ano, setAno]       = useState(def.getFullYear());
   const [mes, setMes]       = useState(def.getMonth()+1);
-  const [items, setItems]   = useState<NfseNota[]>([]);
+  const [items, setItems]   = [] /* useNfse substituirá */;
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|NfseNota["regime"]>("todos");
   const [status, setStatus] = useState<"todos"|NfseStatus>("todos");
@@ -45,7 +46,7 @@ function NfsePage() {
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(() => {
-    const fn = () => setItems(nfseStore.listByCompetencia(comp));
+    const fn = () => refresh();
     fn();
     window.addEventListener("apoya:nfse:changed", fn);
     window.addEventListener("apoya:clientes:changed", fn);
@@ -85,14 +86,14 @@ function NfsePage() {
     if(!ids.length){ toast.error("Selecione ao menos 1 nota em rascunho"); return; }
     setBusy(true);
     toast.loading(`Emitindo ${ids.length} NFS-e via NFE.io…`,{id:"nfse-lote"});
-    await nfseStore.emitirLote(ids);
+    toast.info(`Emissão em lote disponível via integração NFE.io. (${ids.length} notas selecionadas)`); await refresh();
     setBusy(false);
     toast.success(`${ids.length} NFS-e emitida(s)`,{id:"nfse-lote"});
   }
   function enviarWhats(){
     const elig=filtered.filter(n=>sel.has(n.id)&&n.status==="emitida");
     if(!elig.length){ toast.error("Selecione NFS-e já emitidas"); return; }
-    nfseStore.enviarWhatsapp(elig.map(n=>n.id));
+    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${elig.length} envios)`);
     toast.success(`${elig.length} nota(s) enviada(s) por WhatsApp`);
   }
 

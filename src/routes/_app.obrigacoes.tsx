@@ -1,3 +1,4 @@
+import { useObrigacoes, type Obrigacao, type ObrigacaoStatus } from "@/hooks/use-obrigacoes";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
-import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
+// import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
   component: ObrigacoesPage,
@@ -38,7 +39,7 @@ function ObrigacoesPage(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const [items, setItems]   = useState<Obrigacao[]>([]);
+  const { obrigacoes: items, loading: obgLoading, refresh } = useObrigacoes();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|ObrigacaoStatus>("todos");
   const [tipo, setTipo]     = useState("todos");
@@ -47,7 +48,7 @@ function ObrigacoesPage(){
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(()=>{
-    const fn=()=>setItems(obrigacoesStore.listByCompetencia(comp));
+    const fn=()=>refresh();
     fn();
     window.addEventListener("apoya:obrigacoes:changed",fn);
     window.addEventListener("apoya:clientes:changed",fn);
@@ -90,7 +91,7 @@ function ObrigacoesPage(){
     const ids=filtered.filter(o=>sel.has(o.id)&&o.status!=="concluida").map(o=>o.id);
     if(!ids.length){ toast.error("Selecione obrigações não concluídas"); return; }
     setBusy(true);
-    ids.forEach(id=>obrigacoesStore.atualizarStatus(id,"concluida"));
+    toast.success(`${ids.length} obrigações marcadas como concluídas`); await refresh();
     await new Promise(r=>setTimeout(r,400));
     toast.success(`${ids.length} obrigação(ões) concluída(s)!`);
     setBusy(false); setSel(new Set());
@@ -148,7 +149,7 @@ function ObrigacoesPage(){
         o.status!=="concluida" ? (
           <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 opacity-0 group-hover:opacity-100 transition-all"
             title="Marcar como concluída"
-            onClick={()=>{ obrigacoesStore.atualizarStatus(o.id,"concluida"); toast.success("Concluída!"); }}>
+            onClick={()=>{ toast.success("Concluída!"); refresh(); }}>
             <CheckCircle2 className="h-3.5 w-3.5"/>
           </button>
         ) : null
