@@ -98,7 +98,7 @@ const TONE_ICON: Record<KpiTone, string> = {
   neutral: "bg-muted text-muted-foreground",
   primary: "bg-primary/10 text-primary",
   success: "bg-emerald-50 text-emerald-600",
-  warning: "bg-amber-50 text-amber-600",
+  warning: "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]",
   danger:  "bg-red-50 text-red-600",
   info:    "bg-blue-50 text-blue-600",
 };
@@ -207,7 +207,7 @@ export function PlaceholderBlock({
       <h2 className="mt-5 text-lg font-semibold">{title}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{description}</p>
       <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
         {module}
       </div>
     </div>

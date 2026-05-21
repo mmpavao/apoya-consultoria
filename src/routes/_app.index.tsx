@@ -50,7 +50,7 @@ const ultimosClientes = [
 /* ─── Components ──────────────────────────────────────── */
 const statusCfg: Record<string, string> = {
   ativo:        "bg-emerald-50 text-emerald-700",
-  inadimplente: "bg-amber-50   text-amber-700",
+  inadimplente: "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]",
   suspenso:     "bg-red-50     text-red-700",
   inativo:      "bg-muted      text-muted-foreground",
 };
@@ -114,7 +114,7 @@ function MiniLink({
 
 const alertaCfg = {
   danger:  { ring: "ring-destructive/20", icon: "bg-destructive/10 text-destructive" },
-  warning: { ring: "ring-amber-200/60",   icon: "bg-amber-50 text-amber-700" },
+  warning: { ring: "ring-[oklch(0.78_0.155_82/0.30)]", icon: "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]" },
   success: { ring: "ring-emerald-200/60", icon: "bg-emerald-50 text-emerald-700" },
 } as const;
 

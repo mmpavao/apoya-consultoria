@@ -114,7 +114,7 @@ const PAL: Record<string, string> = {
   blue:   "bg-blue-50    text-blue-700",
   green:  "bg-emerald-50 text-emerald-700",
   red:    "bg-red-50     text-red-700",
-  amber:  "bg-amber-50   text-amber-700",
+  amber:  "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]",
   violet: "bg-violet-50  text-violet-700",
   cyan:   "bg-cyan-50    text-cyan-700",
   indigo: "bg-indigo-50  text-indigo-700",
@@ -123,7 +123,7 @@ const PAL: Record<string, string> = {
 const DOT: Record<string, string> = {
   gray:   "bg-muted-foreground/60", blue:   "bg-blue-500",
   green:  "bg-emerald-500",         red:    "bg-red-500",
-  amber:  "bg-amber-500",           violet: "bg-violet-500",
+  amber:  "bg-[oklch(0.78_0.155_82)]",           violet: "bg-violet-500",
   cyan:   "bg-cyan-500",            indigo: "bg-indigo-500",
   orange: "bg-primary",
 };

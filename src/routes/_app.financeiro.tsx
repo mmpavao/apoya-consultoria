@@ -196,7 +196,7 @@ function FinanceiroPage(){
         onToggleRow={toggleOne}
         emptyIcon={<DollarSign className="h-8 w-8"/>}
         emptyText="Nenhuma cobrança encontrada"
-        rowClassName={c=>c.reguaStage==="suspensao"?"bg-red-50/40":c.reguaStage==="negativacao"?"bg-orange-50/40":""}
+        rowClassName={c=>c.reguaStage==="suspensao"?"bg-red-50/40":c.reguaStage==="negativacao"?"bg-primary/5":""}
         toolbar={
           <>
             <TableSearch value={query} onChange={setQuery} placeholder="Buscar cliente ou CNPJ…"/>
