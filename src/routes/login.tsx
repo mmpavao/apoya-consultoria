@@ -123,10 +123,10 @@ function LoginPage() {
                     <Icon className="h-4.5 w-4.5" style={{ color: "var(--color-sidebar-accent)" }} />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: "oklch(0.90 0.01 260)" }}>
+                    <div className="text-sm font-semibold text-white">
                       {f.title}
                     </div>
-                    <div className="text-xs mt-0.5 leading-relaxed" style={{ color: "oklch(0.60 0.015 260)" }}>
+                    <div className="text-xs mt-0.5 leading-relaxed text-white/65">
                       {f.desc}
                     </div>
                   </div>
@@ -137,7 +137,7 @@ function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-[11px]" style={{ color: "oklch(0.40 0.015 260)" }}>
+        <div className="relative z-10 text-[11px] text-white/45">
           © 2026 APOYA Consultoria e Contabilidade · Todos os direitos reservados
         </div>
       </div>
