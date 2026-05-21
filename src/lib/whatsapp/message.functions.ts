@@ -98,7 +98,8 @@ export const sendPresence = createServerFn({ method: "POST" })
     presence: z.enum(["composing", "recording", "paused"]),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/chat/sendPresence/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
       presence: data.presence,
@@ -118,7 +119,8 @@ export const sendText = createServerFn({ method: "POST" })
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const conteudo = withTag(data.texto, conv.departamento, agenteNome);
     const body: any = { number: conv.telefone, text: conteudo, linkPreview: true };
     if (data.replyTo) body.quoted = { key: { id: data.replyTo } };
@@ -164,7 +166,8 @@ export const sendMedia = createServerFn({ method: "POST" })
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const caption = data.caption ? withTag(data.caption, conv.departamento, agenteNome) : undefined;
     const body: any = {
       number: conv.telefone,
@@ -214,7 +217,8 @@ export const sendAudio = createServerFn({ method: "POST" })
     audio: z.string().min(1),    // base64 ou URL
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const evoRes = await evo<any>("POST", `/message/sendWhatsAppAudio/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
       audio: data.audio,
@@ -256,7 +260,8 @@ export const sendReaction = createServerFn({ method: "POST" })
     fromMe: z.boolean().default(false),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const { conv, instance, agenteNome } = await loadCtx(data.conversaId, context.userId);
+    const sb = sbFromContext(context);
+    const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/message/sendReaction/${encodeURIComponent(instance.nome)}`, {
       reactionMessage: {
         key: { remoteJid: phoneToJid(conv.telefone), fromMe: data.fromMe, id: data.messageId },
@@ -290,13 +295,14 @@ export const startConversa = createServerFn({ method: "POST" })
     clienteId: z.string().uuid().optional(),
     nomeContato: z.string().max(80).optional(),
   }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = sbFromContext(context);
     const tel = data.telefone.replace(/\D/g, "");
     const conv = await upsertConversa({
       instanceId: data.instanceId,
       telefone: tel,
       nomeContato: data.nomeContato,
-    });
+    }, sb);
     if (data.clienteId) {
       await sb.from("wa_conversa").update({ cliente_id: data.clienteId }).eq("id", conv.id);
     }
