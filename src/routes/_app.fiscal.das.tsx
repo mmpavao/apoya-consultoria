@@ -20,10 +20,10 @@ export const Route = createFileRoute("/_app/fiscal/das")({
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-const S_COLOR: Record<DasStatus, "gray"|"blue"|"green"|"red"> = {
-  pendente: "blue", gerada: "amber" as "green", paga: "green", erro: "red",
+const S_COLOR: Partial<Record<DasStatus, "gray"|"blue"|"green"|"red">> = {
+  pendente: "blue", gerada: "green", paga: "green", erro: "red",
 };
-const S_LABEL: Record<DasStatus, string> = {
+const S_LABEL: Partial<Record<DasStatus, string>> = {
   pendente:"Pendente", gerada:"Gerada", paga:"Paga", erro:"Erro",
 };
 
@@ -132,7 +132,7 @@ function DasPage() {
       cell: g => (
         <div style={{overflow:"visible", whiteSpace:"normal"}}>
           <InlineBadge color={S_COLOR[g.status]} dot>{S_LABEL[g.status]}</InlineBadge>
-          {g.enviadoWhatsappEm && <div className="text-[10px] text-emerald-600 mt-0.5">✓ WhatsApp</div>}
+          {g.enviadoWaEm && <div className="text-[10px] text-emerald-600 mt-0.5">✓ WhatsApp</div>}
         </div>
       ),
     },
