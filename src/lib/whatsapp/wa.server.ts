@@ -1,7 +1,7 @@
 /**
  * Helpers compartilhados (server-only) para o módulo WhatsApp.
  */
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { sb } from "./sb.server";
 
 export const INSTANCE_NAME_RE = /^[a-z0-9_-]{3,40}$/;
 
