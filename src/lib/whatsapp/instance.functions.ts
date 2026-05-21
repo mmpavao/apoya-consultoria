@@ -205,14 +205,12 @@ export const deleteInstance = createServerFn({ method: "POST" })
     await ensureAdmin(authSb, context.userId);
     const r = await authSb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
-    try {
-      await evo("DELETE", `/instance/logout/${encodeURIComponent(r.data.nome)}`);
-    } catch { /* ignore */ }
-    try {
-      await evo("DELETE", `/instance/delete/${encodeURIComponent(r.data.nome)}`);
-    } catch { /* ignore */ }
+    try { await evo("DELETE", `/instance/logout/${encodeURIComponent(r.data.nome)}`); } catch { /* ignore */ }
+    try { await evo("DELETE", `/instance/delete/${encodeURIComponent(r.data.nome)}`); } catch { /* ignore */ }
+    // limpa referências em conversas antes de remover a instância
+    try { await authSb.from("wa_conversa").delete().eq("instance_id", data.instanceId); } catch { /* ignore */ }
     const del = await authSb.from("wa_instance").delete().eq("id", data.instanceId);
-    if (del.error) throw new Error(del.error.message);
+    if (del.error) throw new Error(`Falha ao excluir instância: ${del.error.message}`);
     return { ok: true };
   });
 
