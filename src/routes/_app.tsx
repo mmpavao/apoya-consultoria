@@ -18,6 +18,16 @@ function AppShell() {
   const navigate = useNavigate();
   const { loading, user, profile, roles, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("apoya:sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("apoya:sidebar-collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
+
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
