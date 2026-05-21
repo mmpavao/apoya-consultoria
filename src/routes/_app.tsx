@@ -61,11 +61,15 @@ function AppShell() {
         fixed sidebar (left-0, inset-y-0) — nunca faz scroll
         main column tem padding-left = sidebar width via CSS class
     */
-    <div className="app-shell">
+    <div className="app-shell" data-sidebar-collapsed={collapsed ? "true" : "false"}>
 
       {/* ─── SIDEBAR — Desktop (fixed) ─────────────────── */}
       <aside className="app-sidebar hidden md:flex flex-col">
-        <AppSidebar onLogout={handleLogout} />
+        <AppSidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
+          onLogout={handleLogout}
+        />
       </aside>
 
       {/* ─── DRAWER — Mobile (overlay) ─────────────────── */}
@@ -80,6 +84,7 @@ function AppShell() {
           </aside>
         </div>
       )}
+
 
       {/* ─── CONTEÚDO PRINCIPAL ────────────────────────── */}
       <div className="app-main">
