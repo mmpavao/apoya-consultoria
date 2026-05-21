@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/PagePlaceholder";
+import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 // config-store: migrado para hooks Supabase (use-usuarios, use-escritorio, use-integracoes)
 
 export const Route = createFileRoute("/_app/configuracoes")({
@@ -91,7 +92,7 @@ function ConfiguracoesPageContent() {
 
         <TabsContent value="usuarios"><UsuariosTab /></TabsContent>
         <TabsContent value="integracoes" className="space-y-4">
-              <IntegracoesSuapbaseTab />
+              <IntegracoesTabsWrapper />
             </TabsContent>
 
             <TabsContent value="templates"><TemplatesTab /></TabsContent>
