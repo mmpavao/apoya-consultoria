@@ -76,7 +76,7 @@ export function useObrigacoes(competencia?: string) {
   const updateStatus = useCallback(async (id: string, status: ObrigacaoStatus) => {
     const patch: Record<string, unknown> = { status };
     if (status === "concluida") patch.concluida_em = new Date().toISOString();
-    const { error: err } = await supabase.from("obrigacoes").update(patch).eq("id", id);
+    const { error: err } = await supabase.from("obrigacoes").update(patch as any).eq("id", id);
     if (err) { toast.error("Erro ao atualizar: " + err.message); return false; }
     return true;
   }, []);
