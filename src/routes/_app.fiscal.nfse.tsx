@@ -198,6 +198,15 @@ function NfsePage() {
         }
       />
 
+      <PageTabs
+        items={[
+          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
+          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
+          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
+        ]}
+      />
+
+
       <KpiGrid cols={6}>
         {kpiList.map(({icon:Icon,label,val,tone})=>(
           <KpiCard key={label} icon={Icon} tone={tone} label={label} value={val} />
