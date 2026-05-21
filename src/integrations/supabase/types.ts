@@ -503,46 +503,73 @@ export type Database = {
       }
       mensagem_whatsapp: {
         Row: {
+          agente_id: string | null
+          agente_nome: string | null
           arquivo_nome: string | null
           arquivo_url: string | null
           cliente_id: string | null
           conteudo: string | null
+          conversa_id: string | null
           created_at: string
+          departamento: string | null
           direcao: string
           eh_automatica: boolean
           evolution_id: string | null
           id: string
+          instance_id: string | null
           lida_em: string | null
+          mime_type: string | null
+          reaction: string | null
+          reaction_to: string | null
+          reply_to: string | null
           status: string
           telefone: string
           tipo: string
         }
         Insert: {
+          agente_id?: string | null
+          agente_nome?: string | null
           arquivo_nome?: string | null
           arquivo_url?: string | null
           cliente_id?: string | null
           conteudo?: string | null
+          conversa_id?: string | null
           created_at?: string
+          departamento?: string | null
           direcao: string
           eh_automatica?: boolean
           evolution_id?: string | null
           id?: string
+          instance_id?: string | null
           lida_em?: string | null
+          mime_type?: string | null
+          reaction?: string | null
+          reaction_to?: string | null
+          reply_to?: string | null
           status?: string
           telefone: string
           tipo?: string
         }
         Update: {
+          agente_id?: string | null
+          agente_nome?: string | null
           arquivo_nome?: string | null
           arquivo_url?: string | null
           cliente_id?: string | null
           conteudo?: string | null
+          conversa_id?: string | null
           created_at?: string
+          departamento?: string | null
           direcao?: string
           eh_automatica?: boolean
           evolution_id?: string | null
           id?: string
+          instance_id?: string | null
           lida_em?: string | null
+          mime_type?: string | null
+          reaction?: string | null
+          reaction_to?: string | null
+          reply_to?: string | null
           status?: string
           telefone?: string
           tipo?: string
@@ -553,6 +580,20 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_whatsapp_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagem_whatsapp_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "wa_instance"
             referencedColumns: ["id"]
           },
         ]
@@ -804,6 +845,126 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      wa_conversa: {
+        Row: {
+          assigned_at: string | null
+          assigned_to: string | null
+          avatar_url: string | null
+          cliente_id: string | null
+          contato_digitando_ate: string | null
+          created_at: string
+          departamento: string | null
+          id: string
+          instance_id: string
+          nao_lidas: number
+          nome_contato: string | null
+          telefone: string
+          ultima_em: string | null
+          ultima_mensagem: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          avatar_url?: string | null
+          cliente_id?: string | null
+          contato_digitando_ate?: string | null
+          created_at?: string
+          departamento?: string | null
+          id?: string
+          instance_id: string
+          nao_lidas?: number
+          nome_contato?: string | null
+          telefone: string
+          ultima_em?: string | null
+          ultima_mensagem?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_to?: string | null
+          avatar_url?: string | null
+          cliente_id?: string | null
+          contato_digitando_ate?: string | null
+          created_at?: string
+          departamento?: string | null
+          id?: string
+          instance_id?: string
+          nao_lidas?: number
+          nome_contato?: string | null
+          telefone?: string
+          ultima_em?: string | null
+          ultima_mensagem?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversa_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_conversa_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "wa_instance"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_instance: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          departamentos: string[]
+          display_name: string
+          evolution_apikey: string | null
+          id: string
+          last_connected_at: string | null
+          last_qr_at: string | null
+          nome: string
+          numero: string | null
+          qr_code: string | null
+          status: string
+          updated_at: string
+          webhook_token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          departamentos?: string[]
+          display_name: string
+          evolution_apikey?: string | null
+          id?: string
+          last_connected_at?: string | null
+          last_qr_at?: string | null
+          nome: string
+          numero?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+          webhook_token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          departamentos?: string[]
+          display_name?: string
+          evolution_apikey?: string | null
+          id?: string
+          last_connected_at?: string | null
+          last_qr_at?: string | null
+          nome?: string
+          numero?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+          webhook_token?: string
         }
         Relationships: []
       }
