@@ -162,12 +162,12 @@ function NfsePage() {
   ];
 
   const kpiList = [
-    {icon:FileText,     label:"Total",    val:kpi.total,           color:"text-foreground",  bg:"bg-card"},
-    {icon:Loader2,      label:"Rascunho", val:kpi.rascunho,        color:"text-blue-600",    bg:"bg-blue-50"},
-    {icon:CheckCircle2, label:"Emitidas", val:kpi.emitida,         color:"text-emerald-600", bg:"bg-emerald-50"},
-    {icon:AlertTriangle,label:"Erro",     val:kpi.erro,            color:"text-red-600",     bg:"bg-red-50"},
-    {icon:Receipt,      label:"Faturado", val:fmtBRL(kpi.valor),   color:"text-foreground",  bg:"bg-muted"},
-    {icon:Ban,          label:"CBS+IBS",  val:fmtBRL(kpi.cbsIbs),  color:"text-orange-600",  bg:"bg-orange-50"},
+    {icon:FileText,     label:"Total",    val:kpi.total,           tone:"neutral" as const},
+    {icon:Loader2,      label:"Rascunho", val:kpi.rascunho,        tone:"info"    as const},
+    {icon:CheckCircle2, label:"Emitidas", val:kpi.emitida,         tone:"success" as const},
+    {icon:AlertTriangle,label:"Erro",     val:kpi.erro,            tone:"danger"  as const},
+    {icon:Receipt,      label:"Faturado", val:fmtBRL(kpi.valor),   tone:"neutral" as const},
+    {icon:Ban,          label:"CBS+IBS",  val:fmtBRL(kpi.cbsIbs),  tone:"warning" as const},
   ];
 
   return (
