@@ -25,6 +25,30 @@ function buildWebhookUrl(baseUrl: string, instanceName: string, token: string): 
   return `${baseUrl}/api/public/evolution-webhook/${encodeURIComponent(instanceName)}?token=${token}`;
 }
 
+async function setEvolutionWebhook(instanceName: string, webhookUrl: string, apiKey?: string | null) {
+  // Evolution v2: /webhook/set/{instance} — payload aninhado em "webhook"
+  try {
+    await evo("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: false,
+        base64: false,
+        events: WEBHOOK_EVENTS,
+      },
+    }, apiKey ?? undefined);
+  } catch (e) {
+    // fallback formato legado (raiz)
+    await evo("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+      enabled: true,
+      url: webhookUrl,
+      webhookByEvents: false,
+      webhookBase64: false,
+      events: WEBHOOK_EVENTS,
+    }, apiKey ?? undefined);
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // listInstances
 // ──────────────────────────────────────────────────────────────────────────
@@ -108,6 +132,9 @@ export const createInstance = createServerFn({ method: "POST" })
       }).eq("id", row.id);
       if (upd.error) throw new Error(upd.error.message);
 
+      // garante webhook persistido na Evolution (alguns servidores ignoram no /create)
+      await setEvolutionWebhook(slug, webhookUrl, evoApiKey);
+
       return { id: row.id, nome: slug, webhookUrl };
     } catch (e) {
       // rollback
@@ -128,6 +155,11 @@ export const connectInstance = createServerFn({ method: "POST" })
     const r = await sb.from("wa_instance").select("*").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const inst = r.data;
+
+    // reforça o webhook antes de conectar
+    const baseUrl = publicBaseUrlFromRequest(getRequest());
+    const webhookUrl = buildWebhookUrl(baseUrl, inst.nome, inst.webhook_token);
+    try { await setEvolutionWebhook(inst.nome, webhookUrl, inst.evolution_apikey); } catch { /* ignore */ }
 
     const res = await evo<any>("GET", `/instance/connect/${encodeURIComponent(inst.nome)}`);
     const qr = res?.base64 ?? res?.code ?? null;
