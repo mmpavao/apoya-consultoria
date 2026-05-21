@@ -61,7 +61,7 @@ export function useSetores() {
 
       setSetores(
         (setoresData ?? []).map((s: Record<string, unknown>) => ({
-          ...(s as Setor),
+          ...(s as unknown as Setor),
           permissoes: permsBySetor.get(s.id as string) ?? [],
         }))
       );

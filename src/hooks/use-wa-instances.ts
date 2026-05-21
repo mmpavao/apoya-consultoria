@@ -67,6 +67,12 @@ export function useWaInstances() {
     },
     async connect(instanceId: string) {
       const r = await fnConnect({ data: { instanceId } });
+      setInstances((cur) => cur.map((inst) => inst.id === instanceId ? {
+        ...inst,
+        status: r.connected ? "connected" : "connecting",
+        qr_code: r.qr ?? inst.qr_code,
+        last_qr_at: r.qr ? new Date().toISOString() : inst.last_qr_at,
+      } : inst));
       await reload();
       return r;
     },
