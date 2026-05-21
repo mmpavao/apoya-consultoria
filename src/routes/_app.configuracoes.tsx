@@ -368,3 +368,19 @@ function IntegracoesSuapbaseTab() {
     </div>
   );
 }
+
+function IntegracoesTabsWrapper() {
+  const [sub, setSub] = useState<"apis" | "whatsapp">("whatsapp");
+  return (
+    <div className="space-y-4">
+      <Tabs value={sub} onValueChange={(v) => setSub(v as "apis" | "whatsapp")}>
+        <TabsList>
+          <TabsTrigger value="whatsapp" className="gap-2"><MessageSquare className="h-4 w-4" />WhatsApp</TabsTrigger>
+          <TabsTrigger value="apis" className="gap-2"><Plug className="h-4 w-4" />APIs</TabsTrigger>
+        </TabsList>
+        <TabsContent value="whatsapp" className="mt-4"><WhatsappInstancesPanel /></TabsContent>
+        <TabsContent value="apis" className="mt-4"><IntegracoesSuapbaseTab /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
