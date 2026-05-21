@@ -3,12 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Download,
   FileText, Loader2, MessageCircle, Receipt, Send,
+  Wallet, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
-import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
@@ -196,6 +197,15 @@ function NfsePage() {
           </>
         }
       />
+
+      <PageTabs
+        items={[
+          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
+          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
+          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
+        ]}
+      />
+
 
       <KpiGrid cols={6}>
         {kpiList.map(({icon:Icon,label,val,tone})=>(

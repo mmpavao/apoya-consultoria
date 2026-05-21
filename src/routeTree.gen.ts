@@ -17,6 +17,7 @@ import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
+import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
@@ -61,6 +62,11 @@ const AppClientesRoute = AppClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
+  id: '/fiscal/',
+  path: '/fiscal/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFiscalSerproRoute = AppFiscalSerproRouteImport.update({
   id: '/fiscal/serpro',
   path: '/fiscal/serpro',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/fiscal/': typeof AppFiscalIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/fiscal': typeof AppFiscalIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/_app/fiscal/': typeof AppFiscalIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/fiscal/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/fiscal'
   id:
     | '__root__'
     | '/_app'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
+    | '/_app/fiscal/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -229,6 +241,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/fiscal/': {
+      id: '/_app/fiscal/'
+      path: '/fiscal'
+      fullPath: '/fiscal/'
+      preLoaderRoute: typeof AppFiscalIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/fiscal/serpro': {
       id: '/_app/fiscal/serpro'
       path: '/fiscal/serpro'
@@ -282,6 +301,7 @@ interface AppRouteChildren {
   AppFiscalDasRoute: typeof AppFiscalDasRoute
   AppFiscalNfseRoute: typeof AppFiscalNfseRoute
   AppFiscalSerproRoute: typeof AppFiscalSerproRoute
+  AppFiscalIndexRoute: typeof AppFiscalIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -294,6 +314,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFiscalDasRoute: AppFiscalDasRoute,
   AppFiscalNfseRoute: AppFiscalNfseRoute,
   AppFiscalSerproRoute: AppFiscalSerproRoute,
+  AppFiscalIndexRoute: AppFiscalIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

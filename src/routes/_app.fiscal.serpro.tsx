@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Activity, CheckCircle2, RefreshCw, Server, Shield, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, RefreshCw, Server, Shield, XCircle, Wallet, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
+import { PageHeader, PageTabs, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
 import { dasStore } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/serpro")({
@@ -65,6 +65,15 @@ function SerproPage() {
           </Button>
         }
       />
+
+      <PageTabs
+        items={[
+          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
+          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
+          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
+        ]}
+      />
+
 
       <KpiGrid cols={4}>
         <KpiCard

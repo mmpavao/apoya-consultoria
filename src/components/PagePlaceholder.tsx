@@ -2,7 +2,42 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+
+/* ────────────────────────────────────────────────────────
+   PageTabs — sub-navegação padrão (ex.: Fiscal: DAS / NFS-e / SERPRO)
+   ──────────────────────────────────────────────────────── */
+export function PageTabs({
+  items,
+}: {
+  items: Array<{ to: string; label: string; icon?: LucideIcon }>;
+}) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <div className="surface-card flex flex-wrap items-center gap-1 p-1.5">
+      {items.map((it) => {
+        const Icon = it.icon;
+        const active = pathname === it.to || pathname.startsWith(it.to + "/");
+        return (
+          <Link
+            key={it.to}
+            to={it.to}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all",
+              active
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {Icon && <Icon className="h-4 w-4" />}
+            {it.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 /* ────────────────────────────────────────────────────────
    PageHeader — cabeçalho único de toda página
