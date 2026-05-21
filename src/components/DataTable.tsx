@@ -91,9 +91,9 @@ export function DataTable<T>({
                       onRowClick && "cursor-pointer hover:bg-muted/40 transition-colors",
                     )}
                     onClick={onRowClick ? (e) => {
-                      // Não navegar se clicou no checkbox ou em botões/links internos
                       const target = e.target as HTMLElement;
-                      if (target.closest('button, a, input, [role="menuitem"], [data-no-rowclick]')) return;
+                      // Bloquear se clicou em checkbox, input ou dentro de célula marcada
+                      if (target.closest('[data-no-rowclick], input[type="checkbox"]')) return;
                       onRowClick(row);
                     } : undefined}
                   >

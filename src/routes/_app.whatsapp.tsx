@@ -22,6 +22,10 @@ import { useAuth } from "@/hooks/use-auth";
 export const Route = createFileRoute("/_app/whatsapp")({
   component: WhatsappPage,
   head: () => ({ meta: [{ title: "WhatsApp · APOYA Gestão" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    tel:  (s["tel"]  as string) ?? "",
+    nome: (s["nome"] as string) ?? "",
+  }),
 });
 
 function fmtTime(iso: string | null | undefined) {
@@ -35,6 +39,7 @@ function initials(s: string | null) {
 
 function WhatsappPage() {
   const { profile } = useAuth();
+  const { tel: deepLinkTel, nome: deepLinkNome } = Route.useSearch();
   const { instances } = useWaInstances();
   const [instanceId, setInstanceId] = useState<string>("");
   useEffect(() => {
@@ -44,6 +49,31 @@ function WhatsappPage() {
   const { conversas } = useWaConversas(instanceId || undefined);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  const actions = useWaActions();
+
+  // Deep link: se chegou com ?tel=, auto-selecionar ou criar conversa
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!deepLinkTel || !instanceId || deepLinkHandled.current) return;
+    const tel = deepLinkTel.replace(/\D/g, "");
+    // Procurar conversa existente
+    const existing = conversas.find(c => c.telefone.replace(/\D/g,"") === tel);
+    if (existing) {
+      setActiveId(existing.id);
+      deepLinkHandled.current = true;
+      return;
+    }
+    // Se conversas já carregaram e não achou, criar nova conversa
+    if (conversas !== undefined) {
+      actions.iniciar({ instanceId, telefone: tel, nomeContato: deepLinkNome || undefined })
+        .then((conv: any) => {
+          if (conv?.conversa?.id) setActiveId(conv.conversa.id);
+          deepLinkHandled.current = true;
+        })
+        .catch(() => { deepLinkHandled.current = true; });
+    }
+  }, [deepLinkTel, instanceId, conversas]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,7 +85,6 @@ function WhatsappPage() {
   const activeInstance = useMemo(() => instances.find(i => i.id === (active?.instance_id || instanceId)), [instances, active, instanceId]);
 
   const { mensagens, reload: reloadMensagens, setMensagens: setMensagensLocal } = useWaMensagens(active?.id ?? null);
-  const actions = useWaActions();
   const [draft, setDraft] = useState("");
   const [departamento, setDepartamento] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);

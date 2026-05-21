@@ -91,10 +91,9 @@ function ClientesPage(){
         <div className="flex items-center gap-2.5" style={{overflow:"visible",whiteSpace:"normal"}}>
           <Initials nome={c.razaoSocial} regime={c.regime}/>
           <div>
-            <Link to="/clientes/$id" params={{id:c.id}}
-              className="font-medium text-foreground leading-tight hover:underline hover:text-primary">
+            <span className="font-medium text-foreground leading-tight">
               {c.razaoSocial}
-            </Link>
+            </span>
             {c.nomeFantasia && <div className="text-[11px] text-muted-foreground">{c.nomeFantasia}</div>}
           </div>
         </div>
@@ -146,13 +145,13 @@ function ClientesPage(){
     {
       key:"acoes", header:"", headerClassName:"w-24 text-right", className:"w-24 text-right",
       cell: c=>(
-        <div className="inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div data-no-rowclick className="inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {c.whatsapp && (
-            <a href={`https://wa.me/${c.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50">
-                <MessageCircle className="h-3.5 w-3.5"/>
-              </Button>
-            </a>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
+              title={`Abrir conversa — ${c.whatsapp}`}
+              onClick={() => navigate({ to: "/whatsapp", search: { tel: c.whatsapp!.replace(/\D/g,""), nome: c.razaoSocial } })}>
+              <MessageCircle className="h-3.5 w-3.5"/>
+            </Button>
           )}
           {c.telefone && (
             <a href={`tel:${c.telefone}`}>
@@ -162,12 +161,12 @@ function ClientesPage(){
             </a>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild data-no-rowclick>
+            <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5"/></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link to="/clientes/$id" params={{id:c.id}}><ExternalLink className="h-4 w-4"/> Ver detalhes</Link>
+              <DropdownMenuItem onClick={() => navigate({ to: "/clientes/$id", params: { id: c.id } })}>
+                <ExternalLink className="h-4 w-4"/> Ver detalhes
               </DropdownMenuItem>
               <DropdownMenuItem onClick={()=>{setEditing(c);setDialog(true);}}>
                 <Pencil className="h-4 w-4"/> Editar
