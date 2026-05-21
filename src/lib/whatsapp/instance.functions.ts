@@ -25,6 +25,30 @@ function buildWebhookUrl(baseUrl: string, instanceName: string, token: string): 
   return `${baseUrl}/api/public/evolution-webhook/${encodeURIComponent(instanceName)}?token=${token}`;
 }
 
+async function setEvolutionWebhook(instanceName: string, webhookUrl: string, apiKey?: string | null) {
+  // Evolution v2: /webhook/set/{instance} — payload aninhado em "webhook"
+  try {
+    await evo("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: false,
+        base64: false,
+        events: WEBHOOK_EVENTS,
+      },
+    }, apiKey ?? undefined);
+  } catch (e) {
+    // fallback formato legado (raiz)
+    await evo("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+      enabled: true,
+      url: webhookUrl,
+      webhookByEvents: false,
+      webhookBase64: false,
+      events: WEBHOOK_EVENTS,
+    }, apiKey ?? undefined);
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // listInstances
 // ──────────────────────────────────────────────────────────────────────────
