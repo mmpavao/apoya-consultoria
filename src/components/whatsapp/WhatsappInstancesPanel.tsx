@@ -104,6 +104,20 @@ export function WhatsappInstancesPanel() {
         onClose={() => setQrInstance(null)}
         onRefresh={() => activeQr && connect(activeQr.id).catch(e => toast.error(e.message))}
       />
+
+      <DeleteDialog
+        instance={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async (inst) => {
+          try {
+            await remove(inst.id);
+            toast.success("Instância removida");
+            setDeleteTarget(null);
+          } catch (e: any) {
+            toast.error(e?.message ?? "Falha ao excluir instância");
+          }
+        }}
+      />
     </div>
   );
 }
