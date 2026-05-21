@@ -3,12 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, Download, FileText, Loader2,
   MessageCircle, RefreshCw, Send, Wallet, AlertTriangle,
+  Receipt, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
-import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
