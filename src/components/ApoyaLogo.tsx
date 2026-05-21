@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import logoOnDark from "@/assets/apoya-logo-light.png"; // logo branca + laranja (para fundos escuros)
+import logoOnDark from "@/assets/apoya-logo-on-dark.png"; // logo branca + laranja TRANSPARENTE (para fundos escuros)
 import logoOnDarkMono from "@/assets/apoya-logo-light-mono.png"; // logo branca (para fundos escuros)
 import logoOnLight from "@/assets/apoya-logo-dark.png"; // logo cinza + laranja (para fundos claros)
 import logoOnLightMono from "@/assets/apoya-logo-dark-mono.png"; // logo cinza (para fundos claros)

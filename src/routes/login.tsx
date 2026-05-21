@@ -101,11 +101,11 @@ function LoginPage() {
         {/* Conteúdo central */}
         <div className="relative z-10 space-y-8 max-w-md">
           <div className="space-y-3">
-            <h2 className="text-3xl lg:text-4xl font-bold leading-tight" style={{ color: "oklch(0.95 0.01 260)" }}>
+            <h2 className="text-3xl lg:text-4xl font-bold leading-tight text-white">
               Seu escritório contábil{" "}
               <span style={{ color: "var(--color-sidebar-accent)" }}>no piloto automático.</span>
             </h2>
-            <p className="text-base leading-relaxed" style={{ color: "oklch(0.65 0.015 260)" }}>
+            <p className="text-base leading-relaxed text-white/75">
               Gerencie 75+ clientes, automatize obrigações fiscais e nunca mais perca um prazo.
             </p>
           </div>
@@ -123,10 +123,10 @@ function LoginPage() {
                     <Icon className="h-4.5 w-4.5" style={{ color: "var(--color-sidebar-accent)" }} />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: "oklch(0.90 0.01 260)" }}>
+                    <div className="text-sm font-semibold text-white">
                       {f.title}
                     </div>
-                    <div className="text-xs mt-0.5 leading-relaxed" style={{ color: "oklch(0.60 0.015 260)" }}>
+                    <div className="text-xs mt-0.5 leading-relaxed text-white/65">
                       {f.desc}
                     </div>
                   </div>
@@ -137,7 +137,7 @@ function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-[11px]" style={{ color: "oklch(0.40 0.015 260)" }}>
+        <div className="relative z-10 text-[11px] text-white/45">
           © 2026 APOYA Consultoria e Contabilidade · Todos os direitos reservados
         </div>
       </div>
