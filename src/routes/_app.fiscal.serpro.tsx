@@ -4,7 +4,7 @@ import { Activity, CheckCircle2, RefreshCw, Server, Shield, XCircle } from "luci
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PageHeader } from "@/components/PagePlaceholder";
+import { PageHeader, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
 import { dasStore } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/serpro")({
@@ -66,20 +66,21 @@ function SerproPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatusCard
+      <KpiGrid cols={4}>
+        <KpiCard
           icon={health.online ? CheckCircle2 : XCircle}
-          tone={health.online ? "success" : "destructive"}
+          tone={health.online ? "success" : "danger"}
           label="Status do gateway"
           value={health.online ? "Online" : "Offline"}
           hint={`Verificado ${formatTime(health.checkedAt)}`}
         />
-        <StatusCard icon={Activity} tone="info" label="Latência" value={`${health.latencyMs} ms`} hint="Última consulta" />
-        <StatusCard icon={Server} tone="default" label="Recursos VPS" value={`CPU ${health.cpu}% · ${health.memMb} MB`} hint="Hetzner / Ubuntu 22.04" />
-        <StatusCard icon={Shield} tone="success" label="Certificado A1" value="Válido" hint={`Expira em ${formatDate(health.certExpira)}`} />
-      </div>
+        <KpiCard icon={Activity} tone="info"    label="Latência"      value={`${health.latencyMs} ms`} hint="Última consulta" />
+        <KpiCard icon={Server}   tone="neutral" label="Recursos VPS"  value={`CPU ${health.cpu}% · ${health.memMb} MB`} hint="Hetzner / Ubuntu 22.04" />
+        <KpiCard icon={Shield}   tone="success" label="Certificado A1" value="Válido" hint={`Expira em ${formatDate(health.certExpira)}`} />
+      </KpiGrid>
 
-      <div className="rounded-2xl border bg-card shadow-sm">
+
+      <div className="surface-card overflow-hidden">
         <div className="flex items-center justify-between border-b p-4">
           <div>
             <div className="font-semibold">Últimas consultas SERPRO</div>
@@ -141,28 +142,3 @@ function formatTime(iso: string) {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function StatusCard({ icon: Icon, label, value, hint, tone }: {
-  icon: typeof Activity; label: string; value: string; hint: string;
-  tone: "default" | "info" | "destructive" | "success";
-}) {
-  const toneCls = {
-    default: "bg-muted text-foreground",
-    info: "bg-info/10 text-info",
-    destructive: "bg-destructive/10 text-destructive",
-    success: "bg-success/10 text-success",
-  }[tone];
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneCls}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-lg font-semibold leading-tight">{value}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
-        </div>
-      </div>
-      <div className="mt-2 text-xs text-muted-foreground">{hint}</div>
-    </div>
-  );
-}
