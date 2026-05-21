@@ -36,7 +36,7 @@ export async function upsertConversa(params: {
   const { instanceId, telefone, nomeContato, ultimaMensagem, incrementaNaoLidas, marcarRecebida } = params;
 
   // tenta achar
-  const existing = await supabaseAdmin
+  const existing = await sb
     .from("wa_conversa")
     .select("*")
     .eq("instance_id", instanceId)
@@ -52,13 +52,13 @@ export async function upsertConversa(params: {
     }
     if (incrementaNaoLidas) patch.nao_lidas = (existing.data.nao_lidas ?? 0) + 1;
     if (Object.keys(patch).length) {
-      const upd = await supabaseAdmin.from("wa_conversa").update(patch).eq("id", existing.data.id).select("*").single();
+      const upd = await sb.from("wa_conversa").update(patch).eq("id", existing.data.id).select("*").single();
       return upd.data ?? existing.data;
     }
     return existing.data;
   }
 
-  const ins = await supabaseAdmin
+  const ins = await sb
     .from("wa_conversa")
     .insert({
       instance_id: instanceId,
@@ -85,12 +85,12 @@ export async function saveMediaBase64(args: {
   const ext = guessExt(args.mimetype, args.fileName);
   const path = `${args.instanceName}/${args.evolutionId}.${ext}`;
   const bytes = Uint8Array.from(atob(args.base64), c => c.charCodeAt(0));
-  const up = await supabaseAdmin.storage.from("whatsapp-media").upload(path, bytes, {
+  const up = await sb.storage.from("whatsapp-media").upload(path, bytes, {
     contentType: args.mimetype,
     upsert: true,
   });
   if (up.error) throw new Error(up.error.message);
-  const pub = supabaseAdmin.storage.from("whatsapp-media").getPublicUrl(path);
+  const pub = sb.storage.from("whatsapp-media").getPublicUrl(path);
   return pub.data.publicUrl;
 }
 
