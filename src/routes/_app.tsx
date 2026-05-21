@@ -18,6 +18,16 @@ function AppShell() {
   const navigate = useNavigate();
   const { loading, user, profile, roles, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("apoya:sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("apoya:sidebar-collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
+
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
@@ -51,11 +61,15 @@ function AppShell() {
         fixed sidebar (left-0, inset-y-0) — nunca faz scroll
         main column tem padding-left = sidebar width via CSS class
     */
-    <div className="app-shell">
+    <div className="app-shell" data-sidebar-collapsed={collapsed ? "true" : "false"}>
 
       {/* ─── SIDEBAR — Desktop (fixed) ─────────────────── */}
       <aside className="app-sidebar hidden md:flex flex-col">
-        <AppSidebar onLogout={handleLogout} />
+        <AppSidebar
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
+          onLogout={handleLogout}
+        />
       </aside>
 
       {/* ─── DRAWER — Mobile (overlay) ─────────────────── */}
@@ -70,6 +84,7 @@ function AppShell() {
           </aside>
         </div>
       )}
+
 
       {/* ─── CONTEÚDO PRINCIPAL ────────────────────────── */}
       <div className="app-main">

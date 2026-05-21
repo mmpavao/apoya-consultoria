@@ -8,6 +8,8 @@ import {
   MessageSquare,
   Settings,
   LogOut,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +17,6 @@ type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  /** Match exato — só ativo se pathname === to */
   exact?: boolean;
 };
 
@@ -38,70 +39,137 @@ function isActive(pathname: string, item: NavItem) {
   return pathname.startsWith(item.to);
 }
 
-function RailItem({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
+function NavLine({
+  item,
+  active,
+  collapsed,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  onClick?: () => void;
+}) {
   const Icon = item.icon;
   return (
     <Link
       to={item.to}
       onClick={onClick}
-      title={item.label}
+      title={collapsed ? item.label : undefined}
       className={cn(
-        "group relative grid h-11 w-11 place-items-center rounded-xl transition-all duration-200",
+        "group relative flex items-center rounded-xl transition-all duration-200",
+        collapsed ? "h-11 w-11 justify-center" : "h-11 w-full px-3 gap-3",
         active
           ? "bg-primary text-primary-foreground shadow-glow"
-          : "text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
       )}
     >
-      <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
-      {/* tooltip ao hover */}
-      <span
-        className="pointer-events-none absolute left-full ml-3 z-50 whitespace-nowrap rounded-lg bg-sidebar-accent px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground opacity-0 shadow-elevated transition-opacity group-hover:opacity-100"
-      >
-        {item.label}
-      </span>
+      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+      {!collapsed && (
+        <span className="text-sm font-medium truncate">{item.label}</span>
+      )}
+      {collapsed && (
+        <span className="pointer-events-none absolute left-full ml-3 z-50 whitespace-nowrap rounded-lg bg-sidebar-accent px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground opacity-0 shadow-elevated transition-opacity group-hover:opacity-100">
+          {item.label}
+        </span>
+      )}
     </Link>
   );
 }
 
 export function AppSidebar({
+  collapsed = false,
+  onToggleCollapse,
   onNavigate,
   onLogout,
 }: {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onNavigate?: () => void;
   onLogout?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <div className="flex h-full w-full flex-col items-center py-5">
-      {/* Logo mark — só símbolo "A" */}
-      <Link
-        to="/"
-        onClick={onNavigate}
-        className="mb-7 grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground font-display text-lg font-bold shadow-glow"
+    <div
+      className={cn(
+        "flex h-full w-full flex-col py-5",
+        collapsed ? "items-center px-0" : "items-stretch px-3"
+      )}
+    >
+      {/* Header: logo + (wordmark) + toggle */}
+      <div
+        className={cn(
+          "mb-7 flex items-center",
+          collapsed ? "flex-col gap-3" : "justify-between"
+        )}
       >
-        a
-      </Link>
+        <Link
+          to="/"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5",
+            collapsed ? "justify-center" : ""
+          )}
+        >
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground font-display text-lg font-bold shadow-glow">
+            a
+          </span>
+          {!collapsed && (
+            <span className="font-display text-lg font-bold tracking-tight text-sidebar-foreground">
+              apoya
+            </span>
+          )}
+        </Link>
+
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            className="hidden md:grid h-8 w-8 place-items-center rounded-lg text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          >
+            {collapsed ? (
+              <ChevronsRight className="h-4 w-4" />
+            ) : (
+              <ChevronsLeft className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Nav principal */}
-      <nav className="flex flex-1 flex-col items-center gap-1.5">
+      <nav
+        className={cn(
+          "flex flex-1 flex-col gap-1.5",
+          collapsed ? "items-center" : "items-stretch"
+        )}
+      >
         {items.map((it) => (
-          <RailItem
+          <NavLine
             key={it.to}
             item={it}
             active={isActive(pathname, it)}
+            collapsed={collapsed}
             onClick={onNavigate}
           />
         ))}
       </nav>
 
-      {/* Footer: settings + logout */}
-      <div className="flex flex-col items-center gap-1.5">
+      {/* Footer */}
+      <div
+        className={cn(
+          "flex flex-col gap-1.5",
+          collapsed ? "items-center" : "items-stretch"
+        )}
+      >
         {bottom.map((it) => (
-          <RailItem
+          <NavLine
             key={it.to}
             item={it}
             active={isActive(pathname, it)}
+            collapsed={collapsed}
             onClick={onNavigate}
           />
         ))}
@@ -109,9 +177,13 @@ export function AppSidebar({
           <button
             onClick={onLogout}
             title="Sair"
-            className="grid h-11 w-11 place-items-center rounded-xl text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-destructive transition-all"
+            className={cn(
+              "flex items-center rounded-xl text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-destructive transition-all",
+              collapsed ? "h-11 w-11 justify-center" : "h-11 w-full px-3 gap-3"
+            )}
           >
-            <LogOut className="h-[18px] w-[18px]" />
+            <LogOut className="h-[18px] w-[18px] shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">Sair</span>}
           </button>
         )}
       </div>

@@ -112,8 +112,10 @@
   --transition-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Layout */
-  --sidebar-width: 80px;
+  --sidebar-width: 248px;
+  --sidebar-width-collapsed: 80px;
   --header-height: 80px;
+
 }
 
 /* ─── Base ─────────────────────────────────────────────── */
@@ -177,7 +179,7 @@
     background: oklch(0.66 0.195 44 / 0.12);
   }
 
-  /* Sidebar fixa, estreita, icon-only */
+  /* Sidebar fixa — largura controlada por data-sidebar-collapsed no .app-shell */
   .app-sidebar {
     position: fixed;
     top: 0; left: 0; bottom: 0;
@@ -185,6 +187,11 @@
     z-index: 40;
     background: var(--color-sidebar);
     overflow: hidden;
+    transition: width 220ms var(--transition-smooth);
+  }
+
+  .app-shell[data-sidebar-collapsed="true"] .app-sidebar {
+    width: var(--sidebar-width-collapsed);
   }
 
   .app-main {
@@ -197,7 +204,13 @@
     position: relative;
     z-index: 1;
     overflow: hidden;
+    transition: margin-left 220ms var(--transition-smooth);
   }
+
+  .app-shell[data-sidebar-collapsed="true"] .app-main {
+    margin-left: var(--sidebar-width-collapsed);
+  }
+
 
   .app-content {
     flex: 1 1 0%;
