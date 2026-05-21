@@ -98,7 +98,7 @@ function NfsePage() {
     toast.success(`${elig.length} nota(s) enviada(s) por WhatsApp`);
   }
 
-  const cols: ColDef<NfseNota>[] = [
+  const cols: ColDef<any>[] = [
     {
       key:"prestador", header:"Prestador",
       cell: n=>(
