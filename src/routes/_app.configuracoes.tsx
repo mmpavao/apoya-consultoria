@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/PagePlaceholder";
+import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 // config-store: migrado para hooks Supabase (use-usuarios, use-escritorio, use-integracoes)
 
 export const Route = createFileRoute("/_app/configuracoes")({
@@ -91,7 +92,7 @@ function ConfiguracoesPageContent() {
 
         <TabsContent value="usuarios"><UsuariosTab /></TabsContent>
         <TabsContent value="integracoes" className="space-y-4">
-              <IntegracoesSuapbaseTab />
+              <IntegracoesTabsWrapper />
             </TabsContent>
 
             <TabsContent value="templates"><TemplatesTab /></TabsContent>
@@ -364,6 +365,22 @@ function IntegracoesSuapbaseTab() {
         <KeyRound className="h-3 w-3" />
         Para atualizar chaves de API, acesse o painel do Supabase → Edge Functions → Secrets.
       </p>
+    </div>
+  );
+}
+
+function IntegracoesTabsWrapper() {
+  const [sub, setSub] = useState<"apis" | "whatsapp">("whatsapp");
+  return (
+    <div className="space-y-4">
+      <Tabs value={sub} onValueChange={(v) => setSub(v as "apis" | "whatsapp")}>
+        <TabsList>
+          <TabsTrigger value="whatsapp" className="gap-2"><MessageSquare className="h-4 w-4" />WhatsApp</TabsTrigger>
+          <TabsTrigger value="apis" className="gap-2"><Plug className="h-4 w-4" />APIs</TabsTrigger>
+        </TabsList>
+        <TabsContent value="whatsapp" className="mt-4"><WhatsappInstancesPanel /></TabsContent>
+        <TabsContent value="apis" className="mt-4"><IntegracoesSuapbaseTab /></TabsContent>
+      </Tabs>
     </div>
   );
 }
