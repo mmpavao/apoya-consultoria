@@ -6,7 +6,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { evo, publicBaseUrlFromRequest } from "@/integrations/evolution/client.server";
-import { sb, sbFromContext, type WaSupabaseClient } from "./sb.server";
+import { sbFromContext, type WaSupabaseClient } from "./sb.server";
 import { INSTANCE_NAME_RE, slugifyInstanceName } from "./wa.server";
 
 const WEBHOOK_EVENTS = [
@@ -75,7 +75,7 @@ export const createInstance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const authSb = sbFromContext(context);
     await ensureAdmin(authSb, context.userId);
-    const db = sb;
+    const db = authSb;
 
     const slug = slugifyInstanceName(data.displayName);
     if (!INSTANCE_NAME_RE.test(slug)) throw new Error("Nome inválido. Use 3-40 caracteres alfanuméricos.");
@@ -152,7 +152,7 @@ export const connectInstance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const authSb = sbFromContext(context);
     await ensureAdmin(authSb, context.userId);
-    const r = await sb.from("wa_instance").select("*").eq("id", data.instanceId).single();
+    const r = await authSb.from("wa_instance").select("*").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const inst = r.data;
 
@@ -164,7 +164,7 @@ export const connectInstance = createServerFn({ method: "POST" })
     const res = await evo<any>("GET", `/instance/connect/${encodeURIComponent(inst.nome)}`);
     const qr = res?.base64 ?? res?.code ?? null;
     const already = res?.instance?.state === "open";
-    const upd = await sb.from("wa_instance").update({
+    const upd = await authSb.from("wa_instance").update({
       status: already ? "connected" : "connecting",
       qr_code: qr,
       last_qr_at: qr ? new Date().toISOString() : null,
@@ -180,13 +180,13 @@ export const refreshStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    sbFromContext(context);
-    const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
+    const authSb = sbFromContext(context);
+    const r = await authSb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     const res = await evo<any>("GET", `/instance/connectionState/${encodeURIComponent(r.data.nome)}`);
     const state = res?.instance?.state ?? "close";
     const status = state === "open" ? "connected" : state === "connecting" ? "connecting" : "disconnected";
-    const upd = await sb.from("wa_instance").update({
+    const upd = await authSb.from("wa_instance").update({
       status,
       last_connected_at: status === "connected" ? new Date().toISOString() : undefined,
     }).eq("id", data.instanceId);
@@ -203,7 +203,7 @@ export const deleteInstance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const authSb = sbFromContext(context);
     await ensureAdmin(authSb, context.userId);
-    const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
+    const r = await authSb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     try {
       await evo("DELETE", `/instance/logout/${encodeURIComponent(r.data.nome)}`);
@@ -211,7 +211,7 @@ export const deleteInstance = createServerFn({ method: "POST" })
     try {
       await evo("DELETE", `/instance/delete/${encodeURIComponent(r.data.nome)}`);
     } catch { /* ignore */ }
-    const del = await sb.from("wa_instance").delete().eq("id", data.instanceId);
+    const del = await authSb.from("wa_instance").delete().eq("id", data.instanceId);
     if (del.error) throw new Error(del.error.message);
     return { ok: true };
   });
@@ -225,10 +225,10 @@ export const logoutInstance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const authSb = sbFromContext(context);
     await ensureAdmin(authSb, context.userId);
-    const r = await sb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
+    const r = await authSb.from("wa_instance").select("nome").eq("id", data.instanceId).single();
     if (r.error || !r.data) throw new Error("Instância não encontrada");
     await evo("DELETE", `/instance/logout/${encodeURIComponent(r.data.nome)}`);
-    const upd = await sb.from("wa_instance").update({ status: "disconnected", qr_code: null }).eq("id", data.instanceId);
+    const upd = await authSb.from("wa_instance").update({ status: "disconnected", qr_code: null }).eq("id", data.instanceId);
     if (upd.error) throw new Error(upd.error.message);
     return { ok: true };
   });
