@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntegracoes, type IntegracaoTipo } from "@/hooks/use-integracoes";
 import { useUsuarios, type UsuarioRole, ROLE_LABELS } from "@/hooks/use-usuarios";
@@ -37,43 +37,13 @@ import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesP
 import { PermissoesTab } from "@/components/PermissoesTab";
 
 export const Route = createFileRoute("/_app/configuracoes")({
-  component: ConfiguracoesGuard,
+  component: ConfiguracoesPageContent,
   head: () => ({ meta: [{ title: "Configurações · APOYA Gestão" }] }),
 });
 
 // ──────────────────────────────────────────────────────────────────────
-// Guard: apenas usuários com role "admin" acessam Configurações
-// ──────────────────────────────────────────────────────────────────────
-function ConfiguracoesGuard() {
-  const { roles, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && !roles.includes("admin")) {
-      navigate({ to: "/" });
-    }
-  }, [loading, roles, navigate]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  if (!roles.includes("admin")) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-muted-foreground text-sm">
-          Acesso restrito. Apenas administradores podem acessar as configurações.
-        </p>
-      </div>
-    );
-  }
-
-  return <ConfiguracoesPageContent />;
-}
+// Configurações — acessível a admins e contadores
+// O controle granular é feito dentro da página por ação
 
 
 function ConfiguracoesPageContent() {
