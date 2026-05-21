@@ -50,9 +50,10 @@ function SerproPage() {
   }, []);
 
   // Últimas consultas: deriva das DAS geradas/erradas mais recentes
-  const { guias: consultas } = useDas()
-    .filter((g) => g.geradoEm || g.erro)
-    .sort((a, b) => (b.geradoEm ?? "").localeCompare(a.geradoEm ?? ""))
+  const { guias } = useDas();
+  const consultas = (guias as any[])
+    .filter((g: any) => g.geradoEm || g.erro)
+    .sort((a: any, b: any) => (b.geradoEm ?? "").localeCompare(a.geradoEm ?? ""))
     .slice(0, 10);
 
   return (
@@ -116,7 +117,7 @@ function SerproPage() {
                 </TableCell>
               </TableRow>
             )}
-            {consultas.map((g) => (
+            {consultas.map((g: any) => (
               <TableRow key={g.id}>
                 <TableCell className="text-sm">{g.geradoEm ? formatTime(g.geradoEm) : "—"}</TableCell>
                 <TableCell className="font-medium">{g.clienteNome}</TableCell>

@@ -1,4 +1,4 @@
-import { useCobrancas, type Cobranca, type CobrancaStatus } from "@/hooks/use-cobrancas";
+import { useCobrancas, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/hooks/use-cobrancas";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -30,7 +30,7 @@ function FinanceiroPage(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const { cobrancas: items, loading: cobLoading, refresh } = useCobrancas();
+  const { cobrancas: items, loading: cobLoading, refetch: refresh } = useCobrancas();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");

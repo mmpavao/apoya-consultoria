@@ -20,11 +20,11 @@ export const Route = createFileRoute("/_app/fiscal/nfse")({
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-const S_COLOR: Record<NfseStatus, BadgeColor> = {
-  rascunho:"blue", emitida:"green", cancelada:"gray", erro:"red",
+const S_COLOR: Partial<Record<string, BadgeColor>> = {
+  rascunho:"blue", emitida:"green", enviada:"green", autorizada:"green", cancelada:"gray", erro:"red", rejeitada:"red",
 };
-const S_LABEL: Record<NfseStatus,string> = {
-  rascunho:"Rascunho", emitida:"Emitida", cancelada:"Cancelada", erro:"Erro",
+const S_LABEL: Partial<Record<string, string>> = {
+  rascunho:"Rascunho", emitida:"Emitida", enviada:"Enviada", autorizada:"Autorizada", cancelada:"Cancelada", erro:"Erro", rejeitada:"Rejeitada",
 };
 const R_COLOR: Record<string, BadgeColor> = {
   MEI:"violet", Simples:"blue", "Lucro Presumido":"cyan", "Lucro Real":"indigo", "Doméstica":"green",
@@ -37,10 +37,11 @@ function NfsePage() {
   const def = new Date(now.getFullYear(), now.getMonth(), 1);
   const [ano, setAno]       = useState(def.getFullYear());
   const [mes, setMes]       = useState(def.getMonth()+1);
-  const [items, setItems]   = [] /* useNfse substituirá */;
+  const { notas, refresh } = useNfse();
+  const items = notas as any[];
   const [query, setQuery]   = useState("");
-  const [regime, setRegime] = useState<"todos"|NfseNota["regime"]>("todos");
-  const [status, setStatus] = useState<"todos"|NfseStatus>("todos");
+  const [regime, setRegime] = useState<"todos"|string>("todos");
+  const [status, setStatus] = useState<"todos"|NfseStatus|string>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
@@ -97,7 +98,7 @@ function NfsePage() {
     toast.success(`${elig.length} nota(s) enviada(s) por WhatsApp`);
   }
 
-  const cols: ColDef<NfseNota>[] = [
+  const cols: ColDef<any>[] = [
     {
       key:"prestador", header:"Prestador",
       cell: n=>(

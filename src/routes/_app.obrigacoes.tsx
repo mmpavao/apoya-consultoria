@@ -1,4 +1,4 @@
-import { useObrigacoes, type Obrigacao, type ObrigacaoStatus } from "@/hooks/use-obrigacoes";
+import { useObrigacoes, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/hooks/use-obrigacoes";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -39,7 +39,7 @@ function ObrigacoesPage(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const { obrigacoes: items, loading: obgLoading, refresh } = useObrigacoes();
+  const { obrigacoes: items, loading: obgLoading, refetch: refresh } = useObrigacoes();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|ObrigacaoStatus>("todos");
   const [tipo, setTipo]     = useState("todos");
