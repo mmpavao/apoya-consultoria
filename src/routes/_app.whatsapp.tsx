@@ -64,9 +64,15 @@ function WhatsappPage() {
     if (active) actions.marcarLida(active.id).catch(() => {});
   }, [active?.id]); // eslint-disable-line
 
+  // ref para o sentinel (último elemento do chat)
+  const bottomRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    // duplo rAF garante que o DOM já foi pintado antes de scrollar
     requestAnimationFrame(() => {
-      const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
     });
   }, [mensagens.length, digitando]);
 
@@ -122,19 +128,51 @@ function WhatsappPage() {
   }
   async function uploadArquivo(f: File) {
     if (!active) return;
+    const tipo: "image" | "video" | "document" =
+      f.type.startsWith("image/") ? "image" :
+      f.type.startsWith("video/") ? "video" : "document";
+
+    // Preview local imediato via object URL
+    const localUrl = URL.createObjectURL(f);
+    const tempId = `temp_media_${Date.now()}`;
+    const tempMsg = {
+      id: tempId,
+      conversa_id: active.id,
+      direcao: "enviada" as const,
+      tipo,
+      conteudo: tipo === "document" ? f.name : null,
+      arquivo_url: localUrl,
+      arquivo_nome: f.name,
+      mime_type: f.type,
+      evolution_id: null,
+      agente_nome: profile?.nome ?? null,
+      departamento: active.departamento,
+      reply_to: null,
+      reaction: null,
+      reaction_to: null,
+      status: "enviando",
+      created_at: new Date().toISOString(),
+      lida_em: null,
+    };
+    setMensagensLocal(prev => [...prev, tempMsg]);
+
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = String(reader.result);
       const base64 = dataUrl.split(",")[1];
-      const tipo: "image" | "video" | "document" =
-        f.type.startsWith("image/") ? "image" :
-        f.type.startsWith("video/") ? "video" : "document";
       try {
         await actions.enviarMidia({
           conversaId: active.id, mediatype: tipo, mimetype: f.type || "application/octet-stream",
           media: base64, fileName: f.name,
         });
-      } catch (e: any) { toast.error(e?.message ?? "Erro ao enviar arquivo"); }
+        // reload para substituir o preview temporário pelo definitivo
+        setTimeout(() => reloadMensagens(), 2000);
+      } catch (e: any) {
+        // reverter optimistic update em erro
+        setMensagensLocal(prev => prev.filter(m => m.id !== tempId));
+        URL.revokeObjectURL(localUrl);
+        toast.error(e?.message ?? "Erro ao enviar arquivo");
+      }
     };
     reader.readAsDataURL(f);
   }
@@ -169,7 +207,7 @@ function WhatsappPage() {
           <p className="text-xs text-muted-foreground">Crie uma em Configurações → Integrações → WhatsApp.</p>
         </div>
       ) : (
-        <div className="grid h-[calc(100vh-13rem)] grid-cols-1 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]">
+        <div className="grid h-[calc(100vh-11rem)] grid-cols-1 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]">
           <aside className={cn("flex flex-col border-r border-border md:flex", active ? "hidden md:flex" : "flex")}>
             <div className="space-y-2 border-b p-3">
               <div className="relative">
@@ -190,7 +228,7 @@ function WhatsappPage() {
             </div>
           </aside>
 
-          <section className={cn("flex min-w-0 flex-col bg-muted/20", active ? "flex" : "hidden md:flex")}>
+          <section className={cn("flex min-w-0 flex-col bg-muted/20 overflow-hidden", active ? "flex" : "hidden md:flex")}>
             {!active ? (
               <div className="flex flex-1 items-center justify-center p-10 text-center">
                 <div>
@@ -200,7 +238,7 @@ function WhatsappPage() {
               </div>
             ) : (
               <>
-                <header className="flex items-center gap-3 border-b bg-card px-3 py-3 md:px-4">
+                <header className="flex shrink-0 items-center gap-3 border-b bg-card px-3 py-3 md:px-4">
                   <Button variant="ghost" size="icon" className="md:hidden -ml-1 h-9 w-9" onClick={() => setActiveId(null)}>
                     <ArrowLeft className="h-5 w-5" />
                   </Button>
@@ -232,7 +270,7 @@ function WhatsappPage() {
                   )}
                 </header>
 
-                <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 md:px-6">
+                <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-6">
                   <div className="mx-auto flex max-w-2xl flex-col gap-2">
                     {mensagens.map((m) => (
                       <div key={m.id} className={cn("flex max-w-[85%] flex-col gap-1 rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%]",
@@ -246,13 +284,29 @@ function WhatsappPage() {
                           <span className="text-2xl">{m.reaction}</span>
                         ) : m.arquivo_url ? (
                           m.tipo === "image" ? (
-                            <img src={m.arquivo_url} alt="" className="max-h-64 rounded-lg" />
+                            <div className="relative">
+                              <img src={m.arquivo_url} alt={m.arquivo_nome ?? "imagem"} className="max-h-64 w-full rounded-xl object-cover" />
+                              {m.status === "enviando" && (
+                                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20">
+                                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                                </div>
+                              )}
+                            </div>
+                          ) : m.tipo === "video" ? (
+                            <div className="relative">
+                              <video src={m.arquivo_url} controls className="max-h-64 w-full rounded-xl" />
+                              {m.status === "enviando" && (
+                                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20">
+                                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                                </div>
+                              )}
+                            </div>
                           ) : m.tipo === "audio" ? (
                             <audio controls src={m.arquivo_url} className="max-w-full" />
                           ) : (
                             <a href={m.arquivo_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg bg-background/60 p-2 hover:underline">
-                              <FileText className="h-5 w-5" />
-                              <span className="text-xs">{m.arquivo_nome ?? "arquivo"}</span>
+                              <FileText className="h-5 w-5 shrink-0" />
+                              <span className="truncate text-xs">{m.arquivo_nome ?? "arquivo"}</span>
                             </a>
                           )
                         ) : null}
@@ -275,10 +329,12 @@ function WhatsappPage() {
                         <span className="ml-1 text-[10px] text-muted-foreground">digitando…</span>
                       </div>
                     )}
+                    {/* sentinel — scroll automático até aqui */}
+                    <div ref={bottomRef} className="h-1 shrink-0" />
                   </div>
                 </div>
 
-                <footer className="flex items-center gap-2 border-t bg-card px-3 py-3 md:px-4">
+                <footer className="flex shrink-0 items-center gap-2 border-t bg-card px-3 py-3 md:px-4">
                   <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted">
                     <Paperclip className="h-5 w-5" />
                     <input type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadArquivo(f); e.target.value = ""; }} />
