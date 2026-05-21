@@ -1,4 +1,4 @@
-import { useCobrancas, type Cobranca, type CobrancaStatus } from "@/hooks/use-cobrancas";
+import { useCobrancas, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/hooks/use-cobrancas";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
