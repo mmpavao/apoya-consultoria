@@ -15,6 +15,7 @@ export function WhatsappInstancesPanel() {
   const { instances, loading, creating, create, connect, refresh, logout, remove } = useWaInstances();
   const [open, setOpen] = useState(false);
   const [qrInstance, setQrInstance] = useState<WaInstance | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WaInstance | null>(null);
 
   const activeQr = qrInstance ? instances.find(i => i.id === qrInstance.id) ?? qrInstance : null;
 
@@ -71,11 +72,7 @@ export function WhatsappInstancesPanel() {
                     <WifiOff className="h-3.5 w-3.5" /> Desconectar
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={async () => {
-                  if (!confirm(`Excluir a instância "${inst.display_name}"? Esta ação remove a conexão WhatsApp.`)) return;
-                  await remove(inst.id);
-                  toast.success("Instância removida");
-                }}>
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(inst)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -106,6 +103,20 @@ export function WhatsappInstancesPanel() {
         instance={activeQr}
         onClose={() => setQrInstance(null)}
         onRefresh={() => activeQr && connect(activeQr.id).catch(e => toast.error(e.message))}
+      />
+
+      <DeleteDialog
+        instance={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async (inst) => {
+          try {
+            await remove(inst.id);
+            toast.success("Instância removida");
+            setDeleteTarget(null);
+          } catch (e: any) {
+            toast.error(e?.message ?? "Falha ao excluir instância");
+          }
+        }}
       />
     </div>
   );
@@ -253,6 +264,70 @@ function QRDialog({
             <RefreshCw className="h-4 w-4" /> Gerar novo QR
           </Button>
           <Button onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteDialog({
+  instance, onClose, onConfirm,
+}: {
+  instance: WaInstance | null;
+  onClose: () => void;
+  onConfirm: (inst: WaInstance) => Promise<void> | void;
+}) {
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!instance) return null;
+  const expected = instance.nome;
+  const matches = typed.trim() === expected;
+
+  return (
+    <Dialog
+      open={!!instance}
+      onOpenChange={(v) => { if (!v) { setTyped(""); setBusy(false); onClose(); } }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Excluir instância</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p>
+            Esta ação é <strong>irreversível</strong>. A instância será desconectada na Evolution API e removida do banco junto com sua referência nas conversas.
+          </p>
+          <div className="surface-card space-y-1 p-3 text-xs">
+            <p><span className="text-muted-foreground">Nome:</span> <strong>{instance.display_name}</strong></p>
+            <p><span className="text-muted-foreground">Identificador:</span> <code>@{instance.nome}</code></p>
+            {instance.numero && <p><span className="text-muted-foreground">Número:</span> +{instance.numero}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              Para confirmar, digite <code className="rounded bg-muted px-1 py-0.5 text-xs">{expected}</code>
+            </Label>
+            <Input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={expected}
+              autoFocus
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button
+            variant="destructive"
+            disabled={!matches || busy}
+            onClick={async () => {
+              setBusy(true);
+              try { await onConfirm(instance); }
+              finally { setBusy(false); setTyped(""); }
+            }}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Excluir definitivamente
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
