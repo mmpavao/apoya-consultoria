@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Clock,
   ExternalLink, Loader2, MessageCircle, MoreHorizontal,
-  Pencil, Phone, Plus, Trash2, Users,
+  FileText, Pencil, Phone, Plus, Trash2, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { ClienteFormDialog } from "@/components/ClienteFormDialog";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { useClientes, REGIME_LABEL, STATUS_LABEL, type Cliente, type Regime, type Status } from "@/hooks/use-clientes";
+import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 
 export const Route = createFileRoute("/_app/clientes")({
   component: ClientesPage,
@@ -57,6 +58,8 @@ function ClientesPage(){
   const [editing, setEditing]   = useState<Cliente|null>(null);
   const [toDelete, setToDelete] = useState<Cliente|null>(null);
   const [sel, setSel]           = useState<Set<string>>(new Set());
+  const [modalNfse, setModalNfse] = useState(false);
+  const [clienteNfse, setClienteNfse] = useState<Cliente | undefined>();
   const [page, setPage]         = useState(1);
 
   const responsaveis = useMemo(()=>Array.from(new Set(clientes.map(c=>c.responsavel))),[clientes]);
@@ -146,6 +149,10 @@ function ClientesPage(){
       key:"acoes", header:"", headerClassName:"w-24 text-right", className:"w-24 text-right",
       cell: c=>(
         <div data-no-rowclick className="inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" title="Emitir NFS-e"
+            onClick={e => { e.stopPropagation(); setClienteNfse(c); setModalNfse(true); }}>
+            <FileText className="h-3.5 w-3.5"/>
+          </Button>
           {c.whatsapp && (
             <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
               title={`Abrir conversa — ${c.whatsapp}`}
@@ -192,16 +199,23 @@ function ClientesPage(){
   }
 
   return (
+    <>
     <div className="space-y-5">
 
       <PageHeader
         title="Clientes"
         subtitle={loading ? "Carregando…" : `${clientes.length} clientes cadastrados`}
         actions={
+          <>
+          <Button size="sm" variant="outline" className="rounded-xl gap-1.5 h-9"
+            onClick={() => { setClienteNfse(undefined); setModalNfse(true); }}>
+            <FileText className="h-4 w-4"/> Emitir NFS-e
+          </Button>
           <Button size="sm" className="rounded-xl gap-1.5 h-9"
             onClick={()=>{setEditing(null);setDialog(true);}}>
             <Plus className="h-4 w-4"/> Novo Cliente
           </Button>
+          </>
         }
       />
 
@@ -293,5 +307,11 @@ function ClientesPage(){
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    <EmitirNfseModal
+      open={modalNfse}
+      onClose={() => setModalNfse(false)}
+      clientePreSelecionado={clienteNfse}
+    />
+    </>
   );
 }

@@ -29,6 +29,7 @@ import { useNfse, type NfseEmitida } from "@/hooks/use-nfse";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { REGIME_LABEL, type Cliente } from "@/hooks/use-clientes";
 import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
+import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
@@ -651,6 +652,7 @@ function EmitirNfse({ cliente }: { cliente: Cliente }) {
 // ────────────────────────────────────────────────────────────────────────────
 export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean } }) {
   const [sub, setSub] = useState<FiscalTab>("resumo");
+  const [modalNfse, setModalNfse] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -674,7 +676,30 @@ export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: 
       {sub === "resumo"    && <ResumoFiscal   cliente={cliente} />}
       {sub === "emitidas"  && <NfEmitidas     cliente={cliente} />}
       {sub === "recebidas" && <NfRecebidas    cliente={cliente} />}
-      {sub === "emitir"    && <EmitirNfse     cliente={cliente} />}
+      {sub === "emitir" && (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Send className="h-6 w-6 text-primary" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold">Emissão de NFS-e</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Preencha os dados da nota no formulário de emissão
+            </p>
+          </div>
+          <button
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
+            onClick={() => setModalNfse(true)}
+          >
+            <Send className="h-4 w-4" /> Abrir formulário de emissão
+          </button>
+        </div>
+      )}
+      <EmitirNfseModal
+        open={modalNfse}
+        onClose={() => setModalNfse(false)}
+        clientePreSelecionado={cliente as any}
+      />
       {sub === "serpro"    && (
         <SerproClientePanel
           cliente={{

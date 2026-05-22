@@ -9,7 +9,7 @@ import {
   Edit, FileText, Mail, MapPin, MessageSquare, Phone, Save, Trash2,
   User, X, AlertTriangle, Briefcase, CreditCard, Hash, Home,
   Info, ReceiptText, ShieldCheck, Users, Zap, ChevronRight,
-  ExternalLink,
+  ExternalLink, Loader2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,8 @@ import { TabServicos } from "@/components/cliente/TabServicos";
 import { TabContratos } from "@/components/cliente/TabContratos";
 import { TabDocumentos } from "@/components/cliente/TabDocumentos";
 import { TabFiscal } from "@/components/cliente/TabFiscal";
+import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
+import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { TabFinanceiro } from "@/components/cliente/TabFinanceiro";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
@@ -145,6 +147,8 @@ function ClienteDetailPage() {
   const { obrigacoes } = useObrigacoes();
 
   const [tab, setTab]         = useState<Tab>("geral");
+  const [modalNfse, setModalNfse] = useState(false);
+  const { buscar: buscarCnpjApi, loading: buscandoCnpj } = useCnpjLookup();
 
   const [editMode, setEditMode] = useState(false);
   const [form, setForm]         = useState<Partial<Cliente>>({});
@@ -200,6 +204,7 @@ function ClienteDetailPage() {
     setForm(p => ({ ...p, [field]: e.target.value }));
 
   return (
+    <>
     <div className="animate-fade-up space-y-5 pb-12">
 
       {/* ── Breadcrumb ── */}
@@ -259,6 +264,9 @@ function ClienteDetailPage() {
               <>
                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:border-destructive" onClick={handleDelete}>
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setModalNfse(true)}>
+                  <ReceiptText className="mr-1.5 h-3.5 w-3.5" />Emitir NFS-e
                 </Button>
                 <Button size="sm" onClick={() => setEditMode(true)}>
                   <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
@@ -480,6 +488,43 @@ function ClienteDetailPage() {
                 <Input value={(form as any)[field] ?? ""} onChange={f(field as keyof Cliente)} />
               </div>
             ))}
+            {/* Botão de auto-fill pelo CNPJ */}
+            <div className="sm:col-span-2 flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" className="gap-2" disabled={buscandoCnpj}
+                onClick={async () => {
+                  const cnpj = (form as any).cnpj ?? cliente.cnpj;
+                  if (!cnpj) { toast.error("CNPJ não informado"); return; }
+                  const d = await buscarCnpjApi(cnpj);
+                  if (d) {
+                    setForm((p: any) => ({
+                      ...p,
+                      razaoSocial:        d.razaoSocial       || p.razaoSocial,
+                      nomeFantasia:       d.nomeFantasia       || p.nomeFantasia,
+                      atividadePrincipal: d.atividadePrincipal || p.atividadePrincipal,
+                      email:              d.email              || p.email,
+                      telefone:           d.telefone           || p.telefone,
+                      codigoMunicipioIbge: d.codigoMunicipioIbge || p.codigoMunicipioIbge,
+                      endereco: {
+                        ...p.endereco,
+                        cep:        d.cep        || p.endereco?.cep,
+                        logradouro: d.logradouro || p.endereco?.logradouro,
+                        numero:     d.numero     || p.endereco?.numero,
+                        bairro:     d.bairro     || p.endereco?.bairro,
+                        municipio:  d.municipio  || p.endereco?.municipio,
+                        uf:         d.uf         || p.endereco?.uf,
+                      },
+                    }));
+                    toast.success("Dados preenchidos automaticamente via CNPJ");
+                  }
+                }}
+              >
+                {buscandoCnpj
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando…</>
+                  : <><RefreshCw className="h-3.5 w-3.5" /> Auto-fill pelo CNPJ</>}
+              </Button>
+              <span className="text-xs text-muted-foreground">Preenche razão social, endereço e contato automaticamente</span>
+            </div>
+
             <div className="space-y-1.5">
               <Label>Regime</Label>
               <Select value={form.regime ?? ""} onValueChange={(v) => setForm(p => ({ ...p, regime: v as Regime }))}>
@@ -557,6 +602,22 @@ function ClienteDetailPage() {
               <Switch checked={form.temIncentivoFiscal ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, temIncentivoFiscal: v }))} />
               <Label>Tem incentivo fiscal</Label>
             </div>
+            <div className="space-y-1.5">
+              <Label>Alíquota ISS (%)</Label>
+              <Input value={(form as any).aliquotaIss ?? ""} type="number" step="0.5" min="0" max="5"
+                placeholder="2"
+                onChange={e => setForm((p: any) => ({ ...p, aliquotaIss: e.target.value === "" ? undefined : parseFloat(e.target.value) }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cód. IBGE do Município</Label>
+              <Input value={(form as any).codigoMunicipioIbge ?? ""} placeholder="3550308"
+                onChange={e => setForm((p: any) => ({ ...p, codigoMunicipioIbge: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>CPF do Titular</Label>
+              <Input value={(form as any).cpf ?? ""} placeholder="000.000.000-00"
+                onChange={e => setForm((p: any) => ({ ...p, cpf: e.target.value }))} />
+            </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Observações</Label>
               <Textarea value={form.observacoes ?? ""} onChange={f("observacoes")} rows={4} />
@@ -569,5 +630,11 @@ function ClienteDetailPage() {
         </div>
       )}
     </div>
+  <EmitirNfseModal
+      open={modalNfse}
+      onClose={() => setModalNfse(false)}
+      clientePreSelecionado={cliente}
+    />
+    </>
   );
 }

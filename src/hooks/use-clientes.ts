@@ -38,6 +38,10 @@ export interface Cliente {
   endereco?: { municipio?: string; uf?: string; cep?: string; logradouro?: string; numero?: string; bairro?: string };
   atividadePrincipal?: string;
   observacoes?: string;
+  aliquotaIss?: number;
+  cpf?: string;
+  codigoMunicipioIbge?: string;
+  nfseioEmitenteId?: string;
   createdAt: string;
 }
 
@@ -76,6 +80,10 @@ function fromDb(row: Record<string, unknown>): Cliente {
     },
     atividadePrincipal:row.atividade_principal as string | undefined,
     observacoes:       row.observacoes as string | undefined,
+    aliquotaIss:       row.aliquota_iss != null ? Number(row.aliquota_iss) : undefined,
+    cpf:               row.cpf as string | undefined,
+    codigoMunicipioIbge: row.codigo_municipio_ibge as string | undefined,
+    nfseioEmitenteId:  row.nfseio_emitente_id as string | undefined,
     createdAt:         row.created_at as string,
   };
 }
@@ -103,7 +111,11 @@ function toDb(c: Partial<Cliente>): Record<string, unknown> {
   if (c.temEmpregados     !== undefined) out.tem_empregados      = c.temEmpregados;
   if (c.temIncentivoFiscal!==undefined)  out.tem_incentivo_fiscal= c.temIncentivoFiscal;
   if (c.atividadePrincipal!==undefined)  out.atividade_principal = c.atividadePrincipal;
-  if (c.observacoes       !== undefined) out.observacoes         = c.observacoes;
+  if (c.observacoes       !== undefined) out.observacoes           = c.observacoes;
+  if (c.aliquotaIss       !== undefined) out.aliquota_iss          = c.aliquotaIss;
+  if (c.cpf               !== undefined) out.cpf                   = c.cpf;
+  if (c.codigoMunicipioIbge !== undefined) out.codigo_municipio_ibge = c.codigoMunicipioIbge;
+  if (c.nfseioEmitenteId  !== undefined) out.nfseio_emitente_id    = c.nfseioEmitenteId;
   if (c.endereco) {
     if (c.endereco.municipio !== undefined) out.municipio  = c.endereco.municipio;
     if (c.endereco.uf        !== undefined) out.uf         = c.endereco.uf;
