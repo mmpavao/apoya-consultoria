@@ -1,97 +1,226 @@
 /**
- * Hook: useNfse
- * Lê notas NFS-e da tabela nfse_notas no Supabase.
- * Emissão real: via Edge Function NFE.io (nunca no front).
+ * Hook useNfse — proxy para /api/nfse
+ * Lida com listagem, emissão, cancelamento, PDF e XML de NFS-e.
  */
-import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useCallback } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
-export type NfseStatus = "rascunho" | "enviada" | "autorizada" | "cancelada" | "erro" | "rejeitada";
+export type NfseStatus = "rascunho" | "processando" | "emitida" | "cancelada" | "erro";
 
-export interface NfseNota {
+export interface NfseEmitida {
   id: string;
-  clienteId: string;
-  clienteNome: string;
-  cnpj: string;
-  competencia: string;
-  valorServico: number;
+  cliente_id: string;
+  numero?: string;
   status: NfseStatus;
-  numeroNota?: string;
-  numeroProtocolo?: string;
-  tomadorRazao?: string;
-  tomadorCnpj?: string;
-  aliquotaCbs: number;
-  aliquotaIbs: number;
-  xmlUrl?: string;
-  pdfUrl?: string;
-  erroMsg?: string;
-  emitidaEm?: string;
-  createdAt: string;
+  competencia?: string;
+  data_emissao?: string;
+  valor_servico?: number;
+  tomador_nome?: string;
+  tomador_cnpj_cpf?: string;
+  pdf_url?: string;
+  nfseio_id?: string;
+  created_at: string;
 }
 
-function fromDb(r: Record<string, unknown>): NfseNota {
-  return {
-    id:               r.id as string,
-    clienteId:        r.cliente_id as string,
-    clienteNome:      (r.cliente_nome as string) ?? "—",
-    cnpj:             (r.cnpj as string)         ?? "—",
-    competencia:      r.competencia as string,
-    valorServico:     Number(r.valor_servico ?? 0),
-    status:           ((r.status as string) as NfseStatus) ?? "rascunho",
-    numeroNota:       (r.numero_nota ?? r.numero) as string | undefined,
-    numeroProtocolo:  r.numero_protocolo as string | undefined,
-    tomadorRazao:     (r.tomador_razao ?? r.tomador) as string | undefined,
-    tomadorCnpj:      (r.tomador_cnpj ?? r.cnpj_tomador) as string | undefined,
-    aliquotaCbs:      Number(r.aliquota_cbs ?? 0.9),
-    aliquotaIbs:      Number(r.aliquota_ibs ?? 0.1),
-    xmlUrl:           r.xml_url as string | undefined,
-    pdfUrl:           r.pdf_url as string | undefined,
-    erroMsg:          (r.ultimo_erro ?? r.erro) as string | undefined,
-    emitidaEm:        r.emitida_em as string | undefined,
-    createdAt:        r.created_at as string,
-  };
+export interface NfseRecebida {
+  id: string;
+  cliente_id: string;
+  numero?: string;
+  competencia?: string;
+  data_emissao?: string;
+  valor_servico?: number;
+  prestador_nome?: string;
+  prestador_cnpj?: string;
+  pdf_url?: string;
+  fonte: "nfeio" | "manual" | "serpro";
+  created_at: string;
 }
 
-export function useNfse(filtros?: { competencia?: string; status?: NfseStatus }) {
-  const [notas, setNotas]     = useState<NfseNota[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+export function useNfse() {
+  const { session } = useAuth();
+  const token = session?.access_token ?? null;
+  const [loading, setLoading] = useState(false);
 
-  const fetch = useCallback(async () => {
+  const authHeader = useCallback(() =>
+    ({ "Content-Type": "application/json", Authorization: `Bearer ${token}` }),
+    [token]);
+
+  // ── Listar emitidas ────────────────────────────────────────────────────
+  const listarEmitidas = useCallback(async (
+    clienteId?: string, competencia?: string
+  ): Promise<NfseEmitida[]> => {
+    if (!token) return [];
+    const params = new URLSearchParams({ tipo: "emitidas" });
+    if (clienteId) params.set("cliente_id", clienteId);
+    if (competencia) params.set("competencia", competencia);
+    const r = await fetch(`/api/nfse?${params}`, { headers: authHeader() });
+    const d = await r.json().catch(() => ({}));
+    return d?.notas ?? [];
+  }, [token, authHeader]);
+
+  // ── Listar recebidas ───────────────────────────────────────────────────
+  const listarRecebidas = useCallback(async (
+    clienteId?: string, competencia?: string
+  ): Promise<NfseRecebida[]> => {
+    if (!token) return [];
+    const params = new URLSearchParams({ tipo: "recebidas" });
+    if (clienteId) params.set("cliente_id", clienteId);
+    if (competencia) params.set("competencia", competencia);
+    const r = await fetch(`/api/nfse?${params}`, { headers: authHeader() });
+    const d = await r.json().catch(() => ({}));
+    return d?.notas ?? [];
+  }, [token, authHeader]);
+
+  // ── Emitir ─────────────────────────────────────────────────────────────
+  const emitir = useCallback(async (
+    clienteId: string,
+    nota: {
+      /** Descrição do serviço */
+      description: string;
+      /** Valor total */
+      servicesAmount: number;
+      /** Código de serviço LC116 / municipal */
+      cityServiceCode: string;
+      /** Alíquota ISS (0.05 = 5%) */
+      issRate?: number;
+      /** ISS retido na fonte? */
+      issRetained?: boolean;
+      /** Competência YYYY-MM */
+      competencia?: string;
+      /** Tomador */
+      borrower: {
+        name: string;
+        federalTaxNumber: string | number;
+        email?: string;
+        address: {
+          country: string;
+          postalCode?: string;
+          street?: string;
+          number?: string;
+          district?: string;
+          state: string;
+          city: { code: string; name: string };
+        };
+      };
+    }
+  ) => {
+    if (!token) return null;
+    setLoading(true);
     try {
-      setLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      let q = db
-        .from("nfse_notas")
-        .select(`
-          id, cliente_id, cliente_nome, cnpj, competencia,
-          valor_servico, status, numero_nota, numero, numero_protocolo,
-          tomador_razao, tomador, tomador_cnpj, cnpj_tomador,
-          aliquota_cbs, aliquota_ibs,
-          xml_url, pdf_url, ultimo_erro, erro, emitida_em, created_at
-        `)
-        .order("competencia", { ascending: false })
-        .limit(500);
-
-      if (filtros?.competencia) q = q.eq("competencia", filtros.competencia);
-      if (filtros?.status)      q = q.eq("status", filtros.status);
-
-      const { data, error: err } = await q;
-      if (err) throw err;
-      setNotas((data ?? []).map(fromDb));
-      setError(null);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao carregar NFS-e";
-      setError(msg);
-      toast.error(msg);
+      const r = await fetch("/api/nfse", {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ action: "emitir", cliente_id: clienteId, nota }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        toast.error("Falha ao emitir NFS-e: " + (d.error ?? `HTTP ${r.status}`));
+        return null;
+      }
+      toast.success(`NFS-e #${d.numero} emitida com sucesso!`);
+      return d;
     } finally {
       setLoading(false);
     }
-  }, [filtros?.competencia, filtros?.status]);
+  }, [token, authHeader]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  // ── Cancelar ───────────────────────────────────────────────────────────
+  const cancelar = useCallback(async (notaId: string, motivo?: string) => {
+    if (!token) return false;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/nfse", {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ action: "cancelar", nota_id: notaId, motivo }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        toast.error("Falha ao cancelar NFS-e: " + (d.error ?? `HTTP ${r.status}`));
+        return false;
+      }
+      toast.success("NFS-e cancelada");
+      return true;
+    } finally {
+      setLoading(false);
+    }
+  }, [token, authHeader]);
 
-  return { notas, loading, error, refresh: fetch };
+  // ── Baixar PDF ─────────────────────────────────────────────────────────
+  const baixarPdf = useCallback(async (notaId: string, nfseioId?: string): Promise<string | null> => {
+    if (!token) return null;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/nfse", {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ action: "pdf", nota_id: notaId, nfseio_id: nfseioId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        toast.error("PDF não disponível: " + (d.error ?? `HTTP ${r.status}`));
+        return null;
+      }
+      return d.pdf_base64 ?? null;
+    } finally {
+      setLoading(false);
+    }
+  }, [token, authHeader]);
+
+  // ── Baixar XML ─────────────────────────────────────────────────────────
+  const baixarXml = useCallback(async (notaId: string, nfseioId?: string): Promise<string | null> => {
+    if (!token) return null;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/nfse", {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ action: "xml", nota_id: notaId, nfseio_id: nfseioId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        toast.error("XML não disponível: " + (d.error ?? `HTTP ${r.status}`));
+        return null;
+      }
+      return d.xml ?? null;
+    } finally {
+      setLoading(false);
+    }
+  }, [token, authHeader]);
+
+  // ── Sincronizar recebidas ──────────────────────────────────────────────
+  const sincronizarRecebidas = useCallback(async (
+    clienteId: string, cnpj: string
+  ) => {
+    if (!token) return null;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/nfse", {
+        method: "POST",
+        headers: authHeader(),
+        body: JSON.stringify({ action: "sincronizar_recebidas", cliente_id: clienteId, cnpj }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        toast.error("Falha ao sincronizar: " + (d.error ?? `HTTP ${r.status}`));
+        return null;
+      }
+      toast.success(`${d.inserted} notas recebidas importadas (total ${d.total})`);
+      return d;
+    } finally {
+      setLoading(false);
+    }
+  }, [token, authHeader]);
+
+  return {
+    loading,
+    listarEmitidas,
+    listarRecebidas,
+    emitir,
+    cancelar,
+    baixarPdf,
+    baixarXml,
+    sincronizarRecebidas,
+  };
 }

@@ -1,279 +1,501 @@
-import { useNfse, type NfseNota, type NfseStatus } from "@/hooks/use-nfse";
+/**
+ * Página /fiscal/nfse — NFS-e emitidas e recebidas
+ * Integrada ao NFE.io via /api/nfse
+ */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
-  AlertTriangle, Ban, CheckCircle2, Download,
-  FileText, Loader2, MessageCircle, Receipt, Send,
-  Wallet, Activity, Plus} from "lucide-react";
+  AlertCircle, CheckCircle2, Download, FileText, Loader2,
+  Plus, RefreshCw, Search, XCircle, FileCode2, Receipt,
+  Send, Trash2, ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
-import { NfseFormDialog } from "@/components/NfseFormDialog";
-// import { nfseStore, type NfseNota, type NfseStatus } from "@/lib/nfse-store";
+import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
+import { useNfse, type NfseEmitida, type NfseRecebida } from "@/hooks/use-nfse";
+import { useClientes } from "@/hooks/use-clientes";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
   component: NfsePage,
-  head: () => ({ meta: [{ title: "NFS-e em Lote · APOYA Gestão" }] }),
+  head: () => ({ meta: [{ title: "NFS-e · APOYA Gestão" }] }),
 });
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-
-const S_COLOR: Partial<Record<string, BadgeColor>> = {
-  rascunho:"blue", emitida:"green", enviada:"green", autorizada:"green", cancelada:"gray", erro:"red", rejeitada:"red",
+const STATUS_COLOR: Record<string, "gray"|"blue"|"green"|"red"> = {
+  rascunho: "gray", processando: "blue", emitida: "green", cancelada: "gray", erro: "red",
 };
-const S_LABEL: Partial<Record<string, string>> = {
-  rascunho:"Rascunho", emitida:"Emitida", enviada:"Enviada", autorizada:"Autorizada", cancelada:"Cancelada", erro:"Erro", rejeitada:"Rejeitada",
-};
-const R_COLOR: Record<string, BadgeColor> = {
-  MEI:"violet", Simples:"blue", "Lucro Presumido":"cyan", "Lucro Real":"indigo", "Doméstica":"green",
+const STATUS_LABEL: Record<string, string> = {
+  rascunho: "Rascunho", processando: "Processando", emitida: "Emitida", cancelada: "Cancelada", erro: "Erro",
 };
 
-const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const fmtBRL = (v?: number | null) =>
+  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+const fmtDate = (d?: string | null) =>
+  d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 
+function downloadBlob(b64: string, filename: string, mime: string) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadText(content: string, filename: string) {
+  const blob = new Blob([content], { type: "application/xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Diálogo de Emissão ────────────────────────────────────────────────────
+function EmitirDialog({
+  open, onClose, clienteId, clienteNome, clienteCnpj, onSuccess,
+}: {
+  open: boolean; onClose: () => void;
+  clienteId: string; clienteNome: string; clienteCnpj: string;
+  onSuccess: () => void;
+}) {
+  const { emitir, loading } = useNfse();
+  const now = new Date();
+  const [form, setForm] = useState({
+    description: "",
+    servicesAmount: "",
+    cityServiceCode: "",
+    issRate: "0",
+    issRetained: false,
+    competencia: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    tomadorNome: clienteNome,
+    tomadorCnpj: clienteCnpj,
+    tomadorEmail: "",
+    tomadorUf: "SP",
+    tomadorCidade: "São Paulo",
+    tomadorCidadeCodigo: "3550308",
+    tomadorCep: "",
+    tomadorLogradouro: "",
+    tomadorNumero: "",
+    tomadorBairro: "",
+  });
+
+  async function handleEmitir() {
+    if (!form.description || !form.servicesAmount || !form.cityServiceCode) {
+      toast.error("Preencha: descrição, valor e código de serviço");
+      return;
+    }
+    const nota = {
+      description: form.description,
+      servicesAmount: parseFloat(form.servicesAmount.replace(",", ".")),
+      cityServiceCode: form.cityServiceCode,
+      issRate: parseFloat(form.issRate) / 100 || 0,
+      issRetained: form.issRetained,
+      competencia: form.competencia,
+      borrower: {
+        name: form.tomadorNome,
+        federalTaxNumber: form.tomadorCnpj.replace(/\D/g, ""),
+        email: form.tomadorEmail || undefined,
+        address: {
+          country: "BRA",
+          postalCode: form.tomadorCep.replace(/\D/g, "") || undefined,
+          street: form.tomadorLogradouro || undefined,
+          number: form.tomadorNumero || undefined,
+          district: form.tomadorBairro || undefined,
+          state: form.tomadorUf,
+          city: { code: form.tomadorCidadeCodigo, name: form.tomadorCidade },
+        },
+      },
+    };
+    const result = await emitir(clienteId, nota as any);
+    if (result) { onSuccess(); onClose(); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" />
+            Emitir NFS-e — {clienteNome}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Serviço */}
+          <div className="space-y-3 rounded-lg border border-border/60 p-4 bg-muted/20">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Serviço</p>
+            <div>
+              <Label className="text-xs mb-1 block">Descrição *</Label>
+              <Textarea value={form.description} rows={2}
+                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                placeholder="Serviços de contabilidade referente ao mês..." />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1 block">Valor (R$) *</Label>
+                <Input value={form.servicesAmount}
+                  onChange={(e) => setForm(p => ({ ...p, servicesAmount: e.target.value }))}
+                  placeholder="1500,00" />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Cód. Serviço LC116 *</Label>
+                <Input value={form.cityServiceCode}
+                  onChange={(e) => setForm(p => ({ ...p, cityServiceCode: e.target.value }))}
+                  placeholder="17.19" />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Alíquota ISS (%)</Label>
+                <Input value={form.issRate}
+                  onChange={(e) => setForm(p => ({ ...p, issRate: e.target.value }))}
+                  placeholder="2" />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Competência</Label>
+                <Input type="month" value={form.competencia}
+                  onChange={(e) => setForm(p => ({ ...p, competencia: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          {/* Tomador */}
+          <div className="space-y-3 rounded-lg border border-border/60 p-4 bg-muted/20">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tomador do Serviço</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label className="text-xs mb-1 block">Nome / Razão Social</Label>
+                <Input value={form.tomadorNome}
+                  onChange={(e) => setForm(p => ({ ...p, tomadorNome: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">CNPJ / CPF</Label>
+                <Input value={form.tomadorCnpj}
+                  onChange={(e) => setForm(p => ({ ...p, tomadorCnpj: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">E-mail</Label>
+                <Input value={form.tomadorEmail}
+                  onChange={(e) => setForm(p => ({ ...p, tomadorEmail: e.target.value }))}
+                  placeholder="financeiro@empresa.com" />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Cidade</Label>
+                <Input value={form.tomadorCidade}
+                  onChange={(e) => setForm(p => ({ ...p, tomadorCidade: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">UF</Label>
+                <Input value={form.tomadorUf} maxLength={2}
+                  onChange={(e) => setForm(p => ({ ...p, tomadorUf: e.target.value.toUpperCase() }))} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={handleEmitir} disabled={loading} className="gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Emitir Nota
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Página principal ──────────────────────────────────────────────────────
 function NfsePage() {
   const now = new Date();
-  const def = new Date(now.getFullYear(), now.getMonth(), 1);
-  const [ano, setAno]       = useState(def.getFullYear());
-  const [mes, setMes]       = useState(def.getMonth()+1);
-  const { notas, refresh } = useNfse();
-  const items = notas as any[];
-  const [query, setQuery]   = useState("");
-  const [regime, setRegime] = useState<"todos"|string>("todos");
-  const [dialogNfse, setDialogNfse] = useState(false);
-  const [status, setStatus] = useState<"todos"|NfseStatus|string>("todos");
-  const [sel, setSel]       = useState<Set<string>>(new Set());
-  const [busy, setBusy]     = useState(false);
-  const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
+  const { clientes } = useClientes();
+  const { loading, listarEmitidas, listarRecebidas, cancelar, baixarPdf, baixarXml, sincronizarRecebidas } = useNfse();
 
-  useEffect(() => {
-    const fn = () => refresh();
-    fn();
-    window.addEventListener("apoya:nfse:changed", fn);
-    window.addEventListener("apoya:clientes:changed", fn);
-    return () => { window.removeEventListener("apoya:nfse:changed",fn); window.removeEventListener("apoya:clientes:changed",fn); };
-  },[comp]);
-  useEffect(() => setSel(new Set()),[comp]);
-
-  const filtered = useMemo(()=>{
-    const q=query.trim().toLowerCase();
-    return items
-      .filter(n=>q?`${n.clienteNome} ${n.cnpj} ${n.tomador}`.toLowerCase().includes(q):true)
-      .filter(n=>regime==="todos"||n.regime===regime)
-      .filter(n=>status==="todos"||n.status===status)
-      .sort((a,b)=>a.clienteNome.localeCompare(b.clienteNome));
-  },[items,query,regime,status]);
-
-  const PAGE_SIZE = 25;
+  const [sub, setSub] = useState<"emitidas" | "recebidas">("emitidas");
+  const [ano, setAno] = useState(now.getFullYear());
+  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [clienteFilter, setClienteFilter] = useState("todos");
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  useEffect(()=>{ setPage(1); },[query,regime,status,mes,ano]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
-  const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const PAGE_SIZE = 20;
 
-  const kpi = useMemo(()=>({
-    total:    items.length,
-    rascunho: items.filter(n=>n.status==="rascunho").length,
-    emitida:  items.filter(n=>n.status==="emitida").length,
-    erro:     items.filter(n=>n.status==="erro").length,
-    valor:    items.filter(n=>n.status==="emitida").reduce((s,n)=>s+n.valorServico,0),
-    cbsIbs:   items.filter(n=>n.status==="emitida").reduce((s,n)=>s+n.valorCbs+n.valorIbs,0),
-  }),[items]);
+  const [emitidas, setEmitidas] = useState<NfseEmitida[]>([]);
+  const [recebidas, setRecebidas] = useState<NfseRecebida[]>([]);
+  const [fetching, setFetching] = useState(false);
 
-  const toggleAll = () => setSel(sel.size===filtered.length ? new Set() : new Set(filtered.map(n=>n.id)));
-  const toggleOne = (id:string)=>{ const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
+  const [dialogEmitir, setDialogEmitir] = useState(false);
+  const [clienteSel, setClienteSel] = useState<typeof clientes[0] | null>(null);
 
-  async function emitirLote() {
-    const ids=filtered.filter(n=>sel.has(n.id)&&(n.status==="rascunho"||n.status==="erro")).map(n=>n.id);
-    if(!ids.length){ toast.error("Selecione ao menos 1 nota em rascunho"); return; }
-    setBusy(true);
-    toast.loading(`Emitindo ${ids.length} NFS-e via NFE.io…`,{id:"nfse-lote"});
-    toast.info(`Emissão em lote disponível via integração NFE.io. (${ids.length} notas selecionadas)`); await refresh();
-    setBusy(false);
-    toast.success(`${ids.length} NFS-e emitida(s)`,{id:"nfse-lote"});
+  const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+
+  const load = useCallback(async () => {
+    setFetching(true);
+    try {
+      const cId = clienteFilter !== "todos" ? clienteFilter : undefined;
+      if (sub === "emitidas") {
+        setEmitidas(await listarEmitidas(cId, competencia));
+      } else {
+        setRecebidas(await listarRecebidas(cId, competencia));
+      }
+    } finally {
+      setFetching(false);
+    }
+  }, [sub, clienteFilter, competencia]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [query, clienteFilter, sub, ano, mes]);
+
+  const filteredE = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return emitidas.filter(n =>
+      !q || `${n.tomador_nome} ${n.tomador_cnpj_cpf} ${n.numero}`.toLowerCase().includes(q)
+    );
+  }, [emitidas, query]);
+
+  const filteredR = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return recebidas.filter(n =>
+      !q || `${n.prestador_nome} ${n.prestador_cnpj} ${n.numero}`.toLowerCase().includes(q)
+    );
+  }, [recebidas, query]);
+
+  const currentList = sub === "emitidas" ? filteredE : filteredR;
+  const totalPages = Math.max(1, Math.ceil(currentList.length / PAGE_SIZE));
+  const pageRows = currentList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const kpi = useMemo(() => ({
+    total: emitidas.length,
+    emitidas_ok: emitidas.filter(n => n.status === "emitida").length,
+    valor: emitidas.reduce((s, n) => s + (n.valor_servico ?? 0), 0),
+    recebidas_total: recebidas.length,
+  }), [emitidas, recebidas]);
+
+  async function handlePdf(nota: NfseEmitida) {
+    const b64 = await baixarPdf(nota.id, nota.nfseio_id);
+    if (b64) downloadBlob(b64, `NFS-e_${nota.numero ?? nota.id}.pdf`, "application/pdf");
   }
-  function enviarWhats(){
-    const elig=filtered.filter(n=>sel.has(n.id)&&n.status==="emitida");
-    if(!elig.length){ toast.error("Selecione NFS-e já emitidas"); return; }
-    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${elig.length} envios)`);
-    toast.success(`${elig.length} nota(s) enviada(s) por WhatsApp`);
+
+  async function handleXml(nota: NfseEmitida) {
+    const xml = await baixarXml(nota.id, nota.nfseio_id);
+    if (xml) downloadText(xml, `NFS-e_${nota.numero ?? nota.id}.xml`);
   }
 
-  const cols: ColDef<any>[] = [
-    {
-      key:"prestador", header:"Prestador",
-      cell: n=>(
-        <div style={{overflow:"visible",whiteSpace:"normal"}}>
-          <div className="font-medium text-foreground leading-tight">{n.clienteNome}</div>
-          <div className="font-mono text-[11px] text-muted-foreground mt-0.5">{n.cnpj}</div>
-        </div>
-      ),
-    },
-    {
-      key:"tomador", header:"Tomador",
-      headerClassName:"hidden lg:table-cell", className:"hidden lg:table-cell text-sm text-muted-foreground",
-      cell: n=><span className="line-clamp-1 max-w-[180px]">{n.tomador}</span>,
-    },
-    {
-      key:"regime", header:"Regime",
-      headerClassName:"hidden sm:table-cell", className:"hidden sm:table-cell",
-      cell: n=>(
-        <InlineBadge color={R_COLOR[n.regime]??"blue"} dot>
-          {n.regime==="Simples"?"Simples Nacional":n.regime}
-        </InlineBadge>
-      ),
-    },
-    {
-      key:"servico", header:"Cód. Serv.",
-      headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
-      cell: n=><span className="font-mono text-xs text-muted-foreground line-clamp-1 max-w-[140px]">{n.descricaoServico}</span>,
-    },
-    {
-      key:"valor", header:"Valor",
-      headerClassName:"text-right", className:"text-right tabular-nums",
-      cell: n=>(
-        <div style={{overflow:"visible",whiteSpace:"normal"}}>
-          <div className="font-semibold">{fmtBRL(n.valorServico)}</div>
-          {(n.valorCbs+n.valorIbs)>0 &&
-            <div className="text-[10px] text-muted-foreground">CBS+IBS {fmtBRL(n.valorCbs+n.valorIbs)}</div>}
-        </div>
-      ),
-    },
-    {
-      key:"iss", header:"ISS",
-      headerClassName:"hidden sm:table-cell text-right", className:"hidden sm:table-cell text-right tabular-nums text-sm text-muted-foreground",
-      cell: n=>fmtBRL(n.valorIss),
-    },
-    {
-      key:"status", header:"Status",
-      cell: n=>(
-        <div style={{overflow:"visible",whiteSpace:"normal"}}>
-          <InlineBadge color={S_COLOR[n.status]} dot>{S_LABEL[n.status]}</InlineBadge>
-          {n.enviadoWhatsappEm && <div className="text-[10px] text-emerald-600 mt-0.5">✓ WhatsApp</div>}
-          {n.numero && <div className="font-mono text-[10px] text-muted-foreground">#{n.numero}</div>}
-        </div>
-      ),
-    },
-    {
-      key:"acoes", header:"", headerClassName:"w-16 text-right", className:"w-16 text-right",
-      cell: n=>(
-        <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {n.pdfUrl && <a href={n.pdfUrl} target="_blank" rel="noopener noreferrer"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors" title="PDF">
-            <Download className="h-3.5 w-3.5"/>
-          </a>}
-          {n.xmlUrl && <a href={n.xmlUrl} target="_blank" rel="noopener noreferrer"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors" title="XML">
-            <FileText className="h-3.5 w-3.5"/>
-          </a>}
-        </div>
-      ),
-    },
+  async function handleCancelar(nota: NfseEmitida) {
+    if (!confirm(`Cancelar NFS-e #${nota.numero}? Esta ação não pode ser desfeita.`)) return;
+    const ok = await cancelar(nota.id);
+    if (ok) load();
+  }
+
+  async function handleSincronizar() {
+    if (clienteFilter === "todos") {
+      toast.error("Selecione um cliente para sincronizar notas recebidas");
+      return;
+    }
+    const cli = clientes.find(c => c.id === clienteFilter);
+    if (!cli?.cnpj) { toast.error("Cliente sem CNPJ cadastrado"); return; }
+    await sincronizarRecebidas(clienteFilter, cli.cnpj);
+    load();
+  }
+
+  // Colunas emitidas
+  const colsEmitidas: ColDef<NfseEmitida>[] = [
+    { key: "numero", header: "#", width: 60, render: r => r.numero ?? "—" },
+    { key: "tomador_nome", header: "Tomador", render: r => (
+      <div>
+        <p className="text-sm font-medium text-foreground truncate max-w-[200px]">{r.tomador_nome ?? "—"}</p>
+        <p className="text-xs text-muted-foreground">{r.tomador_cnpj_cpf ?? "—"}</p>
+      </div>
+    )},
+    { key: "competencia", header: "Competência", width: 110, render: r => r.competencia ?? "—" },
+    { key: "data_emissao", header: "Emissão", width: 100, render: r => fmtDate(r.data_emissao) },
+    { key: "valor_servico", header: "Valor", width: 120, render: r => fmtBRL(r.valor_servico) },
+    { key: "status", header: "Status", width: 100, render: r => (
+      <InlineBadge color={STATUS_COLOR[r.status] ?? "gray"}>{STATUS_LABEL[r.status] ?? r.status}</InlineBadge>
+    )},
+    { key: "_acao", header: "", width: 120, render: r => (
+      <div className="flex items-center gap-1">
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Baixar PDF"
+          onClick={() => handlePdf(r)} disabled={loading}>
+          <Download className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="Baixar XML"
+          onClick={() => handleXml(r)} disabled={loading}>
+          <FileCode2 className="h-3.5 w-3.5" />
+        </Button>
+        {r.status === "emitida" && (
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
+            title="Cancelar" onClick={() => handleCancelar(r)} disabled={loading}>
+            <XCircle className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    )},
   ];
 
-  const kpiList = [
-    {icon:FileText,     label:"Total",    val:kpi.total,           tone:"neutral" as const},
-    {icon:Loader2,      label:"Rascunho", val:kpi.rascunho,        tone:"info"    as const},
-    {icon:CheckCircle2, label:"Emitidas", val:kpi.emitida,         tone:"success" as const},
-    {icon:AlertTriangle,label:"Erro",     val:kpi.erro,            tone:"danger"  as const},
-    {icon:Receipt,      label:"Faturado", val:fmtBRL(kpi.valor),   tone:"neutral" as const},
-    {icon:Ban,          label:"CBS+IBS",  val:fmtBRL(kpi.cbsIbs),  tone:"warning" as const},
+  const colsRecebidas: ColDef<NfseRecebida>[] = [
+    { key: "numero", header: "#", width: 60, render: r => r.numero ?? "—" },
+    { key: "prestador_nome", header: "Prestador", render: r => (
+      <div>
+        <p className="text-sm font-medium text-foreground truncate max-w-[200px]">{r.prestador_nome ?? "—"}</p>
+        <p className="text-xs text-muted-foreground">{r.prestador_cnpj ?? "—"}</p>
+      </div>
+    )},
+    { key: "competencia", header: "Competência", width: 110, render: r => r.competencia ?? "—" },
+    { key: "data_emissao", header: "Emissão", width: 100, render: r => fmtDate(r.data_emissao) },
+    { key: "valor_servico", header: "Valor", width: 120, render: r => fmtBRL(r.valor_servico) },
+    { key: "fonte", header: "Fonte", width: 80, render: r => (
+      <InlineBadge color={r.fonte === "nfeio" ? "blue" : "gray"}>{r.fonte}</InlineBadge>
+    )},
   ];
 
   return (
     <div className="space-y-5">
-
       <PageHeader
-        title="NFS-e em Lote"
-        subtitle="Emissão via NFE.io · Reforma Tributária (CBS/IBS)"
+        title="NFS-e"
+        subtitle="Emissão e controle de Notas Fiscais de Serviço"
         actions={
-          <>
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={enviarWhats} disabled={sel.size===0}>
-              <MessageCircle className="h-4 w-4"/> WhatsApp
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={load} disabled={fetching}>
+              <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} />
+              Atualizar
             </Button>
-            <Button size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={emitirLote} disabled={busy||sel.size===0}>
-              {busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}
-              Emitir ({sel.size})
+            <Button size="sm" className="h-8 gap-1.5"
+              onClick={() => {
+                const cli = clienteFilter !== "todos" ? clientes.find(c => c.id === clienteFilter) ?? null : null;
+                setClienteSel(cli);
+                setDialogEmitir(true);
+              }}>
+              <Plus className="h-3.5 w-3.5" />
+              Nova NFS-e
             </Button>
-          </>
+          </div>
         }
       />
 
-      <PageTabs
-        items={[
-          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
-          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
-          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
-        ]}
-      />
-
-
-      <KpiGrid cols={6}>
-        {kpiList.map(({icon:Icon,label,val,tone})=>(
-          <KpiCard key={label} icon={Icon} tone={tone} label={label} value={val} />
-        ))}
+      {/* KPIs */}
+      <KpiGrid cols={4}>
+        <KpiCard label="Emitidas no mês" value={kpi.emitidas_ok} tone="success" />
+        <KpiCard label="Total emitidas" value={kpi.total} tone="neutral" />
+        <KpiCard label="Valor total" value={fmtBRL(kpi.valor)} tone="primary" />
+        <KpiCard label="Recebidas" value={kpi.recebidas_total} tone="neutral" />
       </KpiGrid>
 
-
-      {/* Tabela */}
-      <DataTable
-        rows={pageRows}
-        cols={cols}
-        getKey={n=>n.id}
-        selected={sel}
-        onToggleAll={toggleAll}
-        onToggleRow={toggleOne}
-        emptyIcon={<Receipt className="h-8 w-8"/>}
-        emptyText="Nenhuma NFS-e para os filtros selecionados"
-        rowClassName={n=>n.status==="cancelada"?"opacity-50":""}
-        toolbar={
-          <>
-            <Select value={mes.toString()} onValueChange={v=>setMes(+v)}>
-              <SelectTrigger className="h-8 w-28 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>{MESES.map((m,i)=><SelectItem key={m} value={(i+1).toString()}>{m}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={ano.toString()} onValueChange={v=>setAno(+v)}>
-              <SelectTrigger className="h-8 w-24 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>{[now.getFullYear()-1,now.getFullYear(),now.getFullYear()+1].map(y=><SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
-            </Select>
-            <div className="h-4 w-px bg-border shrink-0"/>
-            <TableSearch value={query} onChange={setQuery} placeholder="Prestador, tomador, CNPJ…"/>
-            <Select value={regime} onValueChange={v=>setRegime(v as typeof regime)}>
-              <SelectTrigger className="h-8 w-36 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos regimes</SelectItem>
-                <SelectItem value="MEI">MEI</SelectItem>
-                <SelectItem value="Simples">Simples Nacional</SelectItem>
-                <SelectItem value="Lucro Presumido">Lucro Presumido</SelectItem>
-                <SelectItem value="Lucro Real">Lucro Real</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={status} onValueChange={v=>setStatus(v as typeof status)}>
-              <SelectTrigger className="h-8 w-32 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos status</SelectItem>
-                <SelectItem value="rascunho">Rascunho</SelectItem>
-                <SelectItem value="emitida">Emitida</SelectItem>
-                <SelectItem value="enviada">Enviada</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-                <SelectItem value="erro">Erro</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        }
+      {/* Sub-tabs */}
+      <PageTabs
+        tabs={[
+          { id: "emitidas", label: `Emitidas (${emitidas.length})` },
+          { id: "recebidas", label: `Recebidas (${recebidas.length})` },
+        ]}
+        activeTab={sub}
+        onTabChange={(v) => setSub(v as any)}
       />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
-        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Mês/Ano */}
+        <Select value={String(mes)} onValueChange={(v) => setMes(Number(v))}>
+          <SelectTrigger className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {MESES.map((m, i) => (
+              <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(ano)} onValueChange={(v) => setAno(Number(v))}>
+          <SelectTrigger className="h-8 w-24 text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {[2024, 2025, 2026, 2027].map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Cliente */}
+        <Select value={clienteFilter} onValueChange={setClienteFilter}>
+          <SelectTrigger className="h-8 w-48 text-sm"><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os clientes</SelectItem>
+            {clientes.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Busca */}
+        <div className="relative flex-1 min-w-40">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input className="pl-8 h-8 text-sm" placeholder="Buscar por tomador, CNPJ..." value={query}
+            onChange={(e) => setQuery(e.target.value)} />
+        </div>
+
+        {/* Sincronizar recebidas */}
+        {sub === "recebidas" && (
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={handleSincronizar} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Sincronizar
+          </Button>
+        )}
       </div>
 
-      <NfseFormDialog
-        open={dialogNfse}
-        onClose={() => setDialogNfse(false)}
-        onCreated={() => {}}
-      />
+      {/* Tabela */}
+      {fetching ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Carregando notas…</span>
+        </div>
+      ) : sub === "emitidas" ? (
+        <>
+          <DataTable
+            columns={colsEmitidas}
+            rows={pageRows as NfseEmitida[]}
+            emptyState={
+              <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+                <FileText className="h-8 w-8 opacity-30" />
+                <p className="text-sm">Nenhuma NFS-e emitida em {MESES[mes - 1]}/{ano}</p>
+                <Button size="sm" className="mt-1" onClick={() => setDialogEmitir(true)}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Emitir primeira nota
+                </Button>
+              </div>
+            }
+          />
+          <TableFooter total={filteredE.length} pageSize={PAGE_SIZE} page={page}>
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          </TableFooter>
+        </>
+      ) : (
+        <>
+          <DataTable
+            columns={colsRecebidas}
+            rows={pageRows as NfseRecebida[]}
+            emptyState={
+              <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+                <Receipt className="h-8 w-8 opacity-30" />
+                <p className="text-sm">Nenhuma NFS-e recebida em {MESES[mes - 1]}/{ano}</p>
+                <p className="text-xs">Selecione um cliente e clique em "Sincronizar"</p>
+              </div>
+            }
+          />
+          <TableFooter total={filteredR.length} pageSize={PAGE_SIZE} page={page}>
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          </TableFooter>
+        </>
+      )}
+
+      {/* Diálogo emissão */}
+      {dialogEmitir && (
+        <EmitirDialog
+          open={dialogEmitir}
+          onClose={() => setDialogEmitir(false)}
+          clienteId={clienteSel?.id ?? ""}
+          clienteNome={clienteSel?.nome ?? ""}
+          clienteCnpj={clienteSel?.cnpj ?? ""}
+          onSuccess={load}
+        />
+      )}
     </div>
   );
 }

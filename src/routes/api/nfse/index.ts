@@ -1,23 +1,14 @@
 /**
  * API Routes NFE.io — NFS-e
- * POST /api/nfse  → action dispatcher
+ * GET  /api/nfse?cliente_id=xxx&tipo=emitidas|recebidas&competencia=YYYY-MM
+ * POST /api/nfse  { action: "emitir"|"cancelar"|"sincronizar_recebidas"|"pdf"|"xml" }
  *
- * Actions:
- *   emitir        → emite NFS-e via NFE.io, salva PDF+XML no banco
- *   cancelar      → cancela nota
- *   consultar     → consulta status de uma nota
- *   listar        → lista notas emitidas de um cliente
- *   listar_recebidas → notas emitidas CONTRA o CNPJ (tomador)
- *   baixar_pdf    → retorna PDF base64 de nota específica
- *   sincronizar   → busca notas recebidas na API NFE.io e salva no banco
- *
- * Auth: Bearer Supabase no header Authorization.
- * Secret: NFSEIO_API_KEY (Supabase secret / Worker binding)
+ * Auth NFE.io: Bearer <NFSEIO_API_KEY> (não Basic)
+ * Secret: NFSEIO_API_KEY (Cloudflare Worker secret)
+ * Emitente: escritorio_config.nfseio_emitente_id
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// NFE.io base URL
 const NFSEIO_BASE = "https://api.nfe.io/v1";
 
 function json(body: unknown, status = 200) {
@@ -31,41 +22,82 @@ function err(msg: string, status = 400) {
   return json({ error: msg }, status);
 }
 
-async function authenticate(request: Request): Promise<{ userId: string } | Response> {
-  const h = request.headers.get("authorization") ?? "";
-  if (!h.startsWith("Bearer ")) return err("Unauthorized", 401);
-  const { data, error } = await (supabaseAdmin as any).auth.getUser(h.replace("Bearer ", ""));
-  if (error || !data?.user) return err("Token inválido", 401);
-  return { userId: data.user.id };
-}
-
-function getNfseioKey(): string {
-  const key = process.env.NFSEIO_API_KEY ?? "";
-  if (!key) throw new Error("NFSEIO_API_KEY não configurada. Adicione nas variáveis de ambiente do Worker.");
-  return key;
+function getNfseKey(): string {
+  const k = (globalThis as any).__env__?.NFSEIO_API_KEY ?? process.env.NFSEIO_API_KEY ?? "";
+  if (!k) throw new Error("NFSEIO_API_KEY não configurada");
+  return k;
 }
 
 async function nfseio<T = any>(
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
-): Promise<T> {
-  const apiKey = getNfseioKey();
+): Promise<{ data: T; status: number }> {
+  const key = getNfseKey();
   const res = await fetch(`${NFSEIO_BASE}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Basic ${btoa(apiKey + ":")}`,
+      Authorization: key,
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as any)?.message ?? `NFE.io HTTP ${res.status}`);
-  return data as T;
+  // Para PDF/XML, o status 302 precisa ser seguido
+  if (res.status === 302) {
+    const loc = res.headers.get("location") ?? "";
+    const r2 = await fetch(loc);
+    return { data: (await r2.arrayBuffer()) as any, status: r2.status };
+  }
+  let data: any;
+  try { data = await res.json(); } catch { data = {}; }
+  if (!res.ok) throw new Error(data?.message ?? data?.error ?? `NFE.io HTTP ${res.status}`);
+  return { data, status: res.status };
+}
+
+async function getSupabaseUser(authHeader: string) {
+  const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+  const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
+  const token = authHeader.replace("Bearer ", "");
+  const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${token}`, apikey: ANON },
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  return { userId: d.id, token };
+}
+
+async function supaQuery(token: string, query: string) {
+  const r = await fetch("https://ajaqbdsalxfgrwpjbtbn.supabase.co/rest/v1/rpc/sql_query", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM",
+    },
+    body: JSON.stringify({ query }),
+  });
+  return r.json().catch(() => []);
+}
+
+async function supaRest(token: string, table: string, method: string, body?: unknown, params?: string) {
+  const SUPA = "https://ajaqbdsalxfgrwpjbtbn.supabase.co/rest/v1";
+  const SERVICE = (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY
+    ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Prefer: method === "POST" ? "return=representation" : "return=minimal",
+    apikey: SERVICE || token,
+    Authorization: SERVICE ? `Bearer ${SERVICE}` : `Bearer ${token}`,
+  };
+  const r = await fetch(`${SUPA}/${table}${params ? "?" + params : ""}`, {
+    method, headers,
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  return r.json().catch(() => ({}));
 }
 
 async function logOp(
-  db: any,
+  token: string,
   clienteId: string | undefined,
   operacao: string,
   nfseioId: string | undefined,
@@ -76,7 +108,7 @@ async function logOp(
   duracao: number,
   userId: string,
 ) {
-  await db.from("nfseio_log").insert({
+  await supaRest(token, "nfseio_log", "POST", {
     cliente_id: clienteId ?? null,
     operacao,
     nfseio_id: nfseioId ?? null,
@@ -89,178 +121,243 @@ async function logOp(
   });
 }
 
+async function getEmitenteId(token: string): Promise<string> {
+  // Buscar do escritorio_config
+  const rows = await supaRest(token, "escritorio_config", "GET", undefined, "select=nfseio_emitente_id&limit=1");
+  const id = Array.isArray(rows) ? rows[0]?.nfseio_emitente_id : null;
+  return id ?? "10ecf6c4445648549695358f7ac944e7"; // fallback
+}
+
 export const Route = createFileRoute("/api/nfse/")({
   server: {
     handlers: {
-      // GET /api/nfse?cliente_id=xxx  → lista notas emitidas do cliente
+      // GET /api/nfse?cliente_id=xxx&tipo=emitidas|recebidas&competencia=YYYY-MM
       GET: async ({ request }) => {
-        const auth = await authenticate(request);
-        if (auth instanceof Response) return auth;
+        const h = request.headers.get("authorization") ?? "";
+        const user = await getSupabaseUser(h);
+        if (!user) return err("Unauthorized", 401);
+        const { token } = user;
+
         const url = new URL(request.url);
         const clienteId = url.searchParams.get("cliente_id");
-        const tipo = url.searchParams.get("tipo") ?? "emitidas"; // emitidas | recebidas
+        const tipo = url.searchParams.get("tipo") ?? "emitidas";
         const competencia = url.searchParams.get("competencia");
-        const db = supabaseAdmin as any;
 
-        if (tipo === "recebidas") {
-          let q = db.from("nfse_recebida")
-            .select("*")
-            .order("data_emissao", { ascending: false })
-            .limit(100);
-          if (clienteId) q = q.eq("cliente_id", clienteId);
-          if (competencia) q = q.eq("competencia", competencia);
-          const { data, error } = await q;
-          if (error) return err(error.message, 500);
-          return json({ notas: data ?? [] });
-        }
+        const table = tipo === "recebidas" ? "nfse_recebida" : "nfse_emitida";
+        const cols = tipo === "recebidas"
+          ? "id,cliente_id,numero,competencia,data_emissao,valor_servico,prestador_nome,prestador_cnpj,pdf_url,fonte,created_at"
+          : "id,cliente_id,numero,status,competencia,data_emissao,valor_servico,tomador_nome,tomador_cnpj_cpf,pdf_url,nfseio_id,created_at";
 
-        // emitidas
-        let q = db.from("nfse_emitida")
-          .select("id,cliente_id,numero,status,competencia,data_emissao,valor_servico,tomador_nome,tomador_cnpj_cpf,pdf_url,created_at")
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (clienteId) q = q.eq("cliente_id", clienteId);
-        if (competencia) q = q.eq("competencia", competencia);
-        const { data, error } = await q;
-        if (error) return err(error.message, 500);
-        return json({ notas: data ?? [] });
+        let params = `select=${cols}&order=created_at.desc&limit=200`;
+        if (clienteId) params += `&cliente_id=eq.${clienteId}`;
+        if (competencia) params += `&competencia=eq.${competencia}`;
+
+        const rows = await supaRest(token, table, "GET", undefined, params);
+        return json({ notas: Array.isArray(rows) ? rows : [] });
       },
 
       POST: async ({ request }) => {
-        const auth = await authenticate(request);
-        if (auth instanceof Response) return auth;
-        const { userId } = auth;
+        const h = request.headers.get("authorization") ?? "";
+        const user = await getSupabaseUser(h);
+        if (!user) return err("Unauthorized", 401);
+        const { userId, token } = user;
 
         let body: any;
         try { body = await request.json(); } catch { return err("JSON inválido"); }
 
         const { action, cliente_id } = body;
-        const db = supabaseAdmin as any;
         const t0 = Date.now();
 
-        // ── EMITIR ──────────────────────────────────────────────────────
+        // ── EMITIR ─────────────────────────────────────────────────────
         if (action === "emitir") {
-          const { emitente_id, nota } = body;
-          if (!emitente_id || !nota) return err("emitente_id e nota são obrigatórios");
+          const { nota } = body;
+          if (!nota) return err("nota é obrigatório");
+          const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
 
-          // Criar registro rascunho
-          const ins = await db.from("nfse_emitida").insert({
+          // Salvar rascunho
+          const rascunho = await supaRest(token, "nfse_emitida", "POST", {
             cliente_id,
             status: "processando",
             competencia: nota.competencia,
-            tomador_nome: nota.tomador?.nome,
-            tomador_cnpj_cpf: nota.tomador?.cpfCnpj,
-            tomador_email: nota.tomador?.email,
-            tomador_municipio: nota.tomador?.endereco?.municipio,
-            tomador_uf: nota.tomador?.endereco?.uf,
-            descricao_servico: nota.servico?.descricao,
-            codigo_servico: nota.servico?.codigo,
-            valor_servico: nota.servico?.valorServicos,
-            aliquota_iss: nota.servico?.aliquota,
-            issretido: nota.servico?.issRetido ?? false,
+            tomador_nome: nota.borrower?.name,
+            tomador_cnpj_cpf: String(nota.borrower?.federalTaxNumber ?? ""),
+            tomador_email: nota.borrower?.email,
+            tomador_municipio: nota.borrower?.address?.city?.name,
+            tomador_uf: nota.borrower?.address?.state,
+            descricao_servico: nota.description,
+            codigo_servico: nota.cityServiceCode,
+            valor_servico: nota.servicesAmount,
+            aliquota_iss: nota.issRate,
+            issretido: nota.issRetained ?? false,
             created_by: userId,
-          }).select("id").single();
-
-          if (ins.error) return err(ins.error.message, 500);
-          const localId = ins.data.id;
+          });
+          const localId = Array.isArray(rascunho) ? rascunho[0]?.id : rascunho?.id;
+          if (!localId) return err("Falha ao criar rascunho no banco", 500);
 
           try {
-            const result = await nfseio<any>("POST", `/companies/${emitente_id}/serviceinvoices`, nota);
-            const nfseioId = result?.id ?? result?.serviceInvoice?.id;
-            const numero = result?.number ?? result?.serviceInvoice?.number;
-            const pdfUrl = result?.pdfUrl ?? result?.serviceInvoice?.pdfUrl;
-            const xmlUrl = result?.xmlUrl ?? result?.serviceInvoice?.xmlUrl;
+            const { data: result } = await nfseio<any>("POST",
+              `/companies/${emitenteId}/serviceinvoices`, nota);
 
-            // Buscar XML se disponível
-            let xmlContent: string | null = null;
-            if (xmlUrl) {
-              try {
-                const xmlRes = await fetch(xmlUrl, {
-                  headers: { Authorization: `Basic ${btoa(getNfseioKey() + ":")}` },
-                });
-                xmlContent = await xmlRes.text();
-              } catch { /* ignore */ }
-            }
+            const nfseioId = result?.id;
+            const numero = String(result?.number ?? "");
+            const pdfUrl = result?.pdfUrl ?? null;
 
-            await db.from("nfse_emitida").update({
+            await supaRest(token, `nfse_emitida?id=eq.${localId}`, "PATCH", {
               nfseio_id: nfseioId,
               numero,
               status: "emitida",
               data_emissao: new Date().toISOString().slice(0, 10),
               pdf_url: pdfUrl,
-              xml_content: xmlContent,
-            }).eq("id", localId);
+            });
 
-            await logOp(db, cliente_id, "emitir", nfseioId, "ok", nota, { numero, pdfUrl }, undefined, Date.now() - t0, userId);
+            await logOp(token, cliente_id, "emitir", nfseioId, "ok",
+              { ...nota, _emitente: emitenteId }, { numero, pdfUrl },
+              undefined, Date.now() - t0, userId);
+
             return json({ ok: true, id: localId, nfseio_id: nfseioId, numero, pdf_url: pdfUrl });
           } catch (e: any) {
-            await db.from("nfse_emitida").update({ status: "erro", erro_msg: e?.message }).eq("id", localId);
-            await logOp(db, cliente_id, "emitir", undefined, "erro", nota, null, e?.message, Date.now() - t0, userId);
+            await supaRest(token, `nfse_emitida?id=eq.${localId}`, "PATCH",
+              { status: "erro", erro_msg: e?.message });
+            await logOp(token, cliente_id, "emitir", undefined, "erro",
+              nota, null, e?.message, Date.now() - t0, userId);
             return err(e?.message ?? "Falha ao emitir nota", 502);
+          }
+        }
+
+        // ── PDF ─────────────────────────────────────────────────────────
+        if (action === "pdf") {
+          const { nota_id, nfseio_id } = body;
+          let nId = nfseio_id;
+          if (!nId && nota_id) {
+            const rows = await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "GET",
+              undefined, "select=nfseio_id,cliente_id");
+            nId = Array.isArray(rows) ? rows[0]?.nfseio_id : null;
+          }
+          if (!nId) return err("nfseio_id não encontrado");
+          const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
+
+          try {
+            // Seguir redirect manualmente
+            const key = getNfseKey();
+            const r = await fetch(
+              `${NFSEIO_BASE}/companies/${emitenteId}/serviceinvoices/${nId}/pdf`,
+              { headers: { Authorization: key }, redirect: "follow" });
+            if (!r.ok) return err(`PDF não disponível (HTTP ${r.status})`, 502);
+            const buf = await r.arrayBuffer();
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+            return json({ ok: true, pdf_base64: b64, nfseio_id: nId });
+          } catch (e: any) {
+            return err(e?.message ?? "Falha ao buscar PDF", 502);
+          }
+        }
+
+        // ── XML ─────────────────────────────────────────────────────────
+        if (action === "xml") {
+          const { nota_id, nfseio_id } = body;
+          let nId = nfseio_id;
+          if (!nId && nota_id) {
+            const rows = await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "GET",
+              undefined, "select=nfseio_id,xml_content");
+            if (Array.isArray(rows) && rows[0]?.xml_content) {
+              return json({ ok: true, xml: rows[0].xml_content });
+            }
+            nId = Array.isArray(rows) ? rows[0]?.nfseio_id : null;
+          }
+          if (!nId) return err("nfseio_id não encontrado");
+          const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
+
+          try {
+            const key = getNfseKey();
+            const r = await fetch(
+              `${NFSEIO_BASE}/companies/${emitenteId}/serviceinvoices/${nId}/xml`,
+              { headers: { Authorization: key }, redirect: "follow" });
+            if (!r.ok) return err(`XML não disponível (HTTP ${r.status})`, 502);
+            const xml = await r.text();
+            // Salvar no banco
+            if (nota_id) {
+              await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "PATCH", { xml_content: xml });
+            }
+            return json({ ok: true, xml });
+          } catch (e: any) {
+            return err(e?.message ?? "Falha ao buscar XML", 502);
           }
         }
 
         // ── CANCELAR ─────────────────────────────────────────────────────
         if (action === "cancelar") {
-          const { nota_id } = body;
+          const { nota_id, motivo } = body;
           if (!nota_id) return err("nota_id obrigatório");
-          const r = await db.from("nfse_emitida").select("nfseio_id").eq("id", nota_id).single();
-          if (r.error || !r.data?.nfseio_id) return err("Nota não encontrada ou sem ID NFE.io");
-
-          // Buscar emitente_id do cliente
-          const cli = await db.from("clientes").select("nfseio_emitente_id").eq("id", cliente_id).single();
-          if (!cli.data?.nfseio_emitente_id) return err("Cliente sem emitente NFE.io configurado");
+          const rows = await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "GET",
+            undefined, "select=nfseio_id,cliente_id");
+          const row = Array.isArray(rows) ? rows[0] : null;
+          if (!row?.nfseio_id) return err("Nota não encontrada ou sem ID NFE.io");
+          const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
 
           try {
-            await nfseio("DELETE", `/companies/${cli.data.nfseio_emitente_id}/serviceinvoices/${r.data.nfseio_id}`);
-            await db.from("nfse_emitida").update({ status: "cancelada", data_cancelamento: new Date().toISOString().slice(0, 10) }).eq("id", nota_id);
-            await logOp(db, cliente_id, "cancelar", r.data.nfseio_id, "ok", { nota_id }, null, undefined, Date.now() - t0, userId);
+            await nfseio("DELETE",
+              `/companies/${emitenteId}/serviceinvoices/${row.nfseio_id}`);
+            await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "PATCH", {
+              status: "cancelada",
+              data_cancelamento: new Date().toISOString().slice(0, 10),
+              erro_msg: motivo ?? null,
+            });
+            await logOp(token, cliente_id ?? row.cliente_id, "cancelar",
+              row.nfseio_id, "ok", { nota_id, motivo }, null,
+              undefined, Date.now() - t0, userId);
             return json({ ok: true });
           } catch (e: any) {
-            await logOp(db, cliente_id, "cancelar", r.data.nfseio_id, "erro", { nota_id }, null, e?.message, Date.now() - t0, userId);
+            await logOp(token, cliente_id ?? row.cliente_id, "cancelar",
+              row.nfseio_id, "erro", { nota_id }, null,
+              e?.message, Date.now() - t0, userId);
             return err(e?.message ?? "Falha ao cancelar nota", 502);
           }
         }
 
-        // ── SINCRONIZAR RECEBIDAS ─────────────────────────────────────────
+        // ── SINCRONIZAR RECEBIDAS (notas emitidas CONTRA o CNPJ do cliente) ──
         if (action === "sincronizar_recebidas") {
-          const { emitente_id, cnpj, pageIndex = 1, pageCount = 50 } = body;
-          if (!emitente_id || !cnpj) return err("emitente_id e cnpj obrigatórios");
+          const { cnpj, pageIndex = 1, pageCount = 50 } = body;
+          if (!cnpj || !cliente_id) return err("cnpj e cliente_id obrigatórios");
+          const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
+          const cnpjLimpo = cnpj.replace(/\D/g, "");
 
           try {
-            const result = await nfseio<any>("GET",
-              `/companies/${emitente_id}/serviceinvoices?pageIndex=${pageIndex}&pageCount=${pageCount}&takerFederalTaxNumber=${cnpj.replace(/\D/g,"")}`
-            );
-            const notas = result?.serviceInvoices ?? result?.data ?? [];
+            const { data } = await nfseio<any>("GET",
+              `/companies/${emitenteId}/serviceinvoices?pageIndex=${pageIndex}&pageCount=${pageCount}&takerFederalTaxNumber=${cnpjLimpo}`);
+            const notas = data?.serviceInvoices ?? [];
 
             let inserted = 0;
             for (const n of notas) {
-              const upsert = await db.from("nfse_recebida").upsert({
-                cliente_id,
-                cnpj_tomador: cnpj.replace(/\D/g, ""),
-                prestador_nome: n.provider?.name,
-                prestador_cnpj: n.provider?.federalTaxNumber,
-                prestador_municipio: n.provider?.address?.city,
-                numero: String(n.number ?? n.id),
-                codigo_verificacao: n.verificationCode,
-                data_emissao: n.issuedOn?.slice(0, 10),
-                competencia: n.issuedOn?.slice(0, 7).replace("-", "-"),
-                valor_servico: n.servicesAmount,
-                valor_iss: n.deductionsAmount,
-                aliquota_iss: n.issRate,
-                issretido: n.issTaxPayer === "true",
-                descricao_servico: n.servicesDescription,
-                codigo_servico: n.cityServiceCode,
-                nfseio_id: n.id,
-                fonte: "nfeio",
-              }, { onConflict: "cnpj_tomador,numero,prestador_cnpj", ignoreDuplicates: true });
-              if (!upsert.error) inserted++;
+              try {
+                await supaRest(token, "nfse_recebida", "POST", {
+                  cliente_id,
+                  cnpj_tomador: cnpjLimpo,
+                  prestador_nome: n.provider?.name ?? n.provider?.tradeName,
+                  prestador_cnpj: String(n.provider?.federalTaxNumber ?? ""),
+                  prestador_municipio: n.provider?.address?.city?.name,
+                  numero: String(n.number ?? n.id),
+                  codigo_verificacao: n.checkCode ?? n.verificationCode,
+                  data_emissao: n.issuedOn?.slice(0, 10),
+                  competencia: n.issuedOn?.slice(0, 7),
+                  valor_servico: n.servicesAmount,
+                  valor_iss: n.issAmount,
+                  aliquota_iss: n.issAliquot ?? n.issRate,
+                  issretido: n.issRetained === true,
+                  descricao_servico: n.description ?? n.servicesDescription,
+                  codigo_servico: n.cityServiceCode,
+                  nfseio_id: n.id,
+                  fonte: "nfeio",
+                });
+                inserted++;
+              } catch { /* skip duplicates */ }
             }
 
-            await logOp(db, cliente_id, "listar_recebidas", undefined, "ok", { cnpj }, { total: notas.length, inserted }, undefined, Date.now() - t0, userId);
+            await logOp(token, cliente_id, "listar_recebidas", undefined, "ok",
+              { cnpj: cnpjLimpo }, { total: notas.length, inserted },
+              undefined, Date.now() - t0, userId);
             return json({ ok: true, total: notas.length, inserted });
           } catch (e: any) {
-            await logOp(db, cliente_id, "listar_recebidas", undefined, "erro", { cnpj }, null, e?.message, Date.now() - t0, userId);
+            await logOp(token, cliente_id, "listar_recebidas", undefined, "erro",
+              { cnpj: cnpjLimpo }, null, e?.message, Date.now() - t0, userId);
             return err(e?.message ?? "Falha ao sincronizar notas recebidas", 502);
           }
         }
