@@ -3,12 +3,12 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/integrations/supabase/require-auth";
 import { evo } from "@/integrations/evolution/client.server";
-import { sbFromContext, type WaSupabaseClient } from "./sb.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { phoneToJid, upsertConversa } from "./wa.server";
 
-async function loadCtx(sb: WaSupabaseClient, conversaId: string, userId: string) {
+async function loadCtx(sb: any, conversaId: string, userId: string) {
   const c = await sb.from("wa_conversa").select("*, wa_instance:instance_id (id, nome, evolution_apikey)").eq("id", conversaId).single();
   if (c.error || !c.data) throw new Error("Conversa não encontrada");
   const u = await sb.from("profiles").select("full_name").eq("id", userId).single();
@@ -24,10 +24,10 @@ function withTag(content: string, departamento: string | null, agenteNome: strin
 // listConversas / getMensagens
 // ──────────────────────────────────────────────────────────────────────────
 export const listConversas = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({ instanceId: z.string().uuid().optional() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     let q = sb.from("wa_conversa").select("*").order("ultima_em", { ascending: false, nullsFirst: false });
     if (data.instanceId) q = q.eq("instance_id", data.instanceId);
     const r = await q;
@@ -36,10 +36,10 @@ export const listConversas = createServerFn({ method: "GET" })
   });
 
 export const getMensagens = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid(), limit: z.number().min(1).max(200).default(100) }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const r = await sb.from("mensagem_whatsapp")
       .select("*")
       .eq("conversa_id", data.conversaId)
@@ -53,13 +53,13 @@ export const getMensagens = createServerFn({ method: "GET" })
 // assumeConversa
 // ──────────────────────────────────────────────────────────────────────────
 export const assumeConversa = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     departamento: z.string().min(1).max(40),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const r = await sb.from("wa_conversa").update({
       assigned_to: context.userId,
       assigned_at: new Date().toISOString(),
@@ -71,19 +71,19 @@ export const assumeConversa = createServerFn({ method: "POST" })
   });
 
 export const liberarConversa = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     await sb.from("wa_conversa").update({ assigned_to: null, assigned_at: null, departamento: null }).eq("id", data.conversaId);
     return { ok: true };
   });
 
 export const marcarLida = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({ conversaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     await sb.from("wa_conversa").update({ nao_lidas: 0 }).eq("id", data.conversaId);
     return { ok: true };
   });
@@ -92,13 +92,13 @@ export const marcarLida = createServerFn({ method: "POST" })
 // sendPresence (digitando)
 // ──────────────────────────────────────────────────────────────────────────
 export const sendPresence = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     presence: z.enum(["composing", "recording", "paused"]),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const { conv, instance } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/chat/sendPresence/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
@@ -112,14 +112,14 @@ export const sendPresence = createServerFn({ method: "POST" })
 // sendText
 // ──────────────────────────────────────────────────────────────────────────
 export const sendText = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     texto: z.string().min(1).max(4096),
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const conteudo = withTag(data.texto, conv.departamento, agenteNome);
     const body: any = { number: conv.telefone, text: conteudo, linkPreview: true };
@@ -155,7 +155,7 @@ export const sendText = createServerFn({ method: "POST" })
 // sendMedia (URL ou base64)
 // ──────────────────────────────────────────────────────────────────────────
 export const sendMedia = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     mediatype: z.enum(["image", "video", "document"]),
@@ -166,7 +166,7 @@ export const sendMedia = createServerFn({ method: "POST" })
     replyTo: z.string().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const caption = data.caption ? withTag(data.caption, conv.departamento, agenteNome) : undefined;
     const body: any = {
@@ -211,13 +211,13 @@ export const sendMedia = createServerFn({ method: "POST" })
 // sendAudio (PTT)
 // ──────────────────────────────────────────────────────────────────────────
 export const sendAudio = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     audio: z.string().min(1),    // base64 ou URL
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     const evoRes = await evo<any>("POST", `/message/sendWhatsAppAudio/${encodeURIComponent(instance.nome)}`, {
       number: conv.telefone,
@@ -252,7 +252,7 @@ export const sendAudio = createServerFn({ method: "POST" })
 // sendReaction
 // ──────────────────────────────────────────────────────────────────────────
 export const sendReaction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     conversaId: z.string().uuid(),
     messageId: z.string().min(1),
@@ -260,7 +260,7 @@ export const sendReaction = createServerFn({ method: "POST" })
     fromMe: z.boolean().default(false),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const { conv, instance, agenteNome } = await loadCtx(sb, data.conversaId, context.userId);
     await evo("POST", `/message/sendReaction/${encodeURIComponent(instance.nome)}`, {
       reactionMessage: {
@@ -288,7 +288,7 @@ export const sendReaction = createServerFn({ method: "POST" })
 // startConversa (iniciar conversa por número novo)
 // ──────────────────────────────────────────────────────────────────────────
 export const startConversa = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input) => z.object({
     instanceId: z.string().uuid(),
     telefone: z.string().min(8).max(20),
@@ -296,7 +296,7 @@ export const startConversa = createServerFn({ method: "POST" })
     nomeContato: z.string().max(80).optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const sb = sbFromContext(context);
+    const sb: any = supabaseAdmin;
     const tel = data.telefone.replace(/\D/g, "");
     const conv = await upsertConversa({
       instanceId: data.instanceId,

@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const DEPARTAMENTOS_SUGERIDOS = ["fiscal", "financeiro", "contábil", "dp", "atendimento", "comercial"];
 
 export function WhatsappInstancesPanel() {
-  const { instances, loading, creating, create, connect, refresh, logout, remove } = useWaInstances();
+  const { instances, loading, error, creating, create, connect, refresh, logout, remove, reload } = useWaInstances();
   const [open, setOpen] = useState(false);
   const [qrInstance, setQrInstance] = useState<WaInstance | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WaInstance | null>(null);
@@ -34,6 +34,17 @@ export function WhatsappInstancesPanel() {
       {loading ? (
         <div className="flex h-32 items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="surface-card flex flex-col items-center gap-3 p-8 text-center">
+          <XCircle className="h-8 w-8 text-destructive/60" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Erro ao carregar instâncias</p>
+            <p className="text-xs text-muted-foreground mt-1">{error}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={reload}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
+          </Button>
         </div>
       ) : instances.length === 0 ? (
         <div className="surface-card flex flex-col items-center gap-2 p-8 text-center">

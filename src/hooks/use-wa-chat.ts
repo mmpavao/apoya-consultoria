@@ -48,9 +48,15 @@ export function useWaConversas(instanceId?: string) {
   const fn = useServerFn(listConversas);
 
   const reload = useCallback(async () => {
-    const r = await fn({ data: instanceId ? { instanceId } : {} });
-    setConversas(r.conversas as WaConversa[]);
-    setLoading(false);
+    try {
+      const r = await fn({ data: instanceId ? { instanceId } : {} });
+      setConversas((r.conversas ?? []) as WaConversa[]);
+    } catch (e) {
+      console.error("[useWaConversas] erro:", e);
+      setConversas([]);
+    } finally {
+      setLoading(false);
+    }
   }, [fn, instanceId]);
 
   useEffect(() => {
