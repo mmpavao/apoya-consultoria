@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   KeyRound,
   MessageSquare,
+  Package,
   Plug,
   Plus,
   Save,
