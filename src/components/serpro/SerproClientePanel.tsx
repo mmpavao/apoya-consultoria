@@ -166,13 +166,14 @@ export function SerproClientePanel({ cliente }: { cliente: ClienteMin }) {
       const text  = extractText(res);
       const pdf   = extractPdf(res);
 
+      const isInternalErr = res.ok && text?.startsWith("⚠️");
       setResults(p => ({
         ...p,
         [toolName]: {
           loading: false,
-          text: res.ok ? text : null,
+          text: (res.ok && !isInternalErr) ? text : null,
           pdfB64: pdf ?? null,
-          error: res.ok ? null : (res.error ?? "Erro desconhecido"),
+          error: isInternalErr ? text?.replace("⚠️ ", "") : (res.ok ? null : (res.error ?? "Erro desconhecido")),
           ms: res.duracao_ms ?? null,
           blocked: res.blocked ?? false,
         },
@@ -210,21 +211,23 @@ export function SerproClientePanel({ cliente }: { cliente: ClienteMin }) {
     const text  = extractText(res);
     const pdf   = extractPdf(res);
 
+    const isInternalErr = res.ok && text?.startsWith("⚠️");
     setResults(p => ({
       ...p,
       [tool.name]: {
         loading: false,
-        text: res.ok ? text : null,
+        text: (res.ok && !isInternalErr) ? text : null,
         pdfB64: pdf ?? null,
-        error: res.ok ? null : (res.error ?? "Erro"),
+        error: isInternalErr ? text?.replace("⚠️ ", "") : (res.ok ? null : (res.error ?? "Erro")),
         ms: res.duracao_ms ?? null,
         blocked: res.blocked ?? false,
       },
     }));
 
-    if (res.ok)      toast.success(`${tool.description} — OK`);
-    else if (res.blocked) toast.warning("Acesso negado pelo SERPRO: " + res.error);
-    else             toast.error("Erro SERPRO: " + (res.error ?? "desconhecido"));
+    if (res.ok && !isInternalErr) toast.success(`${tool.description} — OK`);
+    else if (res.blocked)         toast.warning("Acesso negado pelo SERPRO: " + res.error);
+    else if (isInternalErr)       toast.warning("SERPRO: " + text?.replace("⚠️ ", ""));
+    else                          toast.error("Erro SERPRO: " + (res.error ?? "desconhecido"));
   }
 
   // ── filtrar tools por regime e categoria ──────────────────────────────

@@ -55,9 +55,18 @@ export function useSerpro() {
       .map((c) => c.text ?? "");
     if (texts.length === 0) return "Sem dados";
     try {
-      // Tentar parsear JSON para exibição bonita
-      const parsed = JSON.parse(texts.join(""));
-      return JSON.stringify(parsed, null, 2);
+      // O MCP retorna: {"ok": true, "result": <dados reais>}
+      // Desembrulhar para exibir só os dados reais
+      const outer = JSON.parse(texts.join(""));
+      // Se o result do MCP falhou, mostrar o erro
+      if (outer?.ok === false) {
+        return "⚠️ " + (outer?.error ?? "Acesso negado pelo SERPRO");
+      }
+      // Desembrulhar result
+      const inner = outer?.result ?? outer;
+      if (typeof inner === "string" && inner.trim() === "") return "Sem dados retornados";
+      if (typeof inner === "string") return inner;
+      return JSON.stringify(inner, null, 2);
     } catch {
       return texts.join("\n");
     }
@@ -71,8 +80,9 @@ export function useSerpro() {
       .map((c) => c.text ?? "");
     const combined = texts.join("");
     try {
-      const parsed = JSON.parse(combined);
-      return parsed?.pdf ?? parsed?.base64 ?? parsed?.result?.pdf ?? null;
+      const outer = JSON.parse(combined);
+      const inner = outer?.result ?? outer;
+      return inner?.pdf ?? inner?.base64 ?? outer?.result?.pdf ?? null;
     } catch {
       return null;
     }
