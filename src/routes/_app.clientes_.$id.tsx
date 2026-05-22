@@ -31,7 +31,8 @@ import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { TabServicos } from "@/components/cliente/TabServicos";
 import { TabContratos } from "@/components/cliente/TabContratos";
 import { TabDocumentos } from "@/components/cliente/TabDocumentos";
-import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
+import { TabFiscal } from "@/components/cliente/TabFiscal";
+import { TabFinanceiro } from "@/components/cliente/TabFinanceiro";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
   component: ClienteDetailPage,
@@ -144,7 +145,7 @@ function ClienteDetailPage() {
   const { obrigacoes } = useObrigacoes();
 
   const [tab, setTab]         = useState<Tab>("geral");
-  const [fiscalSub, setFiscalSub] = useState<"obrigacoes"|"serpro"|"nfse">("obrigacoes");
+
   const [editMode, setEditMode] = useState(false);
   const [form, setForm]         = useState<Partial<Cliente>>({});
   const [saving, setSaving]     = useState(false);
@@ -342,150 +343,21 @@ function ClienteDetailPage() {
 
       {/* ═════════════════════ ABA: FISCAL ═════════════════════ */}
       {tab === "fiscal" && (
-        <div className="space-y-4">
-          {/* Sub-tabs fiscais */}
-          <div className="flex gap-1 border-b border-border/60 pb-0">
-            {(["obrigacoes","serpro","nfse"] as const).map((sub) => (
-              <button
-                key={sub}
-                onClick={() => setFiscalSub(sub)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-                  fiscalSub === sub
-                    ? "border-primary text-primary bg-primary/5"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                }`}
-              >
-                {sub === "obrigacoes" ? "Obrigações" : sub === "serpro" ? "Consultas SERPRO" : "NFS-e Emitidas"}
-              </button>
-            ))}
-          </div>
-
-          {/* Sub-aba: Obrigações */}
-          {fiscalSub === "obrigacoes" && (
-            <div className="grid gap-5 lg:grid-cols-2">
-              <SectionCard title="Obrigações Fiscais" icon={FileText}>
-                {obgCliente.length === 0 ? (
-                  <p className="py-4 text-sm text-center text-muted-foreground">Nenhuma obrigação cadastrada</p>
-                ) : (
-                  <div className="divide-y divide-border/50">
-                    {obgCliente.slice(0, 10).map(o => (
-                      <div key={o.id} className="flex items-center justify-between py-2.5">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{o.tipo}</p>
-                          <p className="text-xs text-muted-foreground">Venc. {new Date(o.vencimento).toLocaleDateString("pt-BR")}</p>
-                        </div>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                          o.status === "concluida"  ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                          o.status === "atrasada"   ? "bg-red-50 text-red-700 border-red-200" :
-                          o.status === "em_andamento"?"bg-blue-50 text-blue-700 border-blue-200" :
-                                                      "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}>
-                          {o.status === "concluida" ? "Concluída" : o.status === "atrasada" ? "Atrasada" : o.status === "em_andamento" ? "Em andamento" : "Pendente"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
-
-              <SectionCard title="Configuração DAS" icon={Calendar}>
-                <InfoRow icon={Calendar}    label="Regime"             value={REGIME_LABEL[cliente.regime]} />
-                <InfoRow icon={Calendar}    label="Vencimento DAS"     value="Todo dia 20 do mês seguinte" />
-                <InfoRow icon={ShieldCheck} label="Tipo"               value={cliente.regime === "MEI" ? "DASMEI (Carnê MEI)" : "DAS — Simples Nacional"} />
-                <InfoRow icon={Zap}         label="Híbrido"            value={cliente.regimeHibrido ? "Sim — alíquotas separadas (Simples + ISS próprio)" : undefined} />
-              </SectionCard>
-
-              <SectionCard title="Dados para NFS-e" icon={ReceiptText}>
-                <InfoRow icon={Hash}        label="Código de Serviço"  value={cliente.codigoServicoNfse} />
-                <InfoRow icon={MapPin}      label="Município"          value={cliente.endereco?.municipio ?? cliente.municipio} />
-                <InfoRow icon={MapPin}      label="UF"                 value={cliente.endereco?.uf ?? cliente.uf} />
-                <InfoRow icon={Hash}        label="Insc. Municipal"    value={cliente.inscricaoMunicipal} />
-                <InfoRow icon={Zap}         label="Incentivo Fiscal"   value={cliente.temIncentivoFiscal ? "Sim — redução de alíquota aplicável" : "Não"} />
-              </SectionCard>
-
-              <SectionCard title="eSocial / Folha" icon={Users}>
-                <InfoRow icon={Users}       label="Tem Empregados"     value={cliente.temEmpregados ? "Sim — sujeito ao eSocial" : "Não"} />
-                {cliente.temEmpregados && <>
-                  <InfoRow icon={Calendar}  label="DCTFWeb"            value="Mensal — até dia 15" />
-                  <InfoRow icon={Calendar}  label="EFD-Contribuições"  value="Mensal — até o 2º dia útil do 2º mês seguinte" />
-                </>}
-              </SectionCard>
-            </div>
-          )}
-
-          {/* Sub-aba: Consultas SERPRO */}
-          {fiscalSub === "serpro" && (
-            <SerproClientePanel
-              cliente={{
-                id: cliente.id,
-                cnpj: cliente.cnpj,
-                cpf: cliente.cpf,
-                regime: (cliente.regime ?? "").toUpperCase().replace("SIMPLES","SIMPLES").replace("MEI","MEI"),
-                tem_certificado: (cliente as any).tem_certificado ?? false,
-                tem_procuracao: (cliente as any).tem_procuracao ?? false,
-              }}
-            />
-          )}
-
-          {/* Sub-aba: NFS-e Emitidas */}
-          {fiscalSub === "nfse" && (
-            <div className="surface-card p-6 flex flex-col items-center gap-3 text-center text-muted-foreground">
-              <ReceiptText className="h-10 w-10 opacity-30" />
-              <p className="text-sm font-medium">Integração NFE.io em implementação</p>
-              <p className="text-xs max-w-sm">
-                Em breve você poderá emitir, visualizar e baixar todas as NFS-e deste cliente diretamente aqui.
-              </p>
-            </div>
-          )}
-        </div>
+        <TabFiscal
+          cliente={{
+            ...cliente,
+            tem_certificado: (cliente as any).tem_certificado ?? false,
+            tem_procuracao:  (cliente as any).tem_procuracao  ?? false,
+          }}
+        />
       )}
 
-      {/* ═════════════════════ ABA: FINANCEIRO ═════════════════════ */}
+
       {tab === "financeiro" && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SectionCard title="Configuração Financeira" icon={DollarSign}>
-            <InfoRow icon={DollarSign}  label="Honorário Mensal"   value={fmtBRL(cliente.valorHonorario)} />
-            <InfoRow icon={Calendar}    label="Dia de Vencimento"  value={cliente.diaVencimento ? `Todo dia ${cliente.diaVencimento}` : undefined} />
-            <InfoRow icon={CreditCard}  label="Forma de Pagamento" value={cliente.formaPagamento} />
-            <InfoRow icon={User}        label="Responsável"        value={cliente.responsavel} />
-          </SectionCard>
-
-          <SectionCard title="Cobranças" icon={ReceiptText}>
-            {cobCliente.length === 0 ? (
-              <p className="py-4 text-sm text-center text-muted-foreground">Nenhuma cobrança registrada</p>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {cobCliente.slice(0, 8).map(c => (
-                  <div key={c.id} className="flex items-center justify-between py-2.5">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{fmtBRL(c.valor)}</p>
-                      <p className="text-xs text-muted-foreground">Venc. {new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
-                    </div>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                      c.status === "paga"     ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      c.status === "vencida"  ? "bg-red-50 text-red-700 border-red-200" :
-                      c.status === "cancelada"? "bg-slate-50 text-slate-500 border-slate-200" :
-                                                "bg-amber-50 text-amber-700 border-amber-200"
-                    }`}>
-                      {c.status === "paga" ? "Paga" : c.status === "vencida" ? "Vencida" : c.status === "cancelada" ? "Cancelada" : "Em aberto"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-
-          {/* Resumo financeiro */}
-          <div className="lg:col-span-2 grid gap-3 sm:grid-cols-4">
-            <KpiMini label="Honorário/mês"  value={fmtBRL(cliente.valorHonorario)} />
-            <KpiMini label="Total pago"     value={fmtBRL(totalPago)} tone="success" />
-            <KpiMini label="Em aberto"      value={fmtBRL(totalDevido)} tone={totalDevido > 0 ? "warning" : "neutral"} />
-            <KpiMini label="Cobranças"      value={cobCliente.length} sub={`${cobCliente.filter(c=>c.status==="paga").length} pagas`} />
-          </div>
-        </div>
+        <TabFinanceiro cliente={cliente} />
       )}
 
-      {/* ═════════════════════ ABA: CONTATO ═════════════════════ */}
+            {/* ═════════════════════ ABA: CONTATO ═════════════════════ */}
       {tab === "contato" && (
         <div className="grid gap-5 lg:grid-cols-2">
           <SectionCard title="Dados de Contato" icon={User}>

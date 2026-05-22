@@ -1,0 +1,692 @@
+/**
+ * TabFiscal — Aba Fiscal do cliente (refatorada)
+ *
+ * Sub-abas:
+ *   Resumo Fiscal  → dados fixos + status PGDAS/DAS/DTE (auto-fetch SERPRO)
+ *   NF Emitidas    → notas emitidas pela empresa (NFE.io)
+ *   NF Recebidas   → notas recebidas pela empresa
+ *   Emitir NFS-e   → formulário de emissão
+ *   Consultas      → acesso completo ao MCP SERPRO
+ *
+ * Filosofia: dados fixos já preenchidos, JSON nunca exposto ao usuário.
+ */
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  AlertTriangle, Calendar, CheckCircle2, ChevronDown, ChevronRight,
+  Clock, Download, FileCode2, FileText, Hash, Info, Loader2,
+  MapPin, Plus, Receipt, ReceiptText, RefreshCw, Search,
+  Send, ShieldCheck, Users, XCircle, Zap, Building2, Wifi, WifiOff,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useSerpro } from "@/hooks/use-serpro";
+import { useNfse, type NfseEmitida } from "@/hooks/use-nfse";
+import { useObrigacoes } from "@/hooks/use-obrigacoes";
+import { REGIME_LABEL, type Cliente } from "@/hooks/use-clientes";
+import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
+
+// ── helpers ────────────────────────────────────────────────────────────────
+const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
+const fmtDate = (d?: string | null) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
+
+function downloadBlob(b64: string, filename: string, mime: string) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── sub-tipos de tab ───────────────────────────────────────────────────────
+type FiscalTab = "resumo" | "emitidas" | "recebidas" | "emitir" | "serpro";
+
+const SUB_TABS: { id: FiscalTab; label: string }[] = [
+  { id: "resumo",   label: "Resumo Fiscal" },
+  { id: "emitidas", label: "NF Emitidas"   },
+  { id: "recebidas",label: "NF Recebidas"  },
+  { id: "emitir",   label: "Emitir NFS-e"  },
+  { id: "serpro",   label: "Consultas SERPRO" },
+];
+
+// ── badge inline ───────────────────────────────────────────────────────────
+function Pill({ cor, children }: { cor: "green"|"red"|"amber"|"gray"|"blue"; children: React.ReactNode }) {
+  const cls = {
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    red:   "bg-red-50 text-red-700 border-red-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    gray:  "bg-slate-50 text-slate-500 border-slate-200",
+    blue:  "bg-blue-50 text-blue-700 border-blue-200",
+  }[cor];
+  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{children}</span>;
+}
+
+// ── linha de dado ──────────────────────────────────────────────────────────
+function DataRow({ label, value, loading }: { label: string; value?: string | null; loading?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {loading
+        ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+        : <span className="text-sm font-medium text-foreground text-right">{value || "—"}</span>
+      }
+    </div>
+  );
+}
+
+// ── card de seção ──────────────────────────────────────────────────────────
+function FiscalCard({ title, icon: Icon, children, expandable, defaultOpen }: {
+  title: string; icon: any; children: React.ReactNode;
+  expandable?: boolean; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? !expandable);
+  return (
+    <div className="surface-card overflow-hidden">
+      <button
+        className={`w-full flex items-center justify-between px-4 py-3 text-left ${expandable ? "hover:bg-muted/30 transition-colors" : ""}`}
+        onClick={expandable ? () => setOpen(o => !o) : undefined}
+      >
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+        </div>
+        {expandable && (open
+          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
+// ── status item (PGDAS, DTE, etc.) ─────────────────────────────────────────
+function StatusItem({ label, ok, detail, loading }: {
+  label: string; ok: boolean | null; detail?: string; loading?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0">
+      <div>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {detail && <p className="text-[11px] text-muted-foreground mt-0.5">{detail}</p>}
+      </div>
+      {loading
+        ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        : ok === null
+          ? <Pill cor="gray">Verificando…</Pill>
+          : ok
+            ? <Pill cor="green">✓ Em dia</Pill>
+            : <Pill cor="red">Pendente</Pill>
+      }
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RESUMO FISCAL (auto-fetch SERPRO)
+// ────────────────────────────────────────────────────────────────────────────
+function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean } }) {
+  const { call } = useSerpro();
+  const { obrigacoes } = useObrigacoes();
+  const cnpj = (cliente.cnpj ?? "").replace(/\D/g, "");
+  const regime = (cliente.regime ?? "").toUpperCase()
+    .replace("SIMPLES NACIONAL", "SIMPLES")
+    .replace("SIMPLES", "SIMPLES");
+
+  const isMEI     = regime === "MEI";
+  const isSimples = regime.includes("SIMPLES");
+
+  const [dteStatus, setDteStatus]         = useState<boolean | null>(null);
+  const [dteLbl, setDteLbl]               = useState<string>("…");
+  const [pgdasOk, setPgdasOk]             = useState<boolean | null>(null);
+  const [pgdasDetail, setPgdasDetail]     = useState<string>("Verificando última declaração…");
+  const [regimeAnos, setRegimeAnos]       = useState<{ ano: number; regime: string }[]>([]);
+  const [loadingAuto, setLoadingAuto]     = useState(false);
+  const [autoFetched, setAutoFetched]     = useState(false);
+  const didRun = useRef(false);
+
+  const obgCliente = obrigacoes.filter(o => o.clienteId === cliente.id);
+  const obgAtrasada = obgCliente.filter(o => o.status === "atrasada").length;
+  const obgPendente = obgCliente.filter(o => o.status === "pendente").length;
+
+  const autoFetch = useCallback(async () => {
+    if (!cnpj || didRun.current) return;
+    didRun.current = true;
+    setLoadingAuto(true);
+
+    // DTE
+    const dteRes = await call("serpro_dte", { cnpj }, cliente.id);
+    if (dteRes.ok) {
+      try {
+        const content = (dteRes.content ?? [])[0]?.text ?? "{}";
+        const outer = JSON.parse(content);
+        const result = outer?.result ?? outer;
+        const status = result?.statusEnquadramento ?? "";
+        const ind    = result?.indicadorEnquadramento;
+        setDteStatus(ind === 2 || status.toLowerCase().includes("optante"));
+        setDteLbl(status || "Enquadrado");
+      } catch { setDteStatus(true); setDteLbl("Ativo"); }
+    } else {
+      setDteStatus(false); setDteLbl("Não verificado");
+    }
+
+    // Regime anos
+    const raRes = await call("serpro_regime_anos", { cnpj }, cliente.id);
+    if (raRes.ok) {
+      try {
+        const outer = JSON.parse((raRes.content ?? [])[0]?.text ?? "{}");
+        const list = outer?.result ?? [];
+        setRegimeAnos(list.slice(0, 4).map((a: any) => ({
+          ano: a.anoCalendario,
+          regime: a.regimeApurado === "COMPETENCIA" ? "Competência" : a.regimeApurado,
+        })));
+      } catch {}
+    }
+
+    // PGDAS (Simples) ou PGMEI
+    if (isSimples && !isMEI) {
+      const pgRes = await call("serpro_pgdas_ultima", { cnpj }, cliente.id);
+      if (pgRes.ok) {
+        try {
+          const outer = JSON.parse((pgRes.content ?? [])[0]?.text ?? "{}");
+          const result = outer?.result ?? outer;
+          if (!result || result === "" || (typeof result === "object" && Object.keys(result).length === 0)) {
+            setPgdasOk(true); setPgdasDetail("Sem pendências de declaração");
+          } else if (outer?.ok === false) {
+            setPgdasOk(false); setPgdasDetail(outer.error ?? "Erro ao verificar");
+          } else {
+            const periodo = result?.periodoApuracao ?? result?.periodo ?? "";
+            setPgdasOk(true); setPgdasDetail(periodo ? `Última declaração: ${periodo}` : "Declarações em dia");
+          }
+        } catch { setPgdasOk(null); setPgdasDetail("Não verificado"); }
+      } else {
+        setPgdasOk(null); setPgdasDetail("Verificação indisponível");
+      }
+    }
+
+    setLoadingAuto(false);
+    setAutoFetched(true);
+  }, [cnpj, isSimples, isMEI, cliente.id]);
+
+  useEffect(() => { if (cnpj) autoFetch(); }, [autoFetch]);
+
+  return (
+    <div className="space-y-4">
+      {/* KPIs rápidos */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Regime",      value: REGIME_LABEL[cliente.regime] ?? cliente.regime },
+          { label: "CNPJ",        value: cliente.cnpj || "—" },
+          { label: "Venc. DAS",   value: "Todo dia 20" },
+          { label: "Obrigações",  value: obgAtrasada > 0 ? `${obgAtrasada} atrasada${obgAtrasada>1?"s":""}` : obgPendente > 0 ? `${obgPendente} pendente${obgPendente>1?"s":""}` : "Em dia" },
+        ].map(k => (
+          <div key={k.label} className="surface-card px-4 py-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{k.label}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Status Federal (auto-fetch) */}
+        <FiscalCard title="Status Federal — SERPRO" icon={ShieldCheck} defaultOpen>
+          {loadingAuto && !autoFetched && (
+            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Consultando Receita Federal…
+            </div>
+          )}
+          <StatusItem
+            label="DTE — Domicílio Tributário Eletrônico"
+            ok={dteStatus}
+            detail={dteLbl !== "…" ? dteLbl : undefined}
+            loading={loadingAuto && dteStatus === null}
+          />
+          {(isSimples && !isMEI) && (
+            <StatusItem
+              label="PGDAS-D — Última Declaração"
+              ok={pgdasOk}
+              detail={pgdasDetail}
+              loading={loadingAuto && pgdasOk === null}
+            />
+          )}
+          <StatusItem
+            label="Obrigações na APOYA"
+            ok={obgAtrasada === 0}
+            detail={obgAtrasada > 0 ? `${obgAtrasada} em atraso` : obgPendente > 0 ? `${obgPendente} pendentes` : "Todas em dia"}
+          />
+          {autoFetched && (
+            <button
+              className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => { didRun.current = false; setDteStatus(null); setPgdasOk(null); setRegimeAnos([]); setAutoFetched(false); autoFetch(); }}
+            >
+              <RefreshCw className="h-3 w-3" /> Atualizar consultas
+            </button>
+          )}
+        </FiscalCard>
+
+        {/* Dados fiscais fixos */}
+        <FiscalCard title="Configuração Fiscal" icon={FileText} defaultOpen>
+          <DataRow label="Tipo DAS"       value={isMEI ? "DASMEI (Carnê MEI)" : isSimples ? "DAS — Simples Nacional" : "—"} />
+          <DataRow label="Regime Híbrido" value={cliente.regimeHibrido ? "Sim — alíquotas separadas" : "Não"} />
+          <DataRow label="Município"      value={cliente.municipio ?? cliente.endereco?.municipio} />
+          <DataRow label="Cód. Serviço NFS-e" value={cliente.codigoServicoNfse} />
+          <DataRow label="Insc. Municipal" value={cliente.inscricaoMunicipal} />
+          <DataRow label="Alíquota ISS"  value={cliente.aliquotaIss ? `${cliente.aliquotaIss}%` : undefined} />
+          <DataRow label="Incentivo Fiscal" value={cliente.temIncentivoFiscal ? "Sim — redução de alíquota" : "Não"} />
+        </FiscalCard>
+
+        {/* Histórico de regime (SERPRO) */}
+        {regimeAnos.length > 0 && (
+          <FiscalCard title="Histórico de Regime — SERPRO" icon={Calendar} expandable>
+            {regimeAnos.map(r => (
+              <DataRow key={r.ano} label={String(r.ano)} value={r.regime} />
+            ))}
+          </FiscalCard>
+        )}
+
+        {/* eSocial */}
+        <FiscalCard title="eSocial / Folha" icon={Users} defaultOpen>
+          <DataRow label="Tem Empregados" value={cliente.temEmpregados ? "Sim — sujeito ao eSocial" : "Não"} />
+          {cliente.temEmpregados && <>
+            <DataRow label="DCTFWeb"         value="Mensal — até dia 15" />
+            <DataRow label="EFD-Contribuições" value="Mensal — até o 2º dia útil do 2º mês seguinte" />
+          </>}
+        </FiscalCard>
+
+        {/* Obrigações deste cliente (expandível) */}
+        {obgCliente.length > 0 && (
+          <FiscalCard title={`Obrigações (${obgCliente.length})`} icon={Clock} expandable defaultOpen={obgAtrasada > 0}>
+            <div className="divide-y divide-border/40">
+              {obgCliente.map(o => (
+                <div key={o.id} className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{o.tipo}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {o.competencia} · Venc. {fmtDate(o.vencimento)}
+                    </p>
+                  </div>
+                  <Pill cor={o.status === "concluida" ? "green" : o.status === "atrasada" ? "red" : o.status === "em_andamento" ? "blue" : "amber"}>
+                    {o.status === "concluida" ? "Concluída" : o.status === "atrasada" ? "Atrasada" : o.status === "em_andamento" ? "Em andamento" : "Pendente"}
+                  </Pill>
+                </div>
+              ))}
+            </div>
+          </FiscalCard>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// NF EMITIDAS
+// ────────────────────────────────────────────────────────────────────────────
+function NfEmitidas({ cliente }: { cliente: Cliente }) {
+  const { listarEmitidas, baixarPdf, baixarXml, cancelar, loading } = useNfse();
+  const [notas, setNotas] = useState<NfseEmitida[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const [query, setQuery] = useState("");
+  const now = new Date();
+  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [ano, setAno] = useState(now.getFullYear());
+
+  const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+
+  const load = useCallback(async () => {
+    setFetching(true);
+    setNotas(await listarEmitidas(cliente.id, competencia));
+    setFetching(false);
+  }, [cliente.id, competencia]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtradas = notas.filter(n => {
+    const q = query.trim().toLowerCase();
+    return !q || `${n.tomador_nome} ${n.numero}`.toLowerCase().includes(q);
+  });
+
+  async function handlePdf(n: NfseEmitida) {
+    const b64 = await baixarPdf(n.id, n.nfseio_id);
+    if (b64) downloadBlob(b64, `NFS-e_${n.numero ?? n.id}.pdf`, "application/pdf");
+  }
+
+  const STATUS_COR: Record<string, "green"|"blue"|"gray"|"red"> = {
+    emitida: "green", processando: "blue", rascunho: "gray", cancelada: "gray", erro: "red"
+  };
+  const STATUS_LBL: Record<string, string> = {
+    emitida: "Emitida", processando: "Processando", rascunho: "Rascunho", cancelada: "Cancelada", erro: "Erro"
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtro */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <select className="h-8 rounded border border-input bg-background px-2 text-sm"
+          value={mes} onChange={e => setMes(Number(e.target.value))}>
+          {["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].map((m,i) => (
+            <option key={i} value={i+1}>{m}</option>
+          ))}
+        </select>
+        <select className="h-8 rounded border border-input bg-background px-2 text-sm"
+          value={ano} onChange={e => setAno(Number(e.target.value))}>
+          {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <div className="relative flex-1 min-w-36">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input className="pl-8 h-8 text-sm" placeholder="Buscar por tomador…" value={query} onChange={e => setQuery(e.target.value)} />
+        </div>
+        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={load} disabled={fetching}>
+          <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+
+      {/* Tabela */}
+      {fetching ? (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando…</span>
+        </div>
+      ) : filtradas.length === 0 ? (
+        <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+          <ReceiptText className="h-8 w-8 opacity-30" />
+          <p className="text-sm">Nenhuma NFS-e emitida neste período</p>
+        </div>
+      ) : (
+        <div className="surface-card overflow-hidden">
+          <table className="ft-table w-full">
+            <thead>
+              <tr>
+                <th className="w-14">#</th>
+                <th>Tomador</th>
+                <th className="w-24">Competência</th>
+                <th className="w-24">Emissão</th>
+                <th className="w-28 text-right">Valor</th>
+                <th className="w-24">Status</th>
+                <th className="w-20"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtradas.map(n => (
+                <tr key={n.id}>
+                  <td className="text-muted-foreground">{n.numero ?? "—"}</td>
+                  <td>
+                    <p className="font-medium truncate max-w-[160px]">{n.tomador_nome ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{n.tomador_cnpj_cpf ?? ""}</p>
+                  </td>
+                  <td>{n.competencia ?? "—"}</td>
+                  <td>{fmtDate(n.data_emissao)}</td>
+                  <td className="text-right font-medium">{fmtBRL(n.valor_servico)}</td>
+                  <td><Pill cor={STATUS_COR[n.status] ?? "gray"}>{STATUS_LBL[n.status] ?? n.status}</Pill></td>
+                  <td>
+                    <div className="flex gap-1 justify-end">
+                      <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="PDF" onClick={() => handlePdf(n)}>
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                      {n.status === "emitida" && (
+                        <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-red-50 text-muted-foreground hover:text-red-600" title="Cancelar"
+                          onClick={async () => { if (confirm(`Cancelar NFS-e #${n.numero}?`)) { await cancelar(n.id); load(); } }}>
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-4 py-2 border-t border-border/40 text-xs text-muted-foreground">
+            {filtradas.length} nota{filtradas.length !== 1 ? "s" : ""} · Total: {fmtBRL(filtradas.reduce((s,n) => s + (n.valor_servico ?? 0), 0))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// NF RECEBIDAS
+// ────────────────────────────────────────────────────────────────────────────
+function NfRecebidas({ cliente }: { cliente: Cliente }) {
+  const { listarRecebidas, sincronizarRecebidas, loading } = useNfse();
+  const [notas, setNotas] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const now = new Date();
+  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [ano, setAno] = useState(now.getFullYear());
+  const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
+
+  const load = useCallback(async () => {
+    setFetching(true);
+    setNotas(await listarRecebidas(cliente.id, competencia));
+    setFetching(false);
+  }, [cliente.id, competencia]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleSync() {
+    if (!cliente.cnpj) { toast.error("CNPJ não cadastrado"); return; }
+    await sincronizarRecebidas(cliente.id, cliente.cnpj.replace(/\D/g,""));
+    load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 items-center">
+        <select className="h-8 rounded border border-input bg-background px-2 text-sm"
+          value={mes} onChange={e => setMes(Number(e.target.value))}>
+          {["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].map((m,i) => (
+            <option key={i} value={i+1}>{m}</option>
+          ))}
+        </select>
+        <select className="h-8 rounded border border-input bg-background px-2 text-sm"
+          value={ano} onChange={e => setAno(Number(e.target.value))}>
+          {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={handleSync} disabled={loading}>
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Sincronizar
+        </Button>
+      </div>
+
+      {fetching ? (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando…</span>
+        </div>
+      ) : notas.length === 0 ? (
+        <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+          <Receipt className="h-8 w-8 opacity-30" />
+          <p className="text-sm">Nenhuma NFS-e recebida neste período</p>
+          <p className="text-xs">Clique em "Sincronizar" para buscar notas via CNPJ</p>
+        </div>
+      ) : (
+        <div className="surface-card overflow-hidden">
+          <table className="ft-table w-full">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Prestador</th>
+                <th className="w-24">Competência</th>
+                <th className="w-28 text-right">Valor</th>
+                <th className="w-20">Fonte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notas.map(n => (
+                <tr key={n.id}>
+                  <td className="text-muted-foreground">{n.numero ?? "—"}</td>
+                  <td>
+                    <p className="font-medium truncate max-w-[180px]">{n.prestador_nome ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{n.prestador_cnpj ?? ""}</p>
+                  </td>
+                  <td>{n.competencia ?? "—"}</td>
+                  <td className="text-right font-medium">{fmtBRL(n.valor_servico)}</td>
+                  <td><Pill cor={n.fonte === "nfeio" ? "blue" : "gray"}>{n.fonte}</Pill></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// EMITIR NFS-e (formulário inline)
+// ────────────────────────────────────────────────────────────────────────────
+function EmitirNfse({ cliente }: { cliente: Cliente }) {
+  const { emitir, loading } = useNfse();
+  const now = new Date();
+  const [form, setForm] = useState({
+    description: "",
+    servicesAmount: "",
+    cityServiceCode: cliente.codigoServicoNfse ?? "",
+    issRate: String(cliente.aliquotaIss ?? "2"),
+    competencia: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`,
+    tomadorNome: "", tomadorCnpj: "", tomadorEmail: "",
+    tomadorUf: cliente.municipio ? (cliente.uf ?? "SP") : "SP",
+    tomadorCidade: cliente.municipio ?? "São Paulo",
+    tomadorCidadeCodigo: (cliente as any).codigo_municipio_ibge ?? "3550308",
+  });
+
+  async function handleEmitir() {
+    if (!form.description || !form.servicesAmount) {
+      toast.error("Preencha a descrição e o valor"); return;
+    }
+    const result = await emitir(cliente.id, {
+      description: form.description,
+      servicesAmount: parseFloat(form.servicesAmount.replace(",",".")),
+      cityServiceCode: form.cityServiceCode,
+      issRate: parseFloat(form.issRate) / 100 || 0,
+      competencia: form.competencia,
+      borrower: {
+        name: form.tomadorNome || cliente.razaoSocial,
+        federalTaxNumber: form.tomadorCnpj.replace(/\D/g,"") || (cliente.cnpj ?? "").replace(/\D/g,""),
+        email: form.tomadorEmail || undefined,
+        address: {
+          country: "BRA", state: form.tomadorUf,
+          city: { code: form.tomadorCidadeCodigo, name: form.tomadorCidade },
+        },
+      },
+    } as any);
+    if (result) setForm(p => ({ ...p, description: "", servicesAmount: "" }));
+  }
+
+  return (
+    <div className="max-w-xl space-y-4">
+      <div className="surface-card p-4 space-y-4">
+        <p className="text-sm font-semibold text-foreground">Dados do Serviço</p>
+        <div>
+          <Label className="text-xs mb-1 block">Descrição do Serviço *</Label>
+          <Textarea rows={2} value={form.description}
+            onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+            placeholder="Serviços de contabilidade — mês de referência…" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs mb-1 block">Valor (R$) *</Label>
+            <Input value={form.servicesAmount}
+              onChange={e => setForm(p => ({ ...p, servicesAmount: e.target.value }))}
+              placeholder="1.500,00" />
+          </div>
+          <div>
+            <Label className="text-xs mb-1 block">Competência</Label>
+            <Input type="month" value={form.competencia}
+              onChange={e => setForm(p => ({ ...p, competencia: e.target.value }))} />
+          </div>
+          <div>
+            <Label className="text-xs mb-1 block">Cód. Serviço LC116</Label>
+            <Input value={form.cityServiceCode}
+              onChange={e => setForm(p => ({ ...p, cityServiceCode: e.target.value }))}
+              placeholder="17.19" />
+          </div>
+          <div>
+            <Label className="text-xs mb-1 block">Alíquota ISS (%)</Label>
+            <Input value={form.issRate}
+              onChange={e => setForm(p => ({ ...p, issRate: e.target.value }))}
+              placeholder="2" />
+          </div>
+        </div>
+      </div>
+
+      <div className="surface-card p-4 space-y-3">
+        <p className="text-sm font-semibold text-foreground">Tomador do Serviço</p>
+        <p className="text-xs text-muted-foreground">Se vazio, usa os dados cadastrados do cliente.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Label className="text-xs mb-1 block">Razão Social / Nome</Label>
+            <Input value={form.tomadorNome}
+              onChange={e => setForm(p => ({ ...p, tomadorNome: e.target.value }))}
+              placeholder={cliente.razaoSocial} />
+          </div>
+          <div>
+            <Label className="text-xs mb-1 block">CNPJ / CPF</Label>
+            <Input value={form.tomadorCnpj}
+              onChange={e => setForm(p => ({ ...p, tomadorCnpj: e.target.value }))}
+              placeholder={cliente.cnpj ?? "—"} />
+          </div>
+          <div>
+            <Label className="text-xs mb-1 block">E-mail</Label>
+            <Input value={form.tomadorEmail}
+              onChange={e => setForm(p => ({ ...p, tomadorEmail: e.target.value }))}
+              placeholder={cliente.email ?? "—"} />
+          </div>
+        </div>
+      </div>
+
+      <Button className="gap-2 w-full" onClick={handleEmitir} disabled={loading}>
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        Emitir Nota Fiscal
+      </Button>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// COMPONENTE PRINCIPAL
+// ────────────────────────────────────────────────────────────────────────────
+export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean } }) {
+  const [sub, setSub] = useState<FiscalTab>("resumo");
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-0.5 border-b border-border/60 overflow-x-auto">
+        {SUB_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
+              sub === t.id
+                ? "border-primary text-primary bg-primary/5"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {sub === "resumo"    && <ResumoFiscal   cliente={cliente} />}
+      {sub === "emitidas"  && <NfEmitidas     cliente={cliente} />}
+      {sub === "recebidas" && <NfRecebidas    cliente={cliente} />}
+      {sub === "emitir"    && <EmitirNfse     cliente={cliente} />}
+      {sub === "serpro"    && (
+        <SerproClientePanel
+          cliente={{
+            id: cliente.id,
+            cnpj: cliente.cnpj,
+            cpf: cliente.cpf,
+            regime: (cliente.regime ?? "").toUpperCase(),
+            tem_certificado: (cliente as any).tem_certificado ?? false,
+            tem_procuracao:  (cliente as any).tem_procuracao  ?? false,
+          }}
+        />
+      )}
+    </div>
+  );
+}

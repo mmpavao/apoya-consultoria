@@ -1,0 +1,329 @@
+/**
+ * TabFinanceiro — Aba Financeiro do cliente (refatorada)
+ *
+ * Sub-abas:
+ *   Resumo       → KPIs + configuração + resumo de cobranças
+ *   Cobranças    → lista completa de cobranças com status
+ *   Honorários   → histórico e configuração de honorários
+ *   Pagamentos   → histórico de pagamentos realizados
+ */
+import { useState, useMemo } from "react";
+import {
+  Calendar, CheckCircle2, Clock, CreditCard, DollarSign,
+  Hash, Loader2, Search, TrendingUp, User, XCircle, ReceiptText,
+  ArrowDownRight, ArrowUpRight, AlertCircle,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useCobrancas } from "@/hooks/use-cobrancas";
+import type { Cliente } from "@/hooks/use-clientes";
+import type { Cobranca } from "@/hooks/use-cobrancas";
+
+// ── helpers ────────────────────────────────────────────────────────────────
+const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
+const fmtDate = (d?: string | null) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
+
+// ── sub-tabs ───────────────────────────────────────────────────────────────
+type FinTab = "resumo" | "cobrancas" | "honorarios" | "pagamentos";
+const FIN_TABS: { id: FinTab; label: string }[] = [
+  { id: "resumo",      label: "Resumo"       },
+  { id: "cobrancas",   label: "Cobranças"    },
+  { id: "honorarios",  label: "Honorários"   },
+  { id: "pagamentos",  label: "Pagamentos"   },
+];
+
+// ── pill ───────────────────────────────────────────────────────────────────
+function Pill({ cor, children }: { cor: "green"|"red"|"amber"|"gray"|"blue"; children: React.ReactNode }) {
+  const cls = {
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    red:   "bg-red-50 text-red-700 border-red-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    gray:  "bg-slate-50 text-slate-500 border-slate-200",
+    blue:  "bg-blue-50 text-blue-700 border-blue-200",
+  }[cor];
+  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{children}</span>;
+}
+
+// ── linha de dado ──────────────────────────────────────────────────────────
+function DataRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground text-right">{value || "—"}</span>
+    </div>
+  );
+}
+
+// ── card ───────────────────────────────────────────────────────────────────
+function FinCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <div className="surface-card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+      </div>
+      <div className="px-4 py-3">{children}</div>
+    </div>
+  );
+}
+
+// ── tabela de cobranças reutilizável ───────────────────────────────────────
+function TabelaCobrancas({ cobrancas }: { cobrancas: Cobranca[] }) {
+  const [query, setQuery] = useState("");
+
+  const STATUS_COR: Record<string, "green"|"red"|"amber"|"gray"> = {
+    paga:"green", vencida:"red", pendente:"amber", cancelada:"gray"
+  };
+  const STATUS_LBL: Record<string, string> = {
+    paga:"Paga", vencida:"Vencida", pendente:"Em aberto", cancelada:"Cancelada"
+  };
+
+  const filtradas = cobrancas.filter(c => {
+    const q = query.trim().toLowerCase();
+    return !q || `${c.descricao} ${c.competencia}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input className="pl-8 h-8 text-sm" placeholder="Buscar por descrição, competência…"
+          value={query} onChange={e => setQuery(e.target.value)} />
+      </div>
+
+      {filtradas.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+          <ReceiptText className="h-8 w-8 opacity-30" />
+          <p className="text-sm">Nenhuma cobrança encontrada</p>
+        </div>
+      ) : (
+        <div className="surface-card overflow-hidden">
+          <table className="ft-table w-full">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th className="w-24">Competência</th>
+                <th className="w-28 text-right">Valor</th>
+                <th className="w-28">Vencimento</th>
+                <th className="w-24">Status</th>
+                <th className="w-24">Pago em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtradas.map(c => (
+                <tr key={c.id} className={c.status === "vencida" ? "bg-red-50/30" : ""}>
+                  <td>
+                    <p className="font-medium">{c.descricao}</p>
+                    <p className="text-xs text-muted-foreground">{c.forma}</p>
+                  </td>
+                  <td>{c.competencia}</td>
+                  <td className="text-right font-semibold">{fmtBRL(c.valor)}</td>
+                  <td>{fmtDate(c.vencimento)}</td>
+                  <td><Pill cor={STATUS_COR[c.status] ?? "gray"}>{STATUS_LBL[c.status] ?? c.status}</Pill></td>
+                  <td className="text-muted-foreground">{fmtDate(c.pagoEm)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-4 py-2 border-t border-border/40 text-xs text-muted-foreground">
+            {filtradas.length} cobranças · Total: {fmtBRL(filtradas.reduce((s,c) => s + c.valor, 0))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// COMPONENTE PRINCIPAL
+// ────────────────────────────────────────────────────────────────────────────
+export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
+  const { cobrancas, loading } = useCobrancas();
+  const [sub, setSub] = useState<FinTab>("resumo");
+
+  const cobCliente = useMemo(() =>
+    cobrancas.filter(c => c.clienteId === cliente.id),
+    [cobrancas, cliente.id]
+  );
+
+  const totalPago    = useMemo(() => cobCliente.filter(c => c.status === "paga").reduce((s,c) => s + c.valor, 0), [cobCliente]);
+  const totalDevido  = useMemo(() => cobCliente.filter(c => c.status === "pendente").reduce((s,c) => s + c.valor, 0), [cobCliente]);
+  const totalVencido = useMemo(() => cobCliente.filter(c => c.status === "vencida").reduce((s,c) => s + c.valor, 0), [cobCliente]);
+
+  const pagas    = cobCliente.filter(c => c.status === "paga");
+  const pendentes= cobCliente.filter(c => c.status === "pendente");
+  const vencidas = cobCliente.filter(c => c.status === "vencida");
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+      <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando financeiro…</span>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-0.5 border-b border-border/60 overflow-x-auto">
+        {FIN_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
+              sub === t.id
+                ? "border-primary text-primary bg-primary/5"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            {t.label}
+            {t.id === "cobrancas" && vencidas.length > 0 && (
+              <span className="ml-1.5 text-[10px] font-bold px-1 py-0.5 rounded-full bg-red-100 text-red-600">
+                {vencidas.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── RESUMO ── */}
+      {sub === "resumo" && (
+        <div className="space-y-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="surface-card px-4 py-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Honorário/mês</p>
+              <p className="text-lg font-bold text-foreground">{fmtBRL(cliente.valorHonorario)}</p>
+            </div>
+            <div className="surface-card px-4 py-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Total pago</p>
+              <p className="text-lg font-bold text-emerald-600">{fmtBRL(totalPago)}</p>
+              <p className="text-[11px] text-muted-foreground">{pagas.length} cobranças</p>
+            </div>
+            <div className="surface-card px-4 py-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Em aberto</p>
+              <p className={`text-lg font-bold ${totalDevido > 0 ? "text-amber-600" : "text-foreground"}`}>{fmtBRL(totalDevido)}</p>
+              <p className="text-[11px] text-muted-foreground">{pendentes.length} pendentes</p>
+            </div>
+            <div className="surface-card px-4 py-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Vencido</p>
+              <p className={`text-lg font-bold ${totalVencido > 0 ? "text-red-600" : "text-foreground"}`}>{fmtBRL(totalVencido)}</p>
+              <p className="text-[11px] text-muted-foreground">{vencidas.length} vencidas</p>
+            </div>
+          </div>
+
+          {/* Alerta se inadimplente */}
+          {vencidas.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-700">Cliente com cobranças vencidas</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  {vencidas.length} cobrança{vencidas.length > 1 ? "s" : ""} em atraso · Total: {fmtBRL(totalVencido)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Configuração */}
+            <FinCard title="Configuração" icon={DollarSign}>
+              <DataRow label="Honorário Mensal"  value={fmtBRL(cliente.valorHonorario)} />
+              <DataRow label="Dia de Vencimento" value={cliente.diaVencimento ? `Todo dia ${cliente.diaVencimento}` : undefined} />
+              <DataRow label="Forma de Pagamento" value={cliente.formaPagamento} />
+              <DataRow label="Responsável"        value={cliente.responsavel} />
+            </FinCard>
+
+            {/* Últimas cobranças */}
+            <FinCard title="Últimas Cobranças" icon={ReceiptText}>
+              {cobCliente.length === 0 ? (
+                <p className="text-sm text-center text-muted-foreground py-3">Nenhuma cobrança registrada</p>
+              ) : (
+                <div className="divide-y divide-border/40">
+                  {cobCliente.slice(0, 6).map(c => (
+                    <div key={c.id} className="flex items-center justify-between py-2">
+                      <div>
+                        <p className="text-sm font-medium">{fmtBRL(c.valor)}</p>
+                        <p className="text-xs text-muted-foreground">{c.competencia} · Venc. {fmtDate(c.vencimento)}</p>
+                      </div>
+                      <Pill cor={c.status === "paga" ? "green" : c.status === "vencida" ? "red" : c.status === "cancelada" ? "gray" : "amber"}>
+                        {c.status === "paga" ? "Paga" : c.status === "vencida" ? "Vencida" : c.status === "cancelada" ? "Cancelada" : "Em aberto"}
+                      </Pill>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cobCliente.length > 6 && (
+                <button className="w-full mt-2 text-xs text-primary hover:underline" onClick={() => setSub("cobrancas")}>
+                  Ver todas as {cobCliente.length} cobranças →
+                </button>
+              )}
+            </FinCard>
+          </div>
+        </div>
+      )}
+
+      {/* ── COBRANÇAS ── */}
+      {sub === "cobrancas" && <TabelaCobrancas cobrancas={cobCliente} />}
+
+      {/* ── HONORÁRIOS ── */}
+      {sub === "honorarios" && (
+        <div className="max-w-md space-y-4">
+          <FinCard title="Configuração de Honorários" icon={DollarSign}>
+            <DataRow label="Valor Mensal"       value={fmtBRL(cliente.valorHonorario)} />
+            <DataRow label="Dia de Vencimento"  value={cliente.diaVencimento ? `Dia ${cliente.diaVencimento}` : undefined} />
+            <DataRow label="Forma de Pagamento" value={cliente.formaPagamento} />
+            <DataRow label="Tier / Plano"       value={(cliente as any).tier} />
+          </FinCard>
+          <FinCard title="Histórico de Pagamento" icon={TrendingUp}>
+            {pagas.length === 0 ? (
+              <p className="text-sm text-center text-muted-foreground py-3">Nenhum pagamento registrado</p>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {pagas.map(c => (
+                  <div key={c.id} className="flex items-center justify-between py-2">
+                    <div>
+                      <p className="text-sm font-medium">{c.competencia}</p>
+                      <p className="text-xs text-muted-foreground">Pago em {fmtDate(c.pagoEm)}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-emerald-600">{fmtBRL(c.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </FinCard>
+        </div>
+      )}
+
+      {/* ── PAGAMENTOS ── */}
+      {sub === "pagamentos" && (
+        <div className="space-y-4">
+          {/* Totalizadores */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="surface-card px-4 py-3 flex items-center gap-3">
+              <ArrowUpRight className="h-5 w-5 text-emerald-500 shrink-0" />
+              <div>
+                <p className="text-[11px] text-muted-foreground">Recebido</p>
+                <p className="text-base font-bold text-emerald-600">{fmtBRL(totalPago)}</p>
+              </div>
+            </div>
+            <div className="surface-card px-4 py-3 flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+              <div>
+                <p className="text-[11px] text-muted-foreground">Pendente</p>
+                <p className="text-base font-bold text-amber-600">{fmtBRL(totalDevido)}</p>
+              </div>
+            </div>
+            <div className="surface-card px-4 py-3 flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+              <div>
+                <p className="text-[11px] text-muted-foreground">Vencido</p>
+                <p className="text-base font-bold text-red-600">{fmtBRL(totalVencido)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabela completa */}
+          <TabelaCobrancas cobrancas={cobCliente} />
+        </div>
+      )}
+    </div>
+  );
+}
