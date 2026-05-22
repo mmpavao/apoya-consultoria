@@ -3,7 +3,8 @@
   "name": "apoya-gestao",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": [
-    "nodejs_compat"
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
   ],
   "main": "src/server.ts",
   "assets": {

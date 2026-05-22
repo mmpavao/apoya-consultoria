@@ -1,124 +1,151 @@
 /**
- * Hook: useWaInstances
- * Gerencia instâncias Evolution via server functions.
- * Usa supabaseAdmin na server fn (sem RLS) → sem loading infinito.
+ * Hook de gerenciamento de instâncias WhatsApp.
+ * Usa API routes (/api/wa/instances) em vez de server fns para garantir
+ * compatibilidade com Cloudflare Workers SSR.
  */
-import { useEffect, useState, useCallback } from "react";
-import { useRealtimeTable } from "@/lib/realtime-singleton";
-import { useServerFn } from "@tanstack/react-start";
-import {
-  listInstances,
-  createInstance,
-  connectInstance,
-  refreshStatus,
-  deleteInstance,
-  logoutInstance,
-} from "@/lib/whatsapp/instance.functions";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
-export interface WaInstance {
+export type WaInstanceStatus =
+  | "creating" | "connecting" | "connected" | "disconnected" | "error";
+
+export type WaInstance = {
   id: string;
   nome: string;
   display_name: string;
   departamentos: string[];
   numero: string | null;
-  status: "created" | "creating" | "connecting" | "connected" | "disconnected";
+  status: WaInstanceStatus;
   qr_code: string | null;
   last_qr_at: string | null;
   last_connected_at: string | null;
   created_at: string;
+};
+
+// ─── helper de fetch autenticado ──────────────────────────────────────────
+
+async function waApi(
+  method: "GET" | "POST",
+  token: string,
+  body?: object,
+): Promise<any> {
+  const res = await fetch("/api/wa/instances", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+  return data;
 }
 
+// ─── hook principal ───────────────────────────────────────────────────────
+
 export function useWaInstances() {
+  const { session } = useAuth();
+  const token = session?.access_token ?? null;
+
   const [instances, setInstances] = useState<WaInstance[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [creating, setCreating]   = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fnList    = useServerFn(listInstances);
-  const fnCreate  = useServerFn(createInstance);
-  const fnConnect = useServerFn(connectInstance);
-  const fnRefresh = useServerFn(refreshStatus);
-  const fnDelete  = useServerFn(deleteInstance);
-  const fnLogout  = useServerFn(logoutInstance);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchInstances = useCallback(async () => {
+    if (!token) return;
     try {
-      const r = await fnList();
-      setInstances((r.instances ?? []) as WaInstance[]);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao carregar instâncias";
-      console.error("[useWaInstances] reload error:", msg);
-      setError(msg);
-      setInstances([]);
+      setLoading(true);
+      const data = await waApi("GET", token);
+      setInstances(data.instances ?? []);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message ?? "Erro ao carregar instâncias");
     } finally {
       setLoading(false);
     }
-  }, [fnList]);
+  }, [token]);
 
-  // Carregamento inicial
-  useEffect(() => { reload(); }, [reload]);
+  // Polling: atualiza a cada 8 segundos enquanto há instância em connecting/creating
+  useEffect(() => {
+    fetchInstances();
+  }, [fetchInstances]);
 
-  // Realtime: recarrega quando wa_instance mudar
-  useRealtimeTable("wa_instance", reload);
+  useEffect(() => {
+    const hasActiveInstance = instances.some(
+      (i) => i.status === "connecting" || i.status === "creating",
+    );
+    if (hasActiveInstance) {
+      pollingRef.current = setInterval(fetchInstances, 8000);
+    } else {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [instances, fetchInstances]);
+
+  // ── ações ──────────────────────────────────────────────────────────────
+
+  const createInstance = useCallback(
+    async (displayName: string, departamentos: string[]) => {
+      if (!token) throw new Error("Não autenticado");
+      const data = await waApi("POST", token, { action: "create", displayName, departamentos });
+      await fetchInstances();
+      return data;
+    },
+    [token, fetchInstances],
+  );
+
+  const connectInstance = useCallback(
+    async (instanceId: string) => {
+      if (!token) throw new Error("Não autenticado");
+      const data = await waApi("POST", token, { action: "connect", instanceId });
+      await fetchInstances();
+      return data;
+    },
+    [token, fetchInstances],
+  );
+
+  const refreshStatus = useCallback(
+    async (instanceId: string) => {
+      if (!token) throw new Error("Não autenticado");
+      const data = await waApi("POST", token, { action: "refresh", instanceId });
+      await fetchInstances();
+      return data;
+    },
+    [token, fetchInstances],
+  );
+
+  const logoutInstance = useCallback(
+    async (instanceId: string) => {
+      if (!token) throw new Error("Não autenticado");
+      await waApi("POST", token, { action: "logout", instanceId });
+      await fetchInstances();
+    },
+    [token, fetchInstances],
+  );
+
+  const deleteInstance = useCallback(
+    async (instanceId: string) => {
+      if (!token) throw new Error("Não autenticado");
+      await waApi("POST", token, { action: "delete", instanceId });
+      setInstances((prev) => prev.filter((i) => i.id !== instanceId));
+    },
+    [token],
+  );
 
   return {
     instances,
     loading,
     error,
-    creating,
-    reload,
-
-    async create(displayName: string, departamentos: string[]) {
-      setCreating(true);
-      try {
-        const r = await fnCreate({ data: { displayName, departamentos } });
-        await reload();
-        return r;
-      } finally {
-        setCreating(false);
-      }
-    },
-
-    async connect(instanceId: string) {
-      try {
-        const r = await fnConnect({ data: { instanceId } });
-        setInstances((cur) =>
-          cur.map((inst) =>
-            inst.id === instanceId
-              ? {
-                  ...inst,
-                  status: r.connected ? "connected" : "connecting",
-                  qr_code: r.qr ?? inst.qr_code,
-                  last_qr_at: r.qr ? new Date().toISOString() : inst.last_qr_at,
-                }
-              : inst,
-          ),
-        );
-        await reload();
-        return r;
-      } catch (e) {
-        await reload();
-        throw e;
-      }
-    },
-
-    async refresh(instanceId: string) {
-      try {
-        await fnRefresh({ data: { instanceId } });
-      } catch { /* ignore */ }
-      await reload();
-    },
-
-    async logout(instanceId: string) {
-      await fnLogout({ data: { instanceId } });
-      await reload();
-    },
-
-    async remove(instanceId: string) {
-      await fnDelete({ data: { instanceId } });
-      await reload();
-    },
+    refresh: fetchInstances,
+    createInstance,
+    connectInstance,
+    refreshStatus,
+    logoutInstance,
+    deleteInstance,
   };
 }

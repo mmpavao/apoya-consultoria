@@ -19,6 +19,7 @@ import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
+import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
@@ -75,6 +76,11 @@ const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
   path: '/fiscal/',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiWaInstancesRoute = ApiWaInstancesRouteImport.update({
+  id: '/api/wa/instances',
+  path: '/api/wa/instances',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppFiscalSerproRoute = AppFiscalSerproRouteImport.update({
   id: '/fiscal/serpro',
   path: '/fiscal/serpro',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/wa/instances': typeof ApiWaInstancesRoute
   '/fiscal/': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
 }
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/wa/instances': typeof ApiWaInstancesRoute
   '/fiscal': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
 }
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/wa/instances': typeof ApiWaInstancesRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
 }
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/api/wa/instances'
     | '/fiscal/'
     | '/api/public/evolution-webhook/$instance'
   fileRoutesByTo: FileRoutesByTo
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/api/wa/instances'
     | '/fiscal'
     | '/api/public/evolution-webhook/$instance'
   id:
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
+    | '/api/wa/instances'
     | '/_app/fiscal/'
     | '/api/public/evolution-webhook/$instance'
   fileRoutesById: FileRoutesById
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   LoginDevRoute: typeof LoginDevRoute
+  ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
 }
 
@@ -294,6 +307,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/fiscal/'
       preLoaderRoute: typeof AppFiscalIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/wa/instances': {
+      id: '/api/wa/instances'
+      path: '/api/wa/instances'
+      fullPath: '/api/wa/instances'
+      preLoaderRoute: typeof ApiWaInstancesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/fiscal/serpro': {
       id: '/_app/fiscal/serpro'
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   LoginDevRoute: LoginDevRoute,
+  ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiPublicEvolutionWebhookInstanceRoute:
     ApiPublicEvolutionWebhookInstanceRoute,
 }
