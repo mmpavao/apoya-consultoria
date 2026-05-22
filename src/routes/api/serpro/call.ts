@@ -56,7 +56,7 @@ export const Route = createFileRoute("/api/serpro/call")({
         let clienteData: any = null;
         if (cliente_id) {
           const { data } = await db
-            .from("cliente")
+            .from("clientes")
             .select("id,regime,tem_certificado,tem_procuracao,cnpj")
             .eq("id", cliente_id)
             .single();
