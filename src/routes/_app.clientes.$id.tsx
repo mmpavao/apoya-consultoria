@@ -12,6 +12,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,9 +22,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
-  useClientes, REGIME_LABEL, STATUS_LABEL,
+  REGIME_LABEL, STATUS_LABEL,
   type Cliente, type Regime, type Status, type FormaPagamento,
 } from "@/hooks/use-clientes";
+import { useClienteById } from "@/hooks/use-cliente-by-id";
 import { useCobrancas } from "@/hooks/use-cobrancas";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 
@@ -130,23 +132,19 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 function ClienteDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const { clientes, loading, updateCliente, deleteCliente } = useClientes();
+  const { cliente, loading, error: clienteError, update: updateClienteById } = useClienteById(id);
   const { cobrancas } = useCobrancas();
   const { obrigacoes } = useObrigacoes();
 
-  const [cliente, setCliente] = useState<Cliente | null>(null);
   const [tab, setTab]         = useState<Tab>("geral");
   const [editMode, setEditMode] = useState(false);
   const [form, setForm]         = useState<Partial<Cliente>>({});
   const [saving, setSaving]     = useState(false);
 
+  // Sincronizar form quando cliente carrega
   useEffect(() => {
-    if (!loading) {
-      const found = clientes.find((c) => c.id === id) ?? null;
-      setCliente(found);
-      if (found) setForm(found);
-    }
-  }, [id, clientes, loading]);
+    if (cliente) setForm(cliente);
+  }, [cliente]);
 
   if (loading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -174,16 +172,17 @@ function ClienteDetailPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      await updateCliente(cliente!.id, form);
+      await updateClienteById(form);
       setEditMode(false);
-      setCliente(c => c ? { ...c, ...form } as Cliente : c);
+      toast.success("Cliente atualizado");
     } catch { toast.error("Erro ao salvar"); }
     finally { setSaving(false); }
   }
 
   async function handleDelete() {
     if (!confirm(`Excluir "${cliente?.razaoSocial}"? Esta ação é irreversível.`)) return;
-    await deleteCliente(cliente!.id);
+    const { error } = await supabase.from("clientes").delete().eq("id", id);
+    if (error) { toast.error("Erro ao excluir: " + error.message); return; }
     toast.success("Cliente excluído");
     navigate({ to: "/clientes" });
   }

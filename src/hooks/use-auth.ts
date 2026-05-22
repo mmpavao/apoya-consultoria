@@ -61,7 +61,12 @@ export function useAuth() {
       else setState((s) => ({ ...s, loading: false }));
     });
 
-    return () => subscription.unsubscribe();
+    // Safety timeout: nunca deixar o loading travado por mais de 6 segundos
+    const safetyTimer = setTimeout(() => {
+      setState((s) => s.loading ? { ...s, loading: false } : s);
+    }, 6000);
+
+    return () => { subscription.unsubscribe(); clearTimeout(safetyTimer); };
   }, [loadProfileAndRoles]);
 
   const signIn = useCallback(async (email: string, password: string) => {
