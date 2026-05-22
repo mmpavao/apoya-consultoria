@@ -473,7 +473,12 @@ function ClienteDetailPage() {
       {tab === "servicos" && <TabServicos clienteId={id} />}
 
       {/* ═════════════════════ ABA: CONTRATOS ════════════════════ */}
-      {tab === "contratos" && <TabContratos clienteId={id} />}
+      {tab === "contratos" && <TabContratos
+          clienteId={id}
+          clienteEmail={cliente.email}
+          clienteWhatsapp={cliente.whatsapp}
+          clienteNome={cliente.razaoSocial}
+        />}
 
       {/* ═════════════════════ ABA: DOCUMENTOS ═══════════════════ */}
       {tab === "documentos" && <TabDocumentos clienteId={id} />}
