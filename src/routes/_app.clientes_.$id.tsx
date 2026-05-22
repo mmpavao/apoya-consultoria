@@ -9,7 +9,7 @@ import {
   Edit, FileText, Mail, MapPin, MessageSquare, Phone, Save, Trash2,
   User, X, AlertTriangle, Briefcase, CreditCard, Hash, Home,
   Info, ReceiptText, ShieldCheck, Users, Zap, ChevronRight,
-  ExternalLink, Loader2, RefreshCw,
+  ExternalLink, Loader2, RefreshCw, TrendingUp, BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,8 @@ import { TabFiscal } from "@/components/cliente/TabFiscal";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { TabFinanceiro } from "@/components/cliente/TabFinanceiro";
+import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
+import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
   component: ClienteDetailPage,
@@ -125,16 +127,18 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "financeiro" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
+type Tab = "geral" | "fiscal" | "financeiro" | "motor_docs" | "motor_apuracao" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: "geral",      label: "Visão Geral", icon: Building2   },
-  { id: "fiscal",     label: "Fiscal",      icon: FileText    },
-  { id: "financeiro", label: "Financeiro",  icon: DollarSign  },
-  { id: "servicos",   label: "Serviços",    icon: Briefcase   },
-  { id: "contratos",  label: "Contratos",   icon: ReceiptText  },
-  { id: "documentos", label: "Documentos",  icon: FileText    },
-  { id: "contato",    label: "Contato",     icon: User        },
-  { id: "historico",  label: "Histórico",   icon: Clock       },
+  { id: "geral",          label: "Visão Geral",   icon: Building2   },
+  { id: "fiscal",         label: "Fiscal",         icon: FileText    },
+  { id: "financeiro",     label: "Financeiro",     icon: DollarSign  },
+  { id: "motor_docs",     label: "Doc. Fiscais",   icon: TrendingUp  },
+  { id: "motor_apuracao", label: "Apuração",       icon: BarChart3   },
+  { id: "servicos",       label: "Serviços",       icon: Briefcase   },
+  { id: "contratos",      label: "Contratos",      icon: ReceiptText  },
+  { id: "documentos",     label: "Documentos",     icon: FileText    },
+  { id: "contato",        label: "Contato",        icon: User        },
+  { id: "historico",      label: "Histórico",      icon: Clock       },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -255,14 +259,14 @@ function ClienteDetailPage() {
                 <Button variant="outline" size="sm" onClick={() => { setEditMode(false); setForm(cliente); }}>
                   <X className="mr-1.5 h-3.5 w-3.5" />Cancelar
                 </Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Button size="sm" onClick={e => { e.stopPropagation(); handleSave(); }} disabled={saving}>
                   <Save className="mr-1.5 h-3.5 w-3.5" />
                   {saving ? "Salvando…" : "Salvar"}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:border-destructive" onClick={handleDelete}>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:border-destructive" onClick={e => { e.stopPropagation(); handleDelete(); }}>
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
                 </Button>
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setModalNfse(true)}>
@@ -273,7 +277,7 @@ function ClienteDetailPage() {
                 </Button>
                 {cliente.whatsapp && (
                   <Button size="sm" variant="outline" className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                    onClick={() => navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } })}>
+                    onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}>
                     <MessageSquare className="h-3.5 w-3.5" />WhatsApp
                   </Button>
                 )}
@@ -365,6 +369,20 @@ function ClienteDetailPage() {
         <TabFinanceiro cliente={cliente} />
       )}
 
+      {tab === "motor_docs" && (
+        <DocumentosFiscaisTab
+          clienteId={id}
+          clienteCnpj={cliente.cnpj}
+        />
+      )}
+
+      {tab === "motor_apuracao" && (
+        <ApuracaoMensalCard
+          clienteId={id}
+          regime={REGIME_LABEL[cliente.regime] ?? cliente.regime}
+        />
+      )}
+
             {/* ═════════════════════ ABA: CONTATO ═════════════════════ */}
       {tab === "contato" && (
         <div className="grid gap-5 lg:grid-cols-2">
@@ -378,7 +396,7 @@ function ClienteDetailPage() {
                   {cliente.whatsapp ? (
                     <button
                       className="text-sm text-primary hover:underline font-medium"
-                      onClick={() => navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } })}
+                      onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}
                     >
                       {cliente.whatsapp}
                     </button>

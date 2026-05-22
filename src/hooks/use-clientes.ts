@@ -35,7 +35,7 @@ export interface Cliente {
   temIncentivoFiscal?: boolean;
   municipio?: string;
   uf?: string;
-  endereco?: { municipio?: string; uf?: string; cep?: string; logradouro?: string; numero?: string; bairro?: string };
+  endereco?: { municipio?: string; uf?: string; cep?: string; logradouro?: string; numero?: string; bairro?: string; complemento?: string };
   atividadePrincipal?: string;
   observacoes?: string;
   aliquotaIss?: number;
@@ -77,6 +77,7 @@ function fromDb(row: Record<string, unknown>): Cliente {
       logradouro:row.logradouro as string | undefined,
       numero:    row.numero as string | undefined,
       bairro:    row.bairro as string | undefined,
+      complemento: (row as any).complemento as string | undefined,
     },
     atividadePrincipal:row.atividade_principal as string | undefined,
     observacoes:       row.observacoes as string | undefined,
@@ -123,6 +124,7 @@ function toDb(c: Partial<Cliente>): Record<string, unknown> {
     if (c.endereco.logradouro!==undefined)  out.logradouro = c.endereco.logradouro;
     if (c.endereco.numero    !== undefined) out.numero     = c.endereco.numero;
     if (c.endereco.bairro    !== undefined) out.bairro     = c.endereco.bairro;
+    if (c.endereco.complemento !== undefined) out.complemento = c.endereco.complemento;
   }
   return out;
 }
