@@ -22,7 +22,7 @@ import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
-import { Route as AppClientesIdRouteImport } from './routes/_app.clientes.$id'
+import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
 import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
 
 const LoginDevRoute = LoginDevRouteImport.update({
@@ -90,9 +90,9 @@ const AppFiscalDasRoute = AppFiscalDasRouteImport.update({
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientesIdRoute = AppClientesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppClientesRoute,
+  id: '/clientes_/$id',
+  path: '/clientes/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 const ApiPublicEvolutionWebhookInstanceRoute =
   ApiPublicEvolutionWebhookInstanceRouteImport.update({
@@ -105,7 +105,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
-  '/clientes': typeof AppClientesRouteWithChildren
+  '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
@@ -120,7 +120,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
-  '/clientes': typeof AppClientesRouteWithChildren
+  '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
@@ -138,13 +138,13 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
-  '/_app/clientes': typeof AppClientesRouteWithChildren
+  '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/clientes/$id': typeof AppClientesIdRoute
+  '/_app/clientes_/$id': typeof AppClientesIdRoute
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -195,7 +195,7 @@ export interface FileRouteTypes {
     | '/_app/obrigacoes'
     | '/_app/whatsapp'
     | '/_app/'
-    | '/_app/clientes/$id'
+    | '/_app/clientes_/$id'
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
@@ -303,12 +303,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFiscalDasRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/clientes/$id': {
-      id: '/_app/clientes/$id'
-      path: '/$id'
+    '/_app/clientes_/$id': {
+      id: '/_app/clientes_/$id'
+      path: '/clientes/$id'
       fullPath: '/clientes/$id'
       preLoaderRoute: typeof AppClientesIdRouteImport
-      parentRoute: typeof AppClientesRoute
+      parentRoute: typeof AppRoute
     }
     '/api/public/evolution-webhook/$instance': {
       id: '/api/public/evolution-webhook/$instance'
@@ -320,25 +320,14 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AppClientesRouteChildren {
-  AppClientesIdRoute: typeof AppClientesIdRoute
-}
-
-const AppClientesRouteChildren: AppClientesRouteChildren = {
-  AppClientesIdRoute: AppClientesIdRoute,
-}
-
-const AppClientesRouteWithChildren = AppClientesRoute._addFileChildren(
-  AppClientesRouteChildren,
-)
-
 interface AppRouteChildren {
-  AppClientesRoute: typeof AppClientesRouteWithChildren
+  AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppClientesIdRoute: typeof AppClientesIdRoute
   AppFiscalDasRoute: typeof AppFiscalDasRoute
   AppFiscalNfseRoute: typeof AppFiscalNfseRoute
   AppFiscalSerproRoute: typeof AppFiscalSerproRoute
@@ -346,12 +335,13 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppClientesRoute: AppClientesRouteWithChildren,
+  AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
   AppWhatsappRoute: AppWhatsappRoute,
   AppIndexRoute: AppIndexRoute,
+  AppClientesIdRoute: AppClientesIdRoute,
   AppFiscalDasRoute: AppFiscalDasRoute,
   AppFiscalNfseRoute: AppFiscalNfseRoute,
   AppFiscalSerproRoute: AppFiscalSerproRoute,

@@ -165,7 +165,7 @@ function ClientesPage(){
               <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5"/></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate({ to: "/clientes/$id", params: { id: c.id } })}>
+              <DropdownMenuItem onClick={() => navigate({ to: "/clientes_/$id", params: { id: c.id } })}>
                 <ExternalLink className="h-4 w-4"/> Ver detalhes
               </DropdownMenuItem>
               <DropdownMenuItem onClick={()=>{setEditing(c);setDialog(true);}}>
@@ -222,7 +222,7 @@ function ClientesPage(){
       {!loading && (
         <>
           <DataTable
-            onRowClick={(c) => navigate({ to: "/clientes/$id", params: { id: c.id } })}
+            onRowClick={(c) => navigate({ to: "/clientes_/$id", params: { id: c.id } })}
             rows={pageItems}
             cols={cols}
             getKey={c=>c.id}

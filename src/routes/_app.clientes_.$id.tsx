@@ -29,7 +29,7 @@ import { useClienteById } from "@/hooks/use-cliente-by-id";
 import { useCobrancas } from "@/hooks/use-cobrancas";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 
-export const Route = createFileRoute("/_app/clientes/$id")({
+export const Route = createFileRoute("/_app/clientes_/$id")({
   component: ClienteDetailPage,
   head: () => ({ meta: [{ title: "Cliente · APOYA Gestão" }] }),
 });
