@@ -158,7 +158,7 @@ function ContratoRow({
           <div className="flex items-center gap-3 mt-1">
             <StatusBadge status={csStatus} />
             <span className="text-xs text-muted-foreground">
-              {contrato.tipo} • {contrato.data_inicio}
+              {contrato.tipo} • {contrato.data_inicio instanceof Date ? contrato.data_inicio.toLocaleDateString("pt-BR") : contrato.data_inicio ? new Date(contrato.data_inicio as any).toLocaleDateString("pt-BR") : "—"}
             </span>
             {contrato.valor_total > 0 && (
               <span className="text-xs font-semibold text-foreground/80">
