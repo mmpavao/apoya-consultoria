@@ -1,6 +1,8 @@
 /**
  * use-contratos-cliente — hook completo com Clicksign
  * Gerencia contratos por cliente + integração Clicksign API v3
+ * 
+ * BUG-08 FIX: Datas normalizadas e parseadas corretamente
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,8 +27,8 @@ export interface ContratoCliente {
   tipo:                 string;
   status:               ContratoStatus;
   valor_total:          number;
-  data_inicio:          string;
-  data_fim?:            string;
+  data_inicio:          Date;          // ✅ Agora é Date
+  data_fim?:            Date;          // ✅ Agora é Date
   corpo_html?:          string;
   clausulas:            unknown[];
   servicos_ids:         string[];
@@ -47,12 +49,12 @@ export interface ContratoCliente {
   notificacao_canal:    CanalNotificacao;
   deadline_days:        number;
   // Datas
-  enviado_em?:          string;
-  assinado_em?:         string;
-  cancelado_em?:        string;
+  enviado_em?:          Date;         // ✅ Agora é Date
+  assinado_em?:         Date;         // ✅ Agora é Date
+  cancelado_em?:        Date;         // ✅ Agora é Date
   observacoes?:         string;
-  created_at:           string;
-  updated_at:           string;
+  created_at:           Date;         // ✅ Agora é Date
+  updated_at:           Date;         // ✅ Agora é Date
 }
 
 export interface ClicksignEvento {
@@ -67,8 +69,8 @@ export interface NovoContratoPayload {
   titulo:           string;
   tipo:             string;
   valor_total:      number;
-  data_inicio:      string;
-  data_fim?:        string;
+  data_inicio:      string | Date;
+  data_fim?:        string | Date;
   corpo_html?:      string;
   clausulas?:       unknown[];
   servicos_ids?:    string[];
@@ -82,6 +84,85 @@ export interface NovoContratoPayload {
 
 const SUPABASE_EF_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 const SUPABASE_ANON   = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// ── Helpers de data ────────────────────────────────────────────
+/**
+ * Normalizar data string ou Date para Date objeto
+ * @param data string (ISO, YYYY-MM-DD, ou timestamp) ou Date
+ * @returns Date ou null se inválida
+ */
+function normalizarData(data: string | Date | null | undefined): Date | null {
+  if (!data) return null;
+  
+  try {
+    if (data instanceof Date) return data;
+    
+    // String ISO ou YYYY-MM-DD
+    const parsed = new Date(data);
+    if (isNaN(parsed.getTime())) {
+      console.warn(`[useContratosCliente] Data inválida: ${data}`);
+      return null;
+    }
+    return parsed;
+  } catch (e) {
+    console.error(`[useContratosCliente/normalizarData] Error:`, e);
+    return null;
+  }
+}
+
+/**
+ * Mapear row do Supabase para ContratoCliente com datas parseadas
+ */
+function mapContratoFromDb(row: any): ContratoCliente {
+  return {
+    id: row.id,
+    cliente_id: row.cliente_id,
+    numero: row.numero,
+    titulo: row.titulo,
+    tipo: row.tipo,
+    status: row.status,
+    valor_total: row.valor_total ?? 0,
+    data_inicio: normalizarData(row.data_inicio) || new Date(),
+    data_fim: normalizarData(row.data_fim),
+    corpo_html: row.corpo_html,
+    clausulas: row.clausulas ?? [],
+    servicos_ids: row.servicos_ids ?? [],
+    clicksign_key: row.clicksign_key,
+    clicksign_envelope_id: row.clicksign_envelope_id,
+    clicksign_document_id: row.clicksign_document_id,
+    clicksign_signer_id: row.clicksign_signer_id,
+    clicksign_status: row.clicksign_status,
+    clicksign_url: row.clicksign_url,
+    clicksign_sign_url: row.clicksign_sign_url,
+    clicksign_signed_pdf: row.clicksign_signed_pdf,
+    clicksign_events: row.clicksign_events ?? [],
+    signatario_nome: row.signatario_nome,
+    signatario_email: row.signatario_email,
+    signatario_whatsapp: row.signatario_whatsapp,
+    notificacao_canal: row.notificacao_canal ?? "email",
+    deadline_days: row.deadline_days ?? 5,
+    enviado_em: normalizarData(row.enviado_em),
+    assinado_em: normalizarData(row.assinado_em),
+    cancelado_em: normalizarData(row.cancelado_em),
+    observacoes: row.observacoes,
+    created_at: normalizarData(row.created_at) || new Date(),
+    updated_at: normalizarData(row.updated_at) || new Date(),
+  };
+}
+
+/**
+ * Formatar data para exibição (ex: "02 de mai, 2026")
+ */
+export function formatarData(data: Date | null | undefined, formato: "curto" | "longo" = "curto"): string {
+  if (!data || !(data instanceof Date) || isNaN(data.getTime())) return "—";
+  
+  const opts: Intl.DateTimeFormatOptions = 
+    formato === "curto" 
+      ? { day: "2-digit", month: "short", year: "numeric" }
+      : { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" };
+  
+  return data.toLocaleDateString("pt-BR", opts);
+}
 
 // ── Status helpers ─────────────────────────────────────────────
 export const STATUS_LABEL: Record<ContratoStatus, string> = {
@@ -112,14 +193,26 @@ export function useContratosCliente(clienteId: string) {
   const fetch = useCallback(async () => {
     if (!clienteId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("contrato_cliente")
-      .select("*")
-      .eq("cliente_id", clienteId)
-      .order("created_at", { ascending: false });
-    if (error) console.error("useContratosCliente:", error);
-    else setContratos((data as ContratoCliente[]) || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("contrato_cliente")
+        .select("*")
+        .eq("cliente_id", clienteId)
+        .order("created_at", { ascending: false });
+      
+      if (error) {
+        console.error("[useContratosCliente/fetch] Supabase error:", error);
+        return;
+      }
+      
+      // ✅ Mapear com parseamento de datas
+      const mapped = (data || []).map(mapContratoFromDb);
+      setContratos(mapped);
+    } catch (e) {
+      console.error("[useContratosCliente/fetch] catch error:", e);
+    } finally {
+      setLoading(false);
+    }
   }, [clienteId]);
 
   useEffect(() => { fetch(); }, [fetch]);
@@ -139,35 +232,88 @@ export function useContratosCliente(clienteId: string) {
 
   // ── CRUD básico ────────────────────────────────────────────
   const criar = useCallback(async (clienteId: string, dados: NovoContratoPayload) => {
-    const { data, error } = await supabase
-      .from("contrato_cliente")
-      .insert({ cliente_id: clienteId, ...dados })
-      .select()
-      .single();
-    if (error) { toast.error("Erro ao criar contrato"); throw error; }
-    toast.success("Contrato criado");
-    await fetch();
-    return data as ContratoCliente;
+    try {
+      const payload = {
+        cliente_id: clienteId,
+        ...dados,
+        data_inicio: dados.data_inicio instanceof Date 
+          ? dados.data_inicio.toISOString().split('T')[0]
+          : dados.data_inicio,
+        data_fim: dados.data_fim instanceof Date 
+          ? dados.data_fim.toISOString().split('T')[0]
+          : dados.data_fim,
+      };
+      
+      const { data, error } = await supabase
+        .from("contrato_cliente")
+        .insert(payload)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("[useContratosCliente/criar] Supabase error:", error);
+        toast.error("Erro ao criar contrato");
+        throw error;
+      }
+      
+      toast.success("Contrato criado");
+      await fetch();
+      return mapContratoFromDb(data);
+    } catch (e) {
+      console.error("[useContratosCliente/criar] catch error:", e);
+      throw e;
+    }
   }, [fetch]);
 
   const atualizar = useCallback(async (id: string, dados: Partial<ContratoCliente>) => {
-    const { error } = await supabase
-      .from("contrato_cliente")
-      .update(dados)
-      .eq("id", id);
-    if (error) { toast.error("Erro ao atualizar contrato"); throw error; }
-    toast.success("Contrato atualizado");
-    await fetch();
+    try {
+      // Converter Date para ISO string
+      const payload = { ...dados };
+      if (dados.data_inicio instanceof Date) {
+        payload.data_inicio = dados.data_inicio.toISOString().split('T')[0] as any;
+      }
+      if (dados.data_fim instanceof Date) {
+        payload.data_fim = dados.data_fim.toISOString().split('T')[0] as any;
+      }
+      
+      const { error } = await supabase
+        .from("contrato_cliente")
+        .update(payload)
+        .eq("id", id);
+      
+      if (error) {
+        console.error("[useContratosCliente/atualizar] Supabase error:", error);
+        toast.error("Erro ao atualizar contrato");
+        throw error;
+      }
+      
+      toast.success("Contrato atualizado");
+      await fetch();
+    } catch (e) {
+      console.error("[useContratosCliente/atualizar] catch error:", e);
+      throw e;
+    }
   }, [fetch]);
 
   const excluir = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from("contrato_cliente")
-      .delete()
-      .eq("id", id);
-    if (error) { toast.error("Erro ao excluir contrato"); throw error; }
-    toast.success("Contrato excluído");
-    await fetch();
+    try {
+      const { error } = await supabase
+        .from("contrato_cliente")
+        .delete()
+        .eq("id", id);
+      
+      if (error) {
+        console.error("[useContratosCliente/excluir] Supabase error:", error);
+        toast.error("Erro ao excluir contrato");
+        throw error;
+      }
+      
+      toast.success("Contrato excluído");
+      await fetch();
+    } catch (e) {
+      console.error("[useContratosCliente/excluir] catch error:", e);
+      throw e;
+    }
   }, [fetch]);
 
   // ── Clicksign: Enviar para assinatura ────────────────────
@@ -188,6 +334,7 @@ export function useContratosCliente(clienteId: string) {
       await fetch();
       return result as { envelope_id: string; sign_url: string; message: string };
     } catch (err) {
+      console.error("[useContratosCliente/enviarParaAssinatura] Error:", err);
       toast.error(`Erro ao enviar: ${err}`);
       throw err;
     } finally {
@@ -212,6 +359,7 @@ export function useContratosCliente(clienteId: string) {
       toast.success("Notificação reenviada!");
       return result;
     } catch (err) {
+      console.error("[useContratosCliente/reenviarNotificacao] Error:", err);
       toast.error(`Erro ao reenviar: ${err}`);
       throw err;
     } finally {
@@ -237,6 +385,7 @@ export function useContratosCliente(clienteId: string) {
       await fetch();
       return result;
     } catch (err) {
+      console.error("[useContratosCliente/cancelarEnvelope] Error:", err);
       toast.error(`Erro ao cancelar: ${err}`);
       throw err;
     } finally {
