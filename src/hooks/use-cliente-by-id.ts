@@ -1,41 +1,60 @@
 /**
- * Hook dedicado para buscar um único cliente por ID
- * Independente do useClientes() global — não usa realtime
+ * Hook dedicado para buscar um único cliente por ID.
+ * fromDb sincronizado com use-clientes.ts — todos os campos mapeados.
  */
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Cliente } from "./use-clientes";
 
-// Re-exportar fromDb do use-clientes
-function fromDb(r: Record<string, unknown>): Cliente {
+function fromDb(row: Record<string, unknown>): Cliente {
   return {
-    id:                  r.id as string,
-    razaoSocial:         r.razao_social as string,
-    nomeFantasia:        r.nome_fantasia as string | undefined,
-    cnpj:                r.cnpj as string,
-    regime:              r.regime as any,
-    status:              r.status as any,
-    responsavel:         r.responsavel as string | undefined,
-    email:               r.email as string | undefined,
-    telefone:            r.telefone as string | undefined,
-    whatsapp:            r.whatsapp as string | undefined,
-    valorHonorario:      Number(r.valor_honorario ?? 0),
-    formaPagamento:      r.forma_pagamento as any,
-    diaVencimento:       r.dia_vencimento as number | undefined,
-    temEmpregados:       Boolean(r.tem_empregados),
-    temIncentivoFiscal:  Boolean(r.tem_incentivo_fiscal),
-    regimeHibrido:       Boolean(r.regime_hibrido),
-    inscricaoMunicipal:  r.inscricao_municipal as string | undefined,
-    inscricaoEstadual:   r.inscricao_estadual as string | undefined,
-    codigoServicoNfse:   r.codigo_servico_nfse as string | undefined,
-    atividadePrincipal:  r.atividade_principal as string | undefined,
-    observacoes:         r.observacoes as string | undefined,
-    municipio:           r.municipio as string | undefined,
-    uf:                  r.uf as string | undefined,
-    endereco:            r.endereco as any,
-    asaasId:             r.asaas_id as string | undefined,
-    createdAt:           r.created_at as string,
-    updatedAt:           r.updated_at as string | undefined,
+    id:                  row.id as string,
+    razaoSocial:         row.razao_social as string,
+    nomeFantasia:        row.nome_fantasia as string | undefined,
+    cnpj:                row.cnpj as string,
+    regime:              ((row.regime as string) ?? "Simples")
+                           .replace("Simples Nacional", "Simples") as any,
+    regimeHibrido:       Boolean(row.regime_hibrido),
+    tier:                row.tier as any,
+    status:              (row.status as any) ?? "ativo",
+    responsavel:         (row.responsavel as string) ?? "",
+    email:               row.email as string | undefined,
+    telefone:            row.telefone as string | undefined,
+    whatsapp:            row.whatsapp as string | undefined,
+    inscricaoMunicipal:  row.inscricao_municipal as string | undefined,
+    inscricaoEstadual:   row.inscricao_estadual as string | undefined,
+    codigoServicoNfse:   row.codigo_servico_nfse as string | undefined,
+    diaVencimento:       row.dia_vencimento as number | undefined,
+    valorHonorario:      row.valor_honorario != null ? Number(row.valor_honorario) : undefined,
+    formaPagamento:      row.forma_pagamento as any,
+    temEmpregados:       Boolean(row.tem_empregados),
+    temIncentivoFiscal:  Boolean(row.tem_incentivo_fiscal),
+    municipio:           row.municipio as string | undefined,
+    uf:                  row.uf as string | undefined,
+    endereco: {
+      municipio:    row.municipio as string | undefined,
+      uf:           row.uf as string | undefined,
+      cep:          row.cep as string | undefined,
+      logradouro:   row.logradouro as string | undefined,
+      numero:       row.numero as string | undefined,
+      bairro:       row.bairro as string | undefined,
+      complemento:  row.complemento as string | undefined,
+    },
+    atividadePrincipal:   row.atividade_principal as string | undefined,
+    observacoes:          row.observacoes as string | undefined,
+    aliquotaIss:          row.aliquota_iss != null ? Number(row.aliquota_iss) : undefined,
+    cpf:                  row.cpf as string | undefined,
+    codigoMunicipioIbge:  row.codigo_municipio_ibge as string | undefined,
+    nfseioEmitenteId:     row.nfseio_emitente_id as string | undefined,
+    // campos extras retornados mas não no tipo base — acessados via (cliente as any)
+    ...(row.asaas_customer_id != null  ? { asaasId:         row.asaas_customer_id as string }  : {}),
+    ...(row.tem_certificado    != null  ? { tem_certificado: Boolean(row.tem_certificado) }      : {}),
+    ...(row.tem_procuracao     != null  ? { tem_procuracao:  Boolean(row.tem_procuracao) }       : {}),
+    ...(row.data_inadimplencia != null  ? { data_inadimplencia: row.data_inadimplencia as string } : {}),
+    ...(row.data_suspensao     != null  ? { data_suspensao:     row.data_suspensao as string }     : {}),
+    ...(row.motivo_suspensao   != null  ? { motivo_suspensao:   row.motivo_suspensao as string }   : {}),
+    createdAt:   row.created_at as string,
+    updatedAt:   row.updated_at as string | undefined,
   };
 }
 
@@ -44,7 +63,7 @@ export function useClienteById(id: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
@@ -54,7 +73,7 @@ export function useClienteById(id: string) {
         .eq("id", id)
         .single();
       if (err) {
-        if (err.code === "PGRST116") setCliente(null); // not found
+        if (err.code === "PGRST116") setCliente(null);
         else throw err;
       } else {
         setCliente(data ? fromDb(data as Record<string, unknown>) : null);
@@ -68,33 +87,45 @@ export function useClienteById(id: string) {
     }
   }, [id]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { load(); }, [load]);
 
   const update = useCallback(async (patch: Partial<Cliente>) => {
     const dbPatch: Record<string, unknown> = {};
-    if (patch.razaoSocial        !== undefined) dbPatch.razao_social         = patch.razaoSocial;
-    if (patch.nomeFantasia        !== undefined) dbPatch.nome_fantasia         = patch.nomeFantasia;
-    if (patch.cnpj                !== undefined) dbPatch.cnpj                  = patch.cnpj;
-    if (patch.regime              !== undefined) dbPatch.regime                 = patch.regime;
-    if (patch.status              !== undefined) dbPatch.status                 = patch.status;
-    if (patch.responsavel         !== undefined) dbPatch.responsavel            = patch.responsavel;
-    if (patch.email               !== undefined) dbPatch.email                  = patch.email;
-    if (patch.telefone            !== undefined) dbPatch.telefone               = patch.telefone;
-    if (patch.whatsapp            !== undefined) dbPatch.whatsapp               = patch.whatsapp;
-    if (patch.valorHonorario      !== undefined) dbPatch.valor_honorario        = patch.valorHonorario;
-    if (patch.formaPagamento      !== undefined) dbPatch.forma_pagamento        = patch.formaPagamento;
-    if (patch.diaVencimento       !== undefined) dbPatch.dia_vencimento         = patch.diaVencimento;
-    if (patch.temEmpregados       !== undefined) dbPatch.tem_empregados         = patch.temEmpregados;
-    if (patch.temIncentivoFiscal  !== undefined) dbPatch.tem_incentivo_fiscal   = patch.temIncentivoFiscal;
-    if (patch.regimeHibrido       !== undefined) dbPatch.regime_hibrido         = patch.regimeHibrido;
-    if (patch.inscricaoMunicipal  !== undefined) dbPatch.inscricao_municipal    = patch.inscricaoMunicipal;
-    if (patch.inscricaoEstadual   !== undefined) dbPatch.inscricao_estadual     = patch.inscricaoEstadual;
-    if (patch.codigoServicoNfse   !== undefined) dbPatch.codigo_servico_nfse   = patch.codigoServicoNfse;
-    if (patch.atividadePrincipal  !== undefined) dbPatch.atividade_principal    = patch.atividadePrincipal;
-    if (patch.observacoes         !== undefined) dbPatch.observacoes            = patch.observacoes;
-    if (patch.municipio           !== undefined) dbPatch.municipio              = patch.municipio;
-    if (patch.uf                  !== undefined) dbPatch.uf                     = patch.uf;
-    if (patch.endereco            !== undefined) dbPatch.endereco               = patch.endereco;
+    if (patch.razaoSocial        !== undefined) dbPatch.razao_social          = patch.razaoSocial;
+    if (patch.nomeFantasia        !== undefined) dbPatch.nome_fantasia          = patch.nomeFantasia;
+    if (patch.cnpj                !== undefined) dbPatch.cnpj                   = patch.cnpj;
+    if (patch.regime              !== undefined) dbPatch.regime                  = patch.regime;
+    if (patch.status              !== undefined) dbPatch.status                  = patch.status;
+    if (patch.responsavel         !== undefined) dbPatch.responsavel             = patch.responsavel;
+    if (patch.email               !== undefined) dbPatch.email                   = patch.email;
+    if (patch.telefone            !== undefined) dbPatch.telefone                = patch.telefone;
+    if (patch.whatsapp            !== undefined) dbPatch.whatsapp                = patch.whatsapp;
+    if (patch.valorHonorario      !== undefined) dbPatch.valor_honorario         = patch.valorHonorario;
+    if (patch.formaPagamento      !== undefined) dbPatch.forma_pagamento         = patch.formaPagamento;
+    if (patch.diaVencimento       !== undefined) dbPatch.dia_vencimento          = patch.diaVencimento;
+    if (patch.temEmpregados       !== undefined) dbPatch.tem_empregados          = patch.temEmpregados;
+    if (patch.temIncentivoFiscal  !== undefined) dbPatch.tem_incentivo_fiscal    = patch.temIncentivoFiscal;
+    if (patch.regimeHibrido       !== undefined) dbPatch.regime_hibrido          = patch.regimeHibrido;
+    if (patch.inscricaoMunicipal  !== undefined) dbPatch.inscricao_municipal     = patch.inscricaoMunicipal;
+    if (patch.inscricaoEstadual   !== undefined) dbPatch.inscricao_estadual      = patch.inscricaoEstadual;
+    if (patch.codigoServicoNfse   !== undefined) dbPatch.codigo_servico_nfse    = patch.codigoServicoNfse;
+    if (patch.atividadePrincipal  !== undefined) dbPatch.atividade_principal     = patch.atividadePrincipal;
+    if (patch.observacoes         !== undefined) dbPatch.observacoes             = patch.observacoes;
+    if (patch.municipio           !== undefined) dbPatch.municipio               = patch.municipio;
+    if (patch.uf                  !== undefined) dbPatch.uf                      = patch.uf;
+    if (patch.endereco            !== undefined) {
+      if (patch.endereco.cep        !== undefined) dbPatch.cep         = patch.endereco.cep;
+      if (patch.endereco.logradouro !== undefined) dbPatch.logradouro  = patch.endereco.logradouro;
+      if (patch.endereco.numero     !== undefined) dbPatch.numero      = patch.endereco.numero;
+      if (patch.endereco.bairro     !== undefined) dbPatch.bairro      = patch.endereco.bairro;
+      if (patch.endereco.complemento!== undefined) dbPatch.complemento = patch.endereco.complemento;
+      if (patch.endereco.municipio  !== undefined) dbPatch.municipio   = patch.endereco.municipio;
+      if (patch.endereco.uf         !== undefined) dbPatch.uf          = patch.endereco.uf;
+    }
+    if (patch.aliquotaIss         !== undefined) dbPatch.aliquota_iss            = patch.aliquotaIss;
+    if (patch.cpf                 !== undefined) dbPatch.cpf                     = patch.cpf;
+    if (patch.nfseioEmitenteId    !== undefined) dbPatch.nfseio_emitente_id      = patch.nfseioEmitenteId;
+    if (patch.codigoMunicipioIbge !== undefined) dbPatch.codigo_municipio_ibge   = patch.codigoMunicipioIbge;
 
     const { error: err } = await supabase
       .from("clientes")
@@ -102,8 +133,8 @@ export function useClienteById(id: string) {
       .eq("id", id);
 
     if (err) throw err;
-    setCliente(prev => prev ? { ...prev, ...patch } : prev);
-  }, [id]);
+    await load(); // Re-fetch para garantir consistência
+  }, [id, load]);
 
-  return { cliente, loading, error, refetch: fetch, update };
+  return { cliente, loading, error, refetch: load, update };
 }

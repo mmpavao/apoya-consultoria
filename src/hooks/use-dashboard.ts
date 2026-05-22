@@ -88,7 +88,7 @@ export function useDashboard() {
       /* ── 1. Clientes ───────────────────────────────────── */
       const { data: clientes } = await supabase
         .from("clientes")
-        .select("id, nome_razao_social, regime, status, honorario_valor, created_at")
+        .select("id, razao_social, regime, status, valor_honorario, created_at")
         .order("created_at", { ascending: false });
 
       const clientesArr  = clientes ?? [];
@@ -98,11 +98,11 @@ export function useDashboard() {
 
       const clientesRecentes: ClienteRecente[] = clientesArr.slice(0, 6).map(c => ({
         id:        c.id,
-        nome:      c.nome_razao_social ?? "—",
+        nome:      c.razao_social ?? "—",
         regime:    c.regime ?? "—",
         status:    c.status ?? "inativo",
-        honorario: c.honorario_valor
-          ? `R$ ${Number(c.honorario_valor).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`
+        honorario: c.valor_honorario
+          ? `R$ ${Number(c.valor_honorario).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`
           : "—",
       }));
 
@@ -164,7 +164,7 @@ export function useDashboard() {
           .reduce((s, c) => s + Number(c.valor ?? 0), 0);
         const previsto = clientesArr
           .filter(c => c.status === "ativo")
-          .reduce((s, c) => s + Number(c.honorario_valor ?? 0), 0);
+          .reduce((s, c) => s + Number(c.valor_honorario ?? 0), 0);
         honorariosData.push({ mes: mesLabel, recebido, previsto });
       }
 
