@@ -28,6 +28,9 @@ import {
 import { useClienteById } from "@/hooks/use-cliente-by-id";
 import { useCobrancas } from "@/hooks/use-cobrancas";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
+import { TabServicos } from "@/components/cliente/TabServicos";
+import { TabContratos } from "@/components/cliente/TabContratos";
+import { TabDocumentos } from "@/components/cliente/TabDocumentos";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
   component: ClienteDetailPage,
@@ -118,11 +121,14 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "financeiro" | "contato" | "historico";
+type Tab = "geral" | "fiscal" | "financeiro" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "geral",      label: "Visão Geral", icon: Building2   },
   { id: "fiscal",     label: "Fiscal",      icon: FileText    },
   { id: "financeiro", label: "Financeiro",  icon: DollarSign  },
+  { id: "servicos",   label: "Serviços",    icon: Briefcase   },
+  { id: "contratos",  label: "Contratos",   icon: ReceiptText  },
+  { id: "documentos", label: "Documentos",  icon: FileText    },
   { id: "contato",    label: "Contato",     icon: User        },
   { id: "historico",  label: "Histórico",   icon: Clock       },
 ];
@@ -254,6 +260,12 @@ function ClienteDetailPage() {
                 <Button size="sm" onClick={() => setEditMode(true)}>
                   <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
                 </Button>
+                {cliente.whatsapp && (
+                  <Button size="sm" variant="outline" className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    onClick={() => navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } })}>
+                    <MessageSquare className="h-3.5 w-3.5" />WhatsApp
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -430,7 +442,20 @@ function ClienteDetailPage() {
           <SectionCard title="Dados de Contato" icon={User}>
             <InfoRow icon={Mail}        label="E-mail"       value={cliente.email} href={cliente.email ? `mailto:${cliente.email}` : undefined} />
             <InfoRow icon={Phone}       label="Telefone"     value={cliente.telefone} href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
-            <InfoRow icon={MessageSquare} label="WhatsApp"   value={cliente.whatsapp} href={cliente.whatsapp ? `https://wa.me/${cliente.whatsapp.replace(/\D/g,"")}` : undefined} />
+            <div className="flex items-start gap-3 py-2.5 border-b border-border/50">
+                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">WhatsApp</p>
+                  {cliente.whatsapp ? (
+                    <button
+                      className="text-sm text-primary hover:underline font-medium"
+                      onClick={() => navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } })}
+                    >
+                      {cliente.whatsapp}
+                    </button>
+                  ) : <p className="text-sm text-muted-foreground">—</p>}
+                </div>
+              </div>
             <InfoRow icon={User}        label="Responsável APOYA" value={cliente.responsavel} />
           </SectionCard>
 
@@ -443,6 +468,15 @@ function ClienteDetailPage() {
           </SectionCard>
         </div>
       )}
+
+      {/* ═════════════════════ ABA: SERVIÇOS ═════════════════════ */}
+      {tab === "servicos" && <TabServicos clienteId={id} />}
+
+      {/* ═════════════════════ ABA: CONTRATOS ════════════════════ */}
+      {tab === "contratos" && <TabContratos clienteId={id} />}
+
+      {/* ═════════════════════ ABA: DOCUMENTOS ═══════════════════ */}
+      {tab === "documentos" && <TabDocumentos clienteId={id} />}
 
       {/* ═════════════════════ ABA: HISTÓRICO ═════════════════════ */}
       {tab === "historico" && (

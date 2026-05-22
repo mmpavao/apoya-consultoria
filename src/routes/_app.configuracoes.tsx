@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntegracoes, type IntegracaoTipo } from "@/hooks/use-integracoes";
 import { useUsuarios, type UsuarioRole, ROLE_LABELS } from "@/hooks/use-usuarios";
@@ -61,6 +61,7 @@ function ConfiguracoesPageContent() {
           <TabsTrigger value="templates" className="gap-2"><MessageSquare className="h-4 w-4" />Templates</TabsTrigger>
           <TabsTrigger value="escritorio" className="gap-2"><Building2 className="h-4 w-4" />Escritório</TabsTrigger>
           <TabsTrigger value="permissoes" className="gap-2"><Shield className="h-4 w-4" />Permissões</TabsTrigger>
+          <TabsTrigger value="servicos" className="gap-2"><Package className="h-4 w-4" />Serviços</TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios"><UsuariosTab /></TabsContent>
@@ -71,7 +72,22 @@ function ConfiguracoesPageContent() {
             <TabsContent value="templates"><TemplatesTab /></TabsContent>
         <TabsContent value="escritorio"><EscritorioTab /></TabsContent>
         <TabsContent value="permissoes"><PermissoesTab /></TabsContent>
-      </Tabs>
+      <TabsContent value="servicos" className="mt-4">
+            <div className="surface-card p-8 rounded-xl text-center">
+              <Package className="h-10 w-10 mx-auto mb-3 text-primary/50" />
+              <h3 className="font-semibold text-base mb-1">Catálogo de Serviços</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Gerencie os serviços disponíveis para contratação pelos clientes.<br/>
+                20 serviços padrão já foram carregados no banco de dados.
+              </p>
+              <Link to="/configuracoes/servicos">
+                <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                  <Package className="h-4 w-4" />Gerenciar Catálogo de Serviços →
+                </button>
+              </Link>
+            </div>
+          </TabsContent>
+        </Tabs>
     </div>
   );
 }
@@ -354,7 +370,22 @@ function IntegracoesTabsWrapper() {
         </TabsList>
         <TabsContent value="whatsapp" className="mt-4"><WhatsappInstancesPanel /></TabsContent>
         <TabsContent value="apis" className="mt-4"><IntegracoesSuapbaseTab /></TabsContent>
-      </Tabs>
+      <TabsContent value="servicos" className="mt-4">
+            <div className="surface-card p-8 rounded-xl text-center">
+              <Package className="h-10 w-10 mx-auto mb-3 text-primary/50" />
+              <h3 className="font-semibold text-base mb-1">Catálogo de Serviços</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Gerencie os serviços disponíveis para contratação pelos clientes.<br/>
+                20 serviços padrão já foram carregados no banco de dados.
+              </p>
+              <Link to="/configuracoes/servicos">
+                <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                  <Package className="h-4 w-4" />Gerenciar Catálogo de Serviços →
+                </button>
+              </Link>
+            </div>
+          </TabsContent>
+        </Tabs>
     </div>
   );
 }

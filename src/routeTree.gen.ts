@@ -16,6 +16,7 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
+import { Route as AppConfiguracoes_servicosRouteImport } from './routes/_app.configuracoes_servicos'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
@@ -59,6 +60,12 @@ const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
   path: '/financeiro',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConfiguracoes_servicosRoute =
+  AppConfiguracoes_servicosRouteImport.update({
+    id: '/configuracoes_servicos',
+    path: '/configuracoes_servicos',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/login-dev': typeof LoginDevRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -122,6 +130,7 @@ export interface FileRoutesByTo {
   '/login-dev': typeof LoginDevRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/login-dev': typeof LoginDevRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/clientes'
     | '/configuracoes'
+    | '/configuracoes_servicos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/clientes'
     | '/configuracoes'
+    | '/configuracoes_servicos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
@@ -191,6 +203,7 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/_app/clientes'
     | '/_app/configuracoes'
+    | '/_app/configuracoes_servicos'
     | '/_app/financeiro'
     | '/_app/obrigacoes'
     | '/_app/whatsapp'
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceiroRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/configuracoes_servicos': {
+      id: '/_app/configuracoes_servicos'
+      path: '/configuracoes_servicos'
+      fullPath: '/configuracoes_servicos'
+      preLoaderRoute: typeof AppConfiguracoes_servicosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/configuracoes': {
       id: '/_app/configuracoes'
       path: '/configuracoes'
@@ -323,6 +343,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppConfiguracoes_servicosRoute: typeof AppConfiguracoes_servicosRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
@@ -337,6 +358,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppConfiguracoes_servicosRoute: AppConfiguracoes_servicosRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
   AppWhatsappRoute: AppWhatsappRoute,
