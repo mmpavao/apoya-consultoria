@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, BarChart3, FileText, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    from: (search.from as string) ?? undefined,
+  }),
   component: LoginPage,
   head: () => ({ meta: [{ title: "Entrar · APOYA Gestão" }] }),
   beforeLoad: async () => {
@@ -38,6 +41,7 @@ const features = [
 /* ── Componente principal ── */
 function LoginPage() {
   const navigate = useNavigate();
+  const { from } = useSearch({ from: Route.fullPath });
   const { signIn, signUp } = useAuth();
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -58,11 +62,11 @@ function LoginPage() {
     try {
       if (mode === "signin") {
         await signIn(email, password);
-        navigate({ to: "/" });
+        navigate({ to: (from && from !== "/login") ? from : "/" });
       } else {
         await signUp(email, password, nome || email.split("@")[0]);
         const { data } = await supabase.auth.getSession();
-        if (data.session) navigate({ to: "/" });
+        if (data.session) navigate({ to: (from && from !== "/login") ? from : "/" });
         else setInfo("Verifique seu e-mail para confirmar o cadastro e depois faça login.");
       }
     } catch (err) {

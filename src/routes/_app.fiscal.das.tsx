@@ -84,9 +84,15 @@ function DasPage() {
     if(!ids.length){ toast.error("Selecione ao menos 1 DAS pendente"); return; }
     setBusy(true);
     toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, {id:"das-lote"});
-    toast.info(`Geração de DAS em lote disponível via integração SERPRO. (${ids.length} guias selecionadas)`); await refresh();
-    setBusy(false);
-    toast.success(`${ids.length} DAS processado(s)`, {id:"das-lote"});
+    try {
+      toast.info(`Geração de DAS em lote disponível via integração SERPRO. (${ids.length} guias selecionadas)`);
+      await refresh();
+      toast.success(`${ids.length} DAS processado(s)`, {id:"das-lote"});
+    } catch (e: any) {
+      toast.error("Erro ao gerar DAS: " + (e?.message ?? "Tente novamente"), {id:"das-lote"});
+    } finally {
+      setBusy(false);
+    }
   }
   function enviarWhats() {
     const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");

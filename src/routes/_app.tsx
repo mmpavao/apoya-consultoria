@@ -11,7 +11,11 @@ export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getSession();
-    if (!data.session) throw redirect({ to: "/login" });
+    if (!data.session) {
+      const location = new URL(request.url);
+      const from = location.pathname + location.search;
+      throw redirect({ to: "/login", search: { from: from !== "/" ? from : undefined } });
+    }
   },
 });
 
@@ -34,7 +38,10 @@ function AppShell() {
 
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/login" });
+    if (!loading && !user) {
+      const from = window.location.pathname + window.location.search;
+      navigate({ to: "/login", search: { from: from !== "/" ? from : undefined } });
+    }
   }, [loading, user, navigate]);
 
   useEffect(() => {

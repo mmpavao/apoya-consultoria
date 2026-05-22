@@ -20,6 +20,7 @@ import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { useNfse, type NfseEmitida, type NfseRecebida } from "@/hooks/use-nfse";
 import { useClientes } from "@/hooks/use-clientes";
+import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
   component: NfsePage,
@@ -56,160 +57,7 @@ function downloadText(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Diálogo de Emissão ────────────────────────────────────────────────────
-function EmitirDialog({
-  open, onClose, clienteId, clienteNome, clienteCnpj, onSuccess,
-}: {
-  open: boolean; onClose: () => void;
-  clienteId: string; clienteNome: string; clienteCnpj: string;
-  onSuccess: () => void;
-}) {
-  const { emitir, loading } = useNfse();
-  const now = new Date();
-  const [form, setForm] = useState({
-    description: "",
-    servicesAmount: "",
-    cityServiceCode: "",
-    issRate: "0",
-    issRetained: false,
-    competencia: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
-    tomadorNome: clienteNome,
-    tomadorCnpj: clienteCnpj,
-    tomadorEmail: "",
-    tomadorUf: "SP",
-    tomadorCidade: "São Paulo",
-    tomadorCidadeCodigo: "3550308",
-    tomadorCep: "",
-    tomadorLogradouro: "",
-    tomadorNumero: "",
-    tomadorBairro: "",
-  });
 
-  async function handleEmitir() {
-    if (!form.description || !form.servicesAmount || !form.cityServiceCode) {
-      toast.error("Preencha: descrição, valor e código de serviço");
-      return;
-    }
-    const nota = {
-      description: form.description,
-      servicesAmount: parseFloat(form.servicesAmount.replace(",", ".")),
-      cityServiceCode: form.cityServiceCode,
-      issRate: parseFloat(form.issRate) / 100 || 0,
-      issRetained: form.issRetained,
-      competencia: form.competencia,
-      borrower: {
-        name: form.tomadorNome,
-        federalTaxNumber: form.tomadorCnpj.replace(/\D/g, ""),
-        email: form.tomadorEmail || undefined,
-        address: {
-          country: "BRA",
-          postalCode: form.tomadorCep.replace(/\D/g, "") || undefined,
-          street: form.tomadorLogradouro || undefined,
-          number: form.tomadorNumero || undefined,
-          district: form.tomadorBairro || undefined,
-          state: form.tomadorUf,
-          city: { code: form.tomadorCidadeCodigo, name: form.tomadorCidade },
-        },
-      },
-    };
-    const result = await emitir(clienteId, nota as any);
-    if (result) { onSuccess(); onClose(); }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-primary" />
-            Emitir NFS-e — {clienteNome}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {/* Serviço */}
-          <div className="space-y-3 rounded-lg border border-border/60 p-4 bg-muted/20">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Serviço</p>
-            <div>
-              <Label className="text-xs mb-1 block">Descrição *</Label>
-              <Textarea value={form.description} rows={2}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                placeholder="Serviços de contabilidade referente ao mês..." />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs mb-1 block">Valor (R$) *</Label>
-                <Input value={form.servicesAmount}
-                  onChange={(e) => setForm(p => ({ ...p, servicesAmount: e.target.value }))}
-                  placeholder="1500,00" />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Cód. Serviço LC116 *</Label>
-                <Input value={form.cityServiceCode}
-                  onChange={(e) => setForm(p => ({ ...p, cityServiceCode: e.target.value }))}
-                  placeholder="17.19" />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Alíquota ISS (%)</Label>
-                <Input value={form.issRate}
-                  onChange={(e) => setForm(p => ({ ...p, issRate: e.target.value }))}
-                  placeholder="2" />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Competência</Label>
-                <Input type="month" value={form.competencia}
-                  onChange={(e) => setForm(p => ({ ...p, competencia: e.target.value }))} />
-              </div>
-            </div>
-          </div>
-
-          {/* Tomador */}
-          <div className="space-y-3 rounded-lg border border-border/60 p-4 bg-muted/20">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tomador do Serviço</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <Label className="text-xs mb-1 block">Nome / Razão Social</Label>
-                <Input value={form.tomadorNome}
-                  onChange={(e) => setForm(p => ({ ...p, tomadorNome: e.target.value }))} />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">CNPJ / CPF</Label>
-                <Input value={form.tomadorCnpj}
-                  onChange={(e) => setForm(p => ({ ...p, tomadorCnpj: e.target.value }))} />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">E-mail</Label>
-                <Input value={form.tomadorEmail}
-                  onChange={(e) => setForm(p => ({ ...p, tomadorEmail: e.target.value }))}
-                  placeholder="financeiro@empresa.com" />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Cidade</Label>
-                <Input value={form.tomadorCidade}
-                  onChange={(e) => setForm(p => ({ ...p, tomadorCidade: e.target.value }))} />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">UF</Label>
-                <Input value={form.tomadorUf} maxLength={2}
-                  onChange={(e) => setForm(p => ({ ...p, tomadorUf: e.target.value.toUpperCase() }))} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
-          <Button onClick={handleEmitir} disabled={loading} className="gap-2">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Emitir Nota
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Página principal ──────────────────────────────────────────────────────
 function NfsePage() {
   const now = new Date();
   const { clientes } = useClientes();
@@ -486,16 +334,12 @@ function NfsePage() {
       )}
 
       {/* Diálogo emissão */}
-      {dialogEmitir && (
-        <EmitirDialog
-          open={dialogEmitir}
-          onClose={() => setDialogEmitir(false)}
-          clienteId={clienteSel?.id ?? ""}
-          clienteNome={clienteSel?.nome ?? ""}
-          clienteCnpj={clienteSel?.cnpj ?? ""}
-          onSuccess={load}
-        />
-      )}
+      <EmitirNfseModal
+        open={dialogEmitir}
+        onClose={() => setDialogEmitir(false)}
+        clientePreSelecionado={clienteSel ?? undefined}
+        onSucesso={() => { setDialogEmitir(false); load(); }}
+      />
     </div>
   );
 }
