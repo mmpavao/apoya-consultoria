@@ -20,6 +20,8 @@ import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoe
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
+import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
+import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
@@ -81,6 +83,16 @@ const ApiWaInstancesRoute = ApiWaInstancesRouteImport.update({
   path: '/api/wa/instances',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSerproStatusRoute = ApiSerproStatusRouteImport.update({
+  id: '/api/serpro/status',
+  path: '/api/serpro/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSerproCallRoute = ApiSerproCallRouteImport.update({
+  id: '/api/serpro/call',
+  path: '/api/serpro/call',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppFiscalSerproRoute = AppFiscalSerproRouteImport.update({
   id: '/fiscal/serpro',
   path: '/fiscal/serpro',
@@ -128,6 +140,8 @@ export interface FileRoutesByFullPath {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/serpro/call': typeof ApiSerproCallRoute
+  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/fiscal/': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -146,6 +160,8 @@ export interface FileRoutesByTo {
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/serpro/call': typeof ApiSerproCallRoute
+  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/fiscal': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -166,6 +182,8 @@ export interface FileRoutesById {
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
+  '/api/serpro/call': typeof ApiSerproCallRoute
+  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -186,6 +204,8 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/api/serpro/call'
+    | '/api/serpro/status'
     | '/api/wa/instances'
     | '/fiscal/'
     | '/api/public/evolution-webhook/$instance'
@@ -204,6 +224,8 @@ export interface FileRouteTypes {
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
+    | '/api/serpro/call'
+    | '/api/serpro/status'
     | '/api/wa/instances'
     | '/fiscal'
     | '/api/public/evolution-webhook/$instance'
@@ -223,6 +245,8 @@ export interface FileRouteTypes {
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
+    | '/api/serpro/call'
+    | '/api/serpro/status'
     | '/api/wa/instances'
     | '/_app/fiscal/'
     | '/api/public/evolution-webhook/$instance'
@@ -232,6 +256,8 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   LoginDevRoute: typeof LoginDevRoute
+  ApiSerproCallRoute: typeof ApiSerproCallRoute
+  ApiSerproStatusRoute: typeof ApiSerproStatusRoute
   ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
 }
@@ -315,6 +341,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWaInstancesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/serpro/status': {
+      id: '/api/serpro/status'
+      path: '/api/serpro/status'
+      fullPath: '/api/serpro/status'
+      preLoaderRoute: typeof ApiSerproStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/serpro/call': {
+      id: '/api/serpro/call'
+      path: '/api/serpro/call'
+      fullPath: '/api/serpro/call'
+      preLoaderRoute: typeof ApiSerproCallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/fiscal/serpro': {
       id: '/_app/fiscal/serpro'
       path: '/fiscal/serpro'
@@ -396,6 +436,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   LoginDevRoute: LoginDevRoute,
+  ApiSerproCallRoute: ApiSerproCallRoute,
+  ApiSerproStatusRoute: ApiSerproStatusRoute,
   ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiPublicEvolutionWebhookInstanceRoute:
     ApiPublicEvolutionWebhookInstanceRoute,
