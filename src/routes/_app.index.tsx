@@ -1,53 +1,30 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  AlertTriangle, ArrowRight, ArrowUpRight, Building2, Calendar,
-  CheckCircle2, Clock, DollarSign, FileText, MessageSquare, Receipt,
+  AlertTriangle, ArrowRight, Building2, Calendar,
+  CheckCircle2, Clock, DollarSign, FileText, Info,
+  Loader2, MessageSquare, Receipt, RefreshCw,
   TrendingUp, Users, Zap,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useAuth } from "@/hooks/use-auth";
+import { useDashboard, type AlertaDash } from "@/hooks/use-dashboard";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
   head: () => ({ meta: [{ title: "Dashboard · APOYA Gestão" }] }),
 });
 
-/* ─── Mock data ───────────────────────────────────────── */
-const honorariosData = [
-  { mes: "Jan", recebido: 38200, previsto: 40000 },
-  { mes: "Fev", recebido: 41500, previsto: 40000 },
-  { mes: "Mar", recebido: 39800, previsto: 42000 },
-  { mes: "Abr", recebido: 43200, previsto: 42000 },
-  { mes: "Mai", recebido: 45100, previsto: 44000 },
-  { mes: "Jun", recebido: 0,     previsto: 46000 },
-];
+/* ── Helpers ──────────────────────────────────────────────── */
+const fmtBRL = (v: number) =>
+  v > 0
+    ? v >= 1_000
+      ? `R$ ${(v / 1_000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`
+      : `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`
+    : "R$ 0";
 
-const alertas = [
-  { tipo: "danger",  icon: AlertTriangle, texto: "3 clientes com DAS vencendo amanhã",  sub: "Ação necessária hoje" },
-  { tipo: "warning", icon: Clock,         texto: "2 NFS-e com dados incompletos",       sub: "Revisar antes do envio" },
-  { tipo: "warning", icon: AlertTriangle, texto: "DCTFWeb de maio ainda não enviada",   sub: "Prazo: último dia útil" },
-  { tipo: "success", icon: CheckCircle2,  texto: "DAS de abril 100% emitido",           sub: "72/72 — enviado por WhatsApp" },
-] as const;
-
-const calFiscal = [
-  { dia: "20", mes: "Mai", label: "DAS — Simples Nacional",   urgente: true  },
-  { dia: "20", mes: "Mai", label: "DASMEI — vencimento",       urgente: true  },
-  { dia: "31", mes: "Mai", label: "DCTFWeb — maio",            urgente: false },
-  { dia: "10", mes: "Jun", label: "DIRBI — maio",              urgente: false },
-  { dia: "15", mes: "Jun", label: "eSocial — competência maio",urgente: false },
-];
-
-const ultimosClientes = [
-  { nome: "Padaria Pão Dourado Ltda", regime: "Simples",         status: "ativo",        honorario: "R$ 680" },
-  { nome: "Clínica Saúde Total ME",   regime: "Lucro Presumido", status: "ativo",        honorario: "R$ 1.200" },
-  { nome: "Tech Solutions Ltda",      regime: "Simples",         status: "inadimplente", honorario: "R$ 850" },
-  { nome: "Maria Silva MEI",          regime: "MEI",             status: "ativo",        honorario: "R$ 120" },
-  { nome: "Construção RJ Ltda",       regime: "Lucro Presumido", status: "suspenso",     honorario: "R$ 2.100" },
-];
-
-/* ─── Components ──────────────────────────────────────── */
 const statusCfg: Record<string, string> = {
   ativo:        "bg-emerald-50 text-emerald-700",
   inadimplente: "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]",
@@ -55,6 +32,7 @@ const statusCfg: Record<string, string> = {
   inativo:      "bg-muted      text-muted-foreground",
 };
 
+/* ── Componentes ──────────────────────────────────────────── */
 function StatBig({
   label, value, sub, icon: Icon, dark, negative,
 }: {
@@ -100,26 +78,31 @@ function MiniLink({
   return (
     <Link
       to={to}
-      className="group surface-card p-5 transition-all hover:border-primary/40 hover:shadow-elevated"
+      className="surface-card group flex items-center gap-4 p-5 transition-shadow hover:shadow-elevated"
     >
-      <div className="mb-3 flex items-center justify-between text-sm text-muted-foreground">
-        <span className="flex items-center gap-2"><Icon className="h-4 w-4" /> {label}</span>
-        <ArrowUpRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="font-display text-xl font-bold tracking-tight text-foreground">{value}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
       </div>
-      <p className="font-display text-2xl font-semibold tracking-tight">{value}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+      <ArrowRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
     </Link>
   );
 }
 
-const alertaCfg = {
-  danger:  { ring: "ring-destructive/20", icon: "bg-destructive/10 text-destructive" },
-  warning: { ring: "ring-[oklch(0.78_0.155_82/0.30)]", icon: "bg-[oklch(0.97_0.045_82)] text-[oklch(0.48_0.130_82)]" },
-  success: { ring: "ring-emerald-200/60", icon: "bg-emerald-50 text-emerald-700" },
+const alertIconMap = {
+  danger:  { Icon: AlertTriangle, ring: "ring-destructive/20", icon: "bg-destructive/10 text-destructive" },
+  warning: { Icon: Clock,         ring: "ring-amber-200",      icon: "bg-amber-50 text-amber-700" },
+  success: { Icon: CheckCircle2,  ring: "ring-emerald-200",    icon: "bg-emerald-50 text-emerald-700" },
+  info:    { Icon: Info,          ring: "ring-blue-200",       icon: "bg-blue-50 text-blue-700" },
 } as const;
 
-function AlertaItem({ tipo, icon: Icon, texto, sub }: typeof alertas[number]) {
-  const cfg = alertaCfg[tipo];
+function AlertaItem({ tipo, texto, sub }: AlertaDash) {
+  const cfg = alertIconMap[tipo] ?? alertIconMap.info;
+  const { Icon } = cfg;
   return (
     <div className={`flex items-start gap-3 rounded-2xl bg-muted/40 p-4 ring-1 ${cfg.ring}`}>
       <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${cfg.icon}`}>
@@ -133,29 +116,72 @@ function AlertaItem({ tipo, icon: Icon, texto, sub }: typeof alertas[number]) {
   );
 }
 
-/* ─── Page ────────────────────────────────────────────── */
+/* ── Skeleton de carregamento ─────────────────────────────── */
+function DashSkeleton() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <div className="h-16 rounded-2xl bg-muted/60" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted/60" />)}
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-2xl bg-muted/60" />)}
+      </div>
+    </div>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────── */
 function Dashboard() {
   const { profile, user } = useAuth();
+  const { data, loading, error, refetch } = useDashboard();
+
   const nome = profile?.nome?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Contador";
 
   const acoes = [
-    { to: "/fiscal/das",  label: "Emitir DAS",     icon: FileText },
-    { to: "/fiscal/nfse", label: "Emitir NFS-e",   icon: Receipt },
-    { to: "/clientes",    label: "Novo cliente",   icon: Building2 },
-    { to: "/whatsapp",    label: "WhatsApp",       icon: MessageSquare },
+    { to: "/fiscal/das",  label: "Emitir DAS",   icon: FileText },
+    { to: "/fiscal/nfse", label: "Emitir NFS-e", icon: Receipt },
+    { to: "/clientes",    label: "Novo cliente", icon: Building2 },
+    { to: "/whatsapp",    label: "WhatsApp",     icon: MessageSquare },
   ];
+
+  if (loading) return <DashSkeleton />;
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <AlertTriangle className="h-10 w-10 text-destructive" />
+        <p className="text-muted-foreground">{error ?? "Erro ao carregar dashboard"}</p>
+        <Button variant="outline" onClick={refetch}><RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente</Button>
+      </div>
+    );
+  }
+
+  const { kpis, calFiscal, clientesRecentes, honorariosData, alertas } = data;
+
+  const urgentesCount = alertas.filter(a => a.tipo === "danger").length;
+  const vencSemana    = calFiscal.filter(c => c.urgente).length;
+
+  const acumulado = honorariosData.reduce((s, m) => s + m.recebido, 0);
 
   return (
     <div className="space-y-8 animate-fade-up">
 
-      {/* ── Header da página ───────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Bem-vindo de volta</p>
           <h1 className="page-title mt-1">Olá, {nome} 👋</h1>
-          <p className="page-subtitle">Você tem <span className="font-semibold text-primary">3 alertas</span> e <span className="font-semibold text-foreground">5 vencimentos</span> esta semana.</p>
+          <p className="page-subtitle">
+            {urgentesCount > 0
+              ? <>Você tem <span className="font-semibold text-destructive">{urgentesCount} alerta{urgentesCount > 1 ? "s" : ""} crítico{urgentesCount > 1 ? "s" : ""}</span>{vencSemana > 0 ? <> e <span className="font-semibold text-foreground">{vencSemana} vencimento{vencSemana > 1 ? "s" : ""}</span> esta semana</> : ""}.</>
+              : "Tudo em dia. Bom trabalho! 🎉"}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={refetch} title="Atualizar dados" className="h-9 w-9 rounded-full">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           {acoes.map((a) => (
             <Link
               key={a.to}
@@ -168,22 +194,63 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* ── KPIs principais ────────────────────────────── */}
+      {/* ── KPIs principais ─────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatBig label="Clientes ativos"  value="72"       sub="+3 este mês" icon={Building2} dark />
-        <StatBig label="Honorários (Mai)" value="R$ 45,1k" sub="+4,4% vs Abr" icon={DollarSign} />
-        <StatBig label="Inadimplentes"    value="6"        sub="2 críticos"   icon={AlertTriangle} negative />
-        <StatBig label="DAS em aberto"    value="3"        sub="vencem amanhã" icon={FileText} />
+        <StatBig
+          label="Clientes ativos"
+          value={kpis.clientesAtivos}
+          sub={`${kpis.clientesTotal} total · ${kpis.suspensos} suspenso${kpis.suspensos !== 1 ? "s" : ""}`}
+          icon={Building2}
+          dark
+        />
+        <StatBig
+          label="Honorários (mês)"
+          value={kpis.honorariosMes > 0 ? fmtBRL(kpis.honorariosMes) : "—"}
+          sub={kpis.honorariosAtraso > 0 ? `${fmtBRL(kpis.honorariosAtraso)} em atraso` : "Sem atraso"}
+          icon={DollarSign}
+        />
+        <StatBig
+          label="Inadimplentes"
+          value={kpis.inadimplentes}
+          sub={kpis.inadimplentes > 0 ? "Régua de cobrança ativa" : "Todos em dia"}
+          icon={AlertTriangle}
+          negative={kpis.inadimplentes > 0}
+        />
+        <StatBig
+          label="DAS em aberto"
+          value={kpis.dasEmAberto}
+          sub={kpis.dasVencendoHoje > 0 ? `${kpis.dasVencendoHoje} vence${kpis.dasVencendoHoje === 1 ? "" : "m"} hoje/amanhã` : "Sem urgência imediata"}
+          icon={FileText}
+          negative={kpis.dasVencendoHoje > 0}
+        />
       </div>
 
-      {/* ── Mini-cards (módulos) ───────────────────────── */}
+      {/* ── Mini-cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <MiniLink to="/obrigacoes" label="Obrigações do mês"   value="142"     sub="38 pendentes · 4 atrasadas" icon={Calendar} />
-        <MiniLink to="/financeiro" label="Cobranças do mês"    value="R$ 51k"  sub="R$ 8,2k em atraso"          icon={DollarSign} />
-        <MiniLink to="/whatsapp"   label="Mensagens não lidas" value="12"      sub="3 conversas humanas"        icon={MessageSquare} />
+        <MiniLink
+          to="/obrigacoes"
+          label="Obrigações do mês"
+          value={String(kpis.obrigacoesMes)}
+          sub={`${kpis.obrigacoesPendentes} pendente${kpis.obrigacoesPendentes !== 1 ? "s" : ""} · ${kpis.obrigacoesAtrasadas} atrasada${kpis.obrigacoesAtrasadas !== 1 ? "s" : ""}`}
+          icon={Calendar}
+        />
+        <MiniLink
+          to="/financeiro"
+          label="NFS-e emitidas no mês"
+          value={String(kpis.nfseEmitidaMes)}
+          sub={kpis.honorariosAtraso > 0 ? `${fmtBRL(kpis.honorariosAtraso)} de cobranças vencidas` : "Cobranças em dia"}
+          icon={DollarSign}
+        />
+        <MiniLink
+          to="/whatsapp"
+          label="Mensagens não lidas"
+          value={String(kpis.wasMsgNaoLidas)}
+          sub={kpis.wasMsgNaoLidas > 0 ? "Clientes aguardando resposta" : "Nenhuma mensagem pendente"}
+          icon={MessageSquare}
+        />
       </div>
 
-      {/* ── Alertas + Calendário fiscal ────────────────── */}
+      {/* ── Alertas + Calendário fiscal ─────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         {/* Alertas */}
@@ -195,10 +262,15 @@ function Dashboard() {
               </span>
               Alertas do dia
             </h2>
-            <span className="pill bg-destructive/10 text-destructive">3 urgentes</span>
+            {urgentesCount > 0 && (
+              <span className="pill bg-destructive/10 text-destructive">{urgentesCount} urgente{urgentesCount > 1 ? "s" : ""}</span>
+            )}
           </div>
           <div className="space-y-3 px-6 pb-6">
-            {alertas.map((a, i) => <AlertaItem key={i} {...a} />)}
+            {alertas.length === 0
+              ? <p className="text-sm text-muted-foreground">Nenhum alerta 🎉</p>
+              : alertas.map((a, i) => <AlertaItem key={i} {...a} />)
+            }
           </div>
         </section>
 
@@ -216,29 +288,32 @@ function Dashboard() {
             </Link>
           </div>
           <div className="px-6 pb-6 space-y-2.5">
-            {calFiscal.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 rounded-2xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/30"
-              >
-                <div className={
-                  "shrink-0 flex flex-col items-center justify-center rounded-xl h-12 w-14 " +
-                  (item.urgente
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-muted text-foreground")
-                }>
-                  <span className="font-display text-lg font-bold leading-none">{item.dia}</span>
-                  <span className="text-[9px] uppercase tracking-wider mt-0.5 opacity-70">{item.mes}</span>
+            {calFiscal.length === 0
+              ? <p className="text-sm text-muted-foreground">Nenhum vencimento próximo.</p>
+              : calFiscal.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-2xl border border-border/60 bg-card p-3 transition-colors hover:border-primary/30"
+                >
+                  <div className={
+                    "shrink-0 flex flex-col items-center justify-center rounded-xl h-12 w-14 " +
+                    (item.urgente
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-muted text-foreground")
+                  }>
+                    <span className="font-display text-lg font-bold leading-none">{item.dia}</span>
+                    <span className="text-[9px] uppercase tracking-wider mt-0.5 opacity-70">{item.mes}</span>
+                  </div>
+                  <p className="flex-1 text-sm font-medium">{item.label}</p>
+                  {item.urgente && <span className="pill bg-destructive/10 text-destructive">Urgente</span>}
                 </div>
-                <p className="flex-1 text-sm font-medium">{item.label}</p>
-                {item.urgente && <span className="pill bg-destructive/10 text-destructive">Urgente</span>}
-              </div>
-            ))}
+              ))
+            }
           </div>
         </section>
       </div>
 
-      {/* ── Honorários — gráfico ───────────────────────── */}
+      {/* ── Honorários — gráfico ────────────────────────────── */}
       <section className="surface-card">
         <div className="flex items-center justify-between px-6 pt-6 pb-3">
           <div>
@@ -246,13 +321,13 @@ function Dashboard() {
               <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-50 text-emerald-700">
                 <TrendingUp className="h-3.5 w-3.5" />
               </span>
-              Honorários 2025
+              Honorários — últimos 6 meses
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">Recebido vs. previsto</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Acumulado</p>
-            <p className="font-display text-xl font-bold tracking-tight">R$ 208.800</p>
+            <p className="font-display text-xl font-bold tracking-tight">{fmtBRL(acumulado)}</p>
           </div>
         </div>
         <div className="px-3 pb-4">
@@ -282,7 +357,7 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* ── Clientes recentes ──────────────────────────── */}
+      {/* ── Clientes recentes ───────────────────────────────── */}
       <section className="surface-card">
         <div className="flex items-center justify-between px-6 py-5">
           <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -295,26 +370,33 @@ function Dashboard() {
             Ver todos <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div>
-          {ultimosClientes.map((c, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 border-t border-border/60 px-6 py-4 transition-colors hover:bg-muted/30"
-            >
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                {c.nome[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{c.nome}</p>
-                <p className="text-xs text-muted-foreground">{c.regime}</p>
-              </div>
-              <span className={"pill " + (statusCfg[c.status] ?? statusCfg.inativo)}>
-                {c.status[0].toUpperCase() + c.status.slice(1)}
-              </span>
-              <span className="hidden sm:block w-20 text-right text-sm font-semibold">{c.honorario}</span>
-            </div>
-          ))}
-        </div>
+        {clientesRecentes.length === 0 ? (
+          <p className="px-6 pb-6 text-sm text-muted-foreground">Nenhum cliente cadastrado ainda.</p>
+        ) : (
+          <div>
+            {clientesRecentes.map((c) => (
+              <Link
+                key={c.id}
+                to={`/clientes/${c.id}`}
+                className="flex items-center gap-4 border-t border-border/60 px-6 py-4 transition-colors hover:bg-muted/30"
+              >
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                  {c.nome[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{c.nome}</p>
+                  <p className="text-xs text-muted-foreground">{c.regime}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={"pill " + (statusCfg[c.status] ?? statusCfg.inativo)}>
+                    {c.status[0]?.toUpperCase() + c.status.slice(1)}
+                  </span>
+                  <span className="hidden sm:block text-sm font-medium text-muted-foreground w-24 text-right">{c.honorario}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
     </div>
