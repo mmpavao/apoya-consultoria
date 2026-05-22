@@ -6,12 +6,12 @@
  *
  * Antes de chamar o MCP, valida:
  *   - Autenticação do usuário (Bearer Supabase)
- *   - Elegibilidade do cliente (regime, certificado, procuração)
+ *   - Loga resultado (ok/erro) em serpro_log
  *   - Loga resultado em serpro_log
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { checkEligibility, SERPRO_TOOLS } from "@/lib/serpro/tools-catalog";
+import { SERPRO_TOOLS } from "@/lib/serpro/tools-catalog";
 
 const MCP_URL = "https://mcp.zapro.tech/mcp";
 const MCP_TOKEN = "apoya-mcp-serpro-2026";
@@ -63,22 +63,9 @@ export const Route = createFileRoute("/api/serpro/call")({
           clienteData = data;
         }
 
-        // Verificar elegibilidade
-        if (clienteData) {
-          const elig = checkEligibility(tool, clienteData);
-          if (!elig.eligible) {
-            await db.from("serpro_log").insert({
-              cliente_id,
-              tool,
-              parametros: params,
-              status: "bloqueado",
-              erro_msg: elig.reason,
-              created_by: userId,
-              duracao_ms: 0,
-            });
-            return json({ error: elig.reason, blocked: true }, 403);
-          }
-        }
+        // Elegibilidade: NÃO bloqueamos no servidor.
+        // O MCP SERPRO decide se o acesso é permitido ou não.
+        // Apenas logamos a tentativa — o resultado do MCP fala por si.
 
         // Chamar o MCP
         try {
