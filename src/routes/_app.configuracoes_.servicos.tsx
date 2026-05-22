@@ -19,7 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useServicoCatalogo, type ServicoCatalogo } from "@/hooks/use-servicos";
 
-export const Route = createFileRoute("/_app/configuracoes_servicos")({
+export const Route = createFileRoute("/_app/configuracoes_/servicos")({
   component: ConfiguracoeServicosPage,
   head: () => ({ meta: [{ title: "Catálogo de Serviços · APOYA Gestão" }] }),
 });

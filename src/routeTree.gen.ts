@@ -16,13 +16,13 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
-import { Route as AppConfiguracoes_servicosRouteImport } from './routes/_app.configuracoes_servicos'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
+import { Route as AppConfiguracoesServicosRouteImport } from './routes/_app.configuracoes_.servicos'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
 import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
 
@@ -60,12 +60,6 @@ const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
   path: '/financeiro',
   getParentRoute: () => AppRoute,
 } as any)
-const AppConfiguracoes_servicosRoute =
-  AppConfiguracoes_servicosRouteImport.update({
-    id: '/configuracoes_servicos',
-    path: '/configuracoes_servicos',
-    getParentRoute: () => AppRoute,
-  } as any)
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
@@ -96,6 +90,12 @@ const AppFiscalDasRoute = AppFiscalDasRouteImport.update({
   path: '/fiscal/das',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConfiguracoesServicosRoute =
+  AppConfiguracoesServicosRouteImport.update({
+    id: '/configuracoes_/servicos',
+    path: '/configuracoes/servicos',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppClientesIdRoute = AppClientesIdRouteImport.update({
   id: '/clientes_/$id',
   path: '/clientes/$id',
@@ -114,11 +114,11 @@ export interface FileRoutesByFullPath {
   '/login-dev': typeof LoginDevRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
-  '/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
   '/clientes/$id': typeof AppClientesIdRoute
+  '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -130,12 +130,12 @@ export interface FileRoutesByTo {
   '/login-dev': typeof LoginDevRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
-  '/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
   '/': typeof AppIndexRoute
   '/clientes/$id': typeof AppClientesIdRoute
+  '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -149,12 +149,12 @@ export interface FileRoutesById {
   '/login-dev': typeof LoginDevRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
-  '/_app/configuracoes_servicos': typeof AppConfiguracoes_servicosRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
   '/_app/': typeof AppIndexRoute
   '/_app/clientes_/$id': typeof AppClientesIdRoute
+  '/_app/configuracoes_/servicos': typeof AppConfiguracoesServicosRoute
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -169,11 +169,11 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/clientes'
     | '/configuracoes'
-    | '/configuracoes_servicos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
     | '/clientes/$id'
+    | '/configuracoes/servicos'
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
@@ -185,12 +185,12 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/clientes'
     | '/configuracoes'
-    | '/configuracoes_servicos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
     | '/'
     | '/clientes/$id'
+    | '/configuracoes/servicos'
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
@@ -203,12 +203,12 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/_app/clientes'
     | '/_app/configuracoes'
-    | '/_app/configuracoes_servicos'
     | '/_app/financeiro'
     | '/_app/obrigacoes'
     | '/_app/whatsapp'
     | '/_app/'
     | '/_app/clientes_/$id'
+    | '/_app/configuracoes_/servicos'
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
@@ -274,13 +274,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceiroRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/configuracoes_servicos': {
-      id: '/_app/configuracoes_servicos'
-      path: '/configuracoes_servicos'
-      fullPath: '/configuracoes_servicos'
-      preLoaderRoute: typeof AppConfiguracoes_servicosRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/configuracoes': {
       id: '/_app/configuracoes'
       path: '/configuracoes'
@@ -323,6 +316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFiscalDasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/configuracoes_/servicos': {
+      id: '/_app/configuracoes_/servicos'
+      path: '/configuracoes/servicos'
+      fullPath: '/configuracoes/servicos'
+      preLoaderRoute: typeof AppConfiguracoesServicosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/clientes_/$id': {
       id: '/_app/clientes_/$id'
       path: '/clientes/$id'
@@ -343,12 +343,12 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
-  AppConfiguracoes_servicosRoute: typeof AppConfiguracoes_servicosRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
   AppIndexRoute: typeof AppIndexRoute
   AppClientesIdRoute: typeof AppClientesIdRoute
+  AppConfiguracoesServicosRoute: typeof AppConfiguracoesServicosRoute
   AppFiscalDasRoute: typeof AppFiscalDasRoute
   AppFiscalNfseRoute: typeof AppFiscalNfseRoute
   AppFiscalSerproRoute: typeof AppFiscalSerproRoute
@@ -358,12 +358,12 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
-  AppConfiguracoes_servicosRoute: AppConfiguracoes_servicosRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
   AppWhatsappRoute: AppWhatsappRoute,
   AppIndexRoute: AppIndexRoute,
   AppClientesIdRoute: AppClientesIdRoute,
+  AppConfiguracoesServicosRoute: AppConfiguracoesServicosRoute,
   AppFiscalDasRoute: AppFiscalDasRoute,
   AppFiscalNfseRoute: AppFiscalNfseRoute,
   AppFiscalSerproRoute: AppFiscalSerproRoute,
