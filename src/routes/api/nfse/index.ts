@@ -10,6 +10,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const NFSEIO_BASE = "https://api.nfe.io/v1";
+const FALLBACK_EMITENTE_ID = "10ecf6c4445648549695358f7ac944e7"; // ZAP TECHNOLOGY (DEV)
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -66,19 +67,6 @@ async function getSupabaseUser(authHeader: string) {
   return { userId: d.id, token };
 }
 
-async function supaQuery(token: string, query: string) {
-  const r = await fetch("https://ajaqbdsalxfgrwpjbtbn.supabase.co/rest/v1/rpc/sql_query", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM",
-    },
-    body: JSON.stringify({ query }),
-  });
-  return r.json().catch(() => []);
-}
-
 async function supaRest(token: string, table: string, method: string, body?: unknown, params?: string) {
   const SUPA = "https://ajaqbdsalxfgrwpjbtbn.supabase.co/rest/v1";
   const SERVICE = (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY
@@ -121,11 +109,25 @@ async function logOp(
   });
 }
 
+/**
+ * Obter o ID do emitente da APOYA.
+ * Busca em escritorio_config.nfseio_emitente_id.
+ * Se não encontrar, usa fallback (ZAP TECHNOLOGY para DEV).
+ * ✅ FIX BUG-05: adicionado try/catch + logging
+ */
 async function getEmitenteId(token: string): Promise<string> {
-  // Buscar do escritorio_config
-  const rows = await supaRest(token, "escritorio_config", "GET", undefined, "select=nfseio_emitente_id&limit=1");
-  const id = Array.isArray(rows) ? rows[0]?.nfseio_emitente_id : null;
-  return id ?? "10ecf6c4445648549695358f7ac944e7"; // fallback
+  try {
+    const rows = await supaRest(token, "escritorio_config", "GET", undefined, "select=nfseio_emitente_id&limit=1");
+    const id = Array.isArray(rows) ? rows[0]?.nfseio_emitente_id : null;
+    if (id) {
+      console.log(`[nfse-api] emitente encontrado: ${id}`);
+      return id;
+    }
+  } catch (e) {
+    console.error(`[nfse-api] erro ao buscar emitente: ${(e as any)?.message}`);
+  }
+  console.warn(`[nfse-api] usando fallback emitente: ${FALLBACK_EMITENTE_ID}`);
+  return FALLBACK_EMITENTE_ID;
 }
 
 export const Route = createFileRoute("/api/nfse/")({
@@ -237,7 +239,6 @@ export const Route = createFileRoute("/api/nfse/")({
           const emitenteId = body.emitente_id ?? (await getEmitenteId(token));
 
           try {
-            // Seguir redirect manualmente
             const key = getNfseKey();
             const r = await fetch(
               `${NFSEIO_BASE}/companies/${emitenteId}/serviceinvoices/${nId}/pdf`,
@@ -245,7 +246,7 @@ export const Route = createFileRoute("/api/nfse/")({
             if (!r.ok) return err(`PDF não disponível (HTTP ${r.status})`, 502);
             const buf = await r.arrayBuffer();
             const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-            return json({ ok: true, pdf_base64: b64, nfseio_id: nId });
+            return json({ ok: true, pdf_base64: b64 });
           } catch (e: any) {
             return err(e?.message ?? "Falha ao buscar PDF", 502);
           }
@@ -257,10 +258,7 @@ export const Route = createFileRoute("/api/nfse/")({
           let nId = nfseio_id;
           if (!nId && nota_id) {
             const rows = await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "GET",
-              undefined, "select=nfseio_id,xml_content");
-            if (Array.isArray(rows) && rows[0]?.xml_content) {
-              return json({ ok: true, xml: rows[0].xml_content });
-            }
+              undefined, "select=nfseio_id,cliente_id");
             nId = Array.isArray(rows) ? rows[0]?.nfseio_id : null;
           }
           if (!nId) return err("nfseio_id não encontrado");
@@ -273,7 +271,6 @@ export const Route = createFileRoute("/api/nfse/")({
               { headers: { Authorization: key }, redirect: "follow" });
             if (!r.ok) return err(`XML não disponível (HTTP ${r.status})`, 502);
             const xml = await r.text();
-            // Salvar no banco
             if (nota_id) {
               await supaRest(token, `nfse_emitida?id=eq.${nota_id}`, "PATCH", { xml_content: xml });
             }
