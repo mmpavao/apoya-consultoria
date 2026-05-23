@@ -620,6 +620,14 @@ function ClienteDetailPage() {
               <Switch checked={form.temIncentivoFiscal ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, temIncentivoFiscal: v }))} />
               <Label>Tem incentivo fiscal</Label>
             </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch checked={(form as any).tem_certificado ?? false} onCheckedChange={(v) => setForm((p: any) => ({ ...p, tem_certificado: v }))} />
+              <Label>Certificado Digital A1/A3</Label>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch checked={(form as any).tem_procuracao ?? false} onCheckedChange={(v) => setForm((p: any) => ({ ...p, tem_procuracao: v }))} />
+              <Label>Procuração eCAC cadastrada</Label>
+            </div>
             <div className="space-y-1.5">
               <Label>Alíquota ISS (%)</Label>
               <Input value={(form as any).aliquotaIss ?? ""} type="number" step="0.5" min="0" max="5"

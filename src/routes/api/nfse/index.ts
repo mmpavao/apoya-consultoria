@@ -8,6 +8,7 @@
  * Emitente: escritorio_config.nfseio_emitente_id
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { supabaseServiceFetch } from "@/lib/supabase-server";
 
 const NFSEIO_BASE = "https://api.nfe.io/v1";
 const FALLBACK_EMITENTE_ID = "10ecf6c4445648549695358f7ac944e7"; // ZAP TECHNOLOGY (DEV)
@@ -67,21 +68,9 @@ async function getSupabaseUser(authHeader: string) {
   return { userId: d.id, token };
 }
 
-async function supaRest(token: string, table: string, method: string, body?: unknown, params?: string) {
-  const SUPA = "https://ajaqbdsalxfgrwpjbtbn.supabase.co/rest/v1";
-  const SERVICE = (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY
-    ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Prefer: method === "POST" ? "return=representation" : "return=minimal",
-    apikey: SERVICE || token,
-    Authorization: SERVICE ? `Bearer ${SERVICE}` : `Bearer ${token}`,
-  };
-  const r = await fetch(`${SUPA}/${table}${params ? "?" + params : ""}`, {
-    method, headers,
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  return r.json().catch(() => ({}));
+async function supaRest(_token: string, table: string, method: string, body?: unknown, params?: string) {
+  // Usa sempre SERVICE_ROLE para garantir acesso irrestrito (server-side only)
+  return supabaseServiceFetch(table, method as "GET"|"POST"|"PATCH"|"DELETE", params, body);
 }
 
 async function logOp(

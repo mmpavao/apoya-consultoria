@@ -126,6 +126,8 @@ export function useClienteById(id: string) {
     if (patch.cpf                 !== undefined) dbPatch.cpf                     = patch.cpf;
     if (patch.nfseioEmitenteId    !== undefined) dbPatch.nfseio_emitente_id      = patch.nfseioEmitenteId;
     if (patch.codigoMunicipioIbge !== undefined) dbPatch.codigo_municipio_ibge   = patch.codigoMunicipioIbge;
+    if ((patch as any).tem_certificado !== undefined) dbPatch.tem_certificado = (patch as any).tem_certificado;
+    if ((patch as any).tem_procuracao  !== undefined) dbPatch.tem_procuracao  = (patch as any).tem_procuracao;
 
     const { error: err } = await supabase
       .from("clientes")

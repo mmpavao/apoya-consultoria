@@ -73,8 +73,10 @@ function downloadPdf(b64: string, filename: string) {
 // ── Mapeador de erros SERPRO → mensagens amigáveis ─────────────────────────
 function friendlyError(err: string | null): string {
   if (!err) return "Erro desconhecido";
+  if (err.includes("AcessoNegado-ICGERENCIADOR-022"))
+    return "⚠ Procuração não encontrada: este CNPJ não possui procuração eletrônica outorgada à APOYA no portal eCAC (ecac.receita.fazenda.gov.br). Solicite ao cliente que acesse o eCAC e cadastre a procuração para o CNPJ 43.507.838/0001-89 (APOYA Contabilidade).";
   if (err.includes("AcessoNegado-ICGERENCIADOR"))
-    return "Acesso negado: o CNPJ deste cliente não possui procuração eletrônica válida no eCAC para o escritório.";
+    return "Acesso negado pelo SERPRO: verifique se a procuração eletrônica está cadastrada no eCAC para este CNPJ.";
   if (err.includes("procuração") || err.includes("procuracao"))
     return "Este acesso requer procuração eletrônica ativa no portal eCAC.";
   if (err.includes("certificado") || err.includes("certificate"))

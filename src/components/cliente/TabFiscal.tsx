@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useSerpro } from "@/hooks/use-serpro";
 import { useNfse, type NfseEmitida } from "@/hooks/use-nfse";
+import { useNfseEmitidas, useNfseRecebidas } from "@/hooks/use-nfse-local";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { REGIME_LABEL, type Cliente } from "@/hooks/use-clientes";
 import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
@@ -329,33 +330,19 @@ function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: bool
 // NF EMITIDAS
 // ────────────────────────────────────────────────────────────────────────────
 function NfEmitidas({ cliente }: { cliente: Cliente }) {
-  const { listarEmitidas, baixarPdf, baixarXml, cancelar, loading } = useNfse();
-  const [notas, setNotas] = useState<NfseEmitida[]>([]);
-  const [fetching, setFetching] = useState(false);
+  const { cancelar } = useNfse();
   const [query, setQuery] = useState("");
   const now = new Date();
-  const [mes, setMes] = useState(now.getMonth() + 1);
+  const [mes, setMes] = useState<number | null>(null); // null = todos os meses
   const [ano, setAno] = useState(now.getFullYear());
 
-  const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
-
-  const load = useCallback(async () => {
-    setFetching(true);
-    setNotas(await listarEmitidas(cliente.id, competencia));
-    setFetching(false);
-  }, [cliente.id, competencia]);
-
-  useEffect(() => { load(); }, [load]);
+  const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
+  const { notas, loading: fetching, error, refetch: load } = useNfseEmitidas(cliente.id, competencia);
 
   const filtradas = notas.filter(n => {
     const q = query.trim().toLowerCase();
-    return !q || `${n.tomador_nome} ${n.numero}`.toLowerCase().includes(q);
+    return !q || `${n.tomador_nome ?? ""} ${n.numero ?? ""}`.toLowerCase().includes(q);
   });
-
-  async function handlePdf(n: NfseEmitida) {
-    const b64 = await baixarPdf(n.id, n.nfseio_id);
-    if (b64) downloadBlob(b64, `NFS-e_${n.numero ?? n.id}.pdf`, "application/pdf");
-  }
 
   const STATUS_COR: Record<string, "green"|"blue"|"gray"|"red"> = {
     emitida: "green", processando: "blue", rascunho: "gray", cancelada: "gray", erro: "red"
@@ -366,10 +353,11 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
 
   return (
     <div className="space-y-4">
-      {/* Filtro */}
+      {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
         <select className="h-8 rounded border border-input bg-background px-2 text-sm"
-          value={mes} onChange={e => setMes(Number(e.target.value))}>
+          value={mes ?? ""} onChange={e => setMes(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Todos os meses</option>
           {["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].map((m,i) => (
             <option key={i} value={i+1}>{m}</option>
           ))}
@@ -387,15 +375,24 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
         </Button>
       </div>
 
+      {/* Erro */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Tabela */}
       {fetching ? (
         <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando…</span>
+          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando notas…</span>
         </div>
       ) : filtradas.length === 0 ? (
         <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
           <ReceiptText className="h-8 w-8 opacity-30" />
-          <p className="text-sm">Nenhuma NFS-e emitida neste período</p>
+          <p className="text-sm font-medium">Nenhuma NFS-e emitida{mes ? " neste período" : ""}</p>
+          <p className="text-xs opacity-60">As notas emitidas via sistema aparecerão aqui</p>
         </div>
       ) : (
         <div className="surface-card overflow-hidden">
@@ -414,20 +411,23 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
             <tbody>
               {filtradas.map(n => (
                 <tr key={n.id}>
-                  <td className="text-muted-foreground">{n.numero ?? "—"}</td>
+                  <td className="text-muted-foreground text-xs">{n.numero ?? "—"}</td>
                   <td>
-                    <p className="font-medium truncate max-w-[160px]">{n.tomador_nome ?? "—"}</p>
+                    <p className="font-medium truncate max-w-[180px]">{n.tomador_nome ?? "—"}</p>
                     <p className="text-xs text-muted-foreground">{n.tomador_cnpj_cpf ?? ""}</p>
                   </td>
-                  <td>{n.competencia ?? "—"}</td>
-                  <td>{fmtDate(n.data_emissao)}</td>
-                  <td className="text-right font-medium">{fmtBRL(n.valor_servico)}</td>
+                  <td className="text-sm">{n.competencia ?? "—"}</td>
+                  <td className="text-sm">{fmtDate(n.data_emissao)}</td>
+                  <td className="text-right font-medium text-sm">{fmtBRL(n.valor_servico)}</td>
                   <td><Pill cor={STATUS_COR[n.status] ?? "gray"}>{STATUS_LBL[n.status] ?? n.status}</Pill></td>
                   <td>
                     <div className="flex gap-1 justify-end">
-                      <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="PDF" onClick={() => handlePdf(n)}>
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
+                      {n.pdf_url && (
+                        <a href={n.pdf_url} target="_blank" rel="noopener noreferrer"
+                          className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="PDF">
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                      )}
                       {n.status === "emitida" && (
                         <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-red-50 text-muted-foreground hover:text-red-600" title="Cancelar"
                           onClick={async () => { if (confirm(`Cancelar NFS-e #${n.numero}?`)) { await cancelar(n.id); load(); } }}>
@@ -453,33 +453,18 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
 // NF RECEBIDAS
 // ────────────────────────────────────────────────────────────────────────────
 function NfRecebidas({ cliente }: { cliente: Cliente }) {
-  const { listarRecebidas, sincronizarRecebidas, loading } = useNfse();
-  const [notas, setNotas] = useState<any[]>([]);
-  const [fetching, setFetching] = useState(false);
+  const [mes, setMes] = useState<number | null>(null); // null = todos os meses
   const now = new Date();
-  const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
-  const competencia = `${ano}-${String(mes).padStart(2, "0")}`;
-
-  const load = useCallback(async () => {
-    setFetching(true);
-    setNotas(await listarRecebidas(cliente.id, competencia));
-    setFetching(false);
-  }, [cliente.id, competencia]);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function handleSync() {
-    if (!cliente.cnpj) { toast.error("CNPJ não cadastrado"); return; }
-    await sincronizarRecebidas(cliente.id, cliente.cnpj.replace(/\D/g,""));
-    load();
-  }
+  const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
+  const { notas, loading: fetching, error, refetch: load } = useNfseRecebidas(cliente.id, competencia);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
         <select className="h-8 rounded border border-input bg-background px-2 text-sm"
-          value={mes} onChange={e => setMes(Number(e.target.value))}>
+          value={mes ?? ""} onChange={e => setMes(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Todos os meses</option>
           {["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"].map((m,i) => (
             <option key={i} value={i+1}>{m}</option>
           ))}
@@ -488,10 +473,16 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
           value={ano} onChange={e => setAno(Number(e.target.value))}>
           {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={handleSync} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Sincronizar
+        <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={load} disabled={fetching}>
+          <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} /> Atualizar
         </Button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+          <AlertTriangle className="h-4 w-4 shrink-0" /><span>{error}</span>
+        </div>
+      )}
 
       {fetching ? (
         <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
@@ -500,44 +491,52 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
       ) : notas.length === 0 ? (
         <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
           <Receipt className="h-8 w-8 opacity-30" />
-          <p className="text-sm">Nenhuma NFS-e recebida neste período</p>
-          <p className="text-xs">Clique em "Sincronizar" para buscar notas via CNPJ</p>
+          <p className="text-sm font-medium">Nenhuma NFS-e recebida{mes ? " neste período" : ""}</p>
+          <p className="text-xs opacity-60">Notas recebidas de prestadores de serviço aparecerão aqui</p>
         </div>
       ) : (
         <div className="surface-card overflow-hidden">
           <table className="ft-table w-full">
             <thead>
               <tr>
-                <th>#</th>
+                <th className="w-14">#</th>
                 <th>Prestador</th>
                 <th className="w-24">Competência</th>
+                <th className="w-24">Emissão</th>
                 <th className="w-28 text-right">Valor</th>
-                <th className="w-20">Fonte</th>
+                <th className="w-24">Fonte</th>
               </tr>
             </thead>
             <tbody>
               {notas.map(n => (
                 <tr key={n.id}>
-                  <td className="text-muted-foreground">{n.numero ?? "—"}</td>
+                  <td className="text-muted-foreground text-xs">{n.numero ?? "—"}</td>
                   <td>
                     <p className="font-medium truncate max-w-[180px]">{n.prestador_nome ?? "—"}</p>
                     <p className="text-xs text-muted-foreground">{n.prestador_cnpj ?? ""}</p>
                   </td>
-                  <td>{n.competencia ?? "—"}</td>
-                  <td className="text-right font-medium">{fmtBRL(n.valor_servico)}</td>
-                  <td><Pill cor={n.fonte === "nfeio" ? "blue" : "gray"}>{n.fonte}</Pill></td>
+                  <td className="text-sm">{n.competencia ?? "—"}</td>
+                  <td className="text-sm">{fmtDate(n.data_emissao)}</td>
+                  <td className="text-right font-medium text-sm">{fmtBRL(n.valor_servico)}</td>
+                  <td>
+                    {n.fonte && (
+                      <Pill cor="blue">{n.fonte}</Pill>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <div className="px-4 py-2 border-t border-border/40 text-xs text-muted-foreground">
+            {notas.length} nota{notas.length !== 1 ? "s" : ""} · Total: {fmtBRL(notas.reduce((s,n) => s + (n.valor_servico ?? 0), 0))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// EMITIR NFS-e (formulário inline)
+// ── EMITIR NFS-e (formulário inline)
 // ────────────────────────────────────────────────────────────────────────────
 function EmitirNfse({ cliente }: { cliente: Cliente }) {
   const { emitir, loading } = useNfse();
