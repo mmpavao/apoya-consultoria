@@ -360,6 +360,25 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
                 <ToggleField label="Tem incentivo fiscal" checked={!!form.temIncentivoFiscal} onChange={v => update_("temIncentivoFiscal", v)} hint="Habilita DIRBI mensal (2026)" />
                 <ToggleField label="Regime híbrido (Reforma Tributária)" checked={!!form.regimeHibrido} onChange={v => update_("regimeHibrido", v)} hint="CBS/IBS separados do DAS — janelas abril/setembro" />
               </div>
+
+              {/* ── Acesso SERPRO ── */}
+              <div className="pt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Acesso SERPRO / eCAC</p>
+                <div className="space-y-2.5">
+                  <ToggleField
+                    label="Tem Certificado Digital A1/A3"
+                    checked={!!(form as any).tem_certificado}
+                    onChange={v => update_("tem_certificado" as any, v)}
+                    hint="Necessário para consultas avançadas via SERPRO"
+                  />
+                  <ToggleField
+                    label="Tem Procuração no eCAC"
+                    checked={!!(form as any).tem_procuracao}
+                    onChange={v => update_("tem_procuracao" as any, v)}
+                    hint="Autoriza APOYA a consultar dados fiscais em nome do cliente"
+                  />
+                </div>
+              </div>
             </div>
           )}
 

@@ -86,6 +86,9 @@ function fromDb(row: Record<string, unknown>): Cliente {
     codigoMunicipioIbge: row.codigo_municipio_ibge as string | undefined,
     nfseioEmitenteId:  row.nfseio_emitente_id as string | undefined,
     createdAt:         row.created_at as string,
+    // campos SERPRO — mantidos como any para evitar breaking change no tipo Cliente
+    ...((row.tem_certificado !== undefined) ? { tem_certificado: row.tem_certificado as boolean } : {}),
+    ...((row.tem_procuracao  !== undefined) ? { tem_procuracao:  row.tem_procuracao  as boolean } : {}),
   };
 }
 
@@ -117,6 +120,8 @@ function toDb(c: Partial<Cliente>): Record<string, unknown> {
   if (c.cpf               !== undefined) out.cpf                   = c.cpf;
   if (c.codigoMunicipioIbge !== undefined) out.codigo_municipio_ibge = c.codigoMunicipioIbge;
   if (c.nfseioEmitenteId  !== undefined) out.nfseio_emitente_id    = c.nfseioEmitenteId;
+  if ((c as any).tem_certificado !== undefined) out.tem_certificado = (c as any).tem_certificado;
+  if ((c as any).tem_procuracao  !== undefined) out.tem_procuracao  = (c as any).tem_procuracao;
   if (c.endereco) {
     if (c.endereco.municipio !== undefined) out.municipio  = c.endereco.municipio;
     if (c.endereco.uf        !== undefined) out.uf         = c.endereco.uf;
