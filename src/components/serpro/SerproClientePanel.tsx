@@ -304,9 +304,13 @@ export function SerproClientePanel({ cliente }: { cliente: ClienteMin }) {
             <CheckCircle2 className="h-3.5 w-3.5" /> Certificado cadastrado
           </span>
         )}
-        {cliente.tem_procuracao && (
+        {cliente.tem_procuracao ? (
           <span className="text-xs flex items-center gap-1 text-emerald-600">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Procuração eCAC
+            <CheckCircle2 className="h-3.5 w-3.5" /> Procuração eCAC ativa
+          </span>
+        ) : (
+          <span className="text-xs flex items-center gap-1 text-amber-600">
+            <AlertCircle className="h-3.5 w-3.5" /> Sem procuração eCAC
           </span>
         )}
 
@@ -385,13 +389,13 @@ export function SerproClientePanel({ cliente }: { cliente: ClienteMin }) {
                           {tool.requiresCert && !cliente.tem_certificado && !state.text && (
                             <p className="text-[11px] text-amber-500 mt-0.5 flex items-center gap-1">
                               <AlertCircle className="h-3 w-3 shrink-0" />
-                              Pode exigir certificado digital — tentando mesmo assim
+                              ⚠ Exige certificado digital A1/A3
                             </p>
                           )}
                           {tool.requiresProc && !cliente.tem_procuracao && !state.text && (
                             <p className="text-[11px] text-amber-500 mt-0.5 flex items-center gap-1">
                               <AlertCircle className="h-3 w-3 shrink-0" />
-                              Pode exigir procuração eCAC — tentando mesmo assim
+                              ⚠ Exige procuração eCAC ativa
                             </p>
                           )}
                           {missingCnpj && (
