@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useSerpro } from "@/hooks/use-serpro";
+import { SerproResultRenderer } from "@/components/serpro/SerproResultRenderer";
 import { SERPRO_TOOLS, SERPRO_CATEGORIES } from "@/lib/serpro/tools-catalog";
 
 // ── tipos ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,31 @@ function downloadPdf(b64: string, filename: string) {
   } catch { toast.error("Falha ao gerar PDF"); }
 }
 
+// ── Mapeador de erros SERPRO → mensagens amigáveis ─────────────────────────
+function friendlyError(err: string | null): string {
+  if (!err) return "Erro desconhecido";
+  if (err.includes("AcessoNegado-ICGERENCIADOR"))
+    return "Acesso negado: o CNPJ deste cliente não possui procuração eletrônica válida no eCAC para o escritório.";
+  if (err.includes("procuração") || err.includes("procuracao"))
+    return "Este acesso requer procuração eletrônica ativa no portal eCAC.";
+  if (err.includes("certificado") || err.includes("certificate"))
+    return "Este acesso requer certificado digital A1/A3 ativo.";
+  if (err.includes("403") || err.includes("Forbidden"))
+    return "Acesso negado pelo SERPRO (403). Verifique as credenciais do gateway.";
+  if (err.includes("401") || err.includes("Unauthorized"))
+    return "Token SERPRO inválido ou expirado. Atualize nas configurações.";
+  if (err.includes("timeout") || err.includes("ETIMEDOUT"))
+    return "Tempo esgotado ao consultar o SERPRO. Tente novamente.";
+  // remover JSON bruto de erros
+  if (err.startsWith("{") || err.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(err);
+      return parsed?.texto ?? parsed?.message ?? parsed?.error ?? "Erro na consulta SERPRO";
+    } catch { /**/ }
+  }
+  return err;
+}
+
 // ── Caixa de resultado ─────────────────────────────────────────────────────
 function ResultBox({ state, onPdf, filename }: {
   state: ResultState; onPdf: () => void; filename: string;
@@ -79,32 +105,25 @@ function ResultBox({ state, onPdf, filename }: {
     </div>
   );
   if (state.blocked) return (
-    <div className="flex items-start gap-1.5 py-1.5 text-xs text-amber-600">
+    <div className="flex items-start gap-1.5 py-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-2">
       <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-      <span>{state.error}</span>
+      <span>{friendlyError(state.error)}</span>
     </div>
   );
   if (state.error) return (
-    <div className="flex items-start gap-1.5 py-1.5 text-xs text-red-500">
+    <div className="flex items-start gap-1.5 py-1.5 text-xs text-red-500 bg-red-50 rounded-lg px-2 py-2">
       <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-      <span className="break-words">{state.error}</span>
+      <span className="break-words">{friendlyError(state.error)}</span>
     </div>
   );
   if (!state.text) return null;
   return (
-    <div className="mt-2 rounded-lg border border-border/60 bg-muted/30 p-3">
-      {state.pdfB64 && (
-        <Button size="sm" variant="outline" className="mb-2 h-6 text-[11px] gap-1" onClick={onPdf}>
-          <Download className="h-3 w-3" /> Baixar PDF
-        </Button>
-      )}
-      <pre className="text-[11px] leading-relaxed text-foreground/80 overflow-x-auto whitespace-pre-wrap break-all max-h-52 font-mono">
-        {state.text}
-      </pre>
-      {state.ms != null && (
-        <p className="mt-1 text-[10px] text-muted-foreground text-right">{state.ms}ms</p>
-      )}
-    </div>
+    <SerproResultRenderer
+      text={state.text}
+      pdfB64={state.pdfB64}
+      ms={state.ms}
+      onPdf={onPdf}
+    />
   );
 }
 

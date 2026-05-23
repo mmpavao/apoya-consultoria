@@ -1,97 +1,80 @@
 /**
- * Hook useNfse — proxy para /api/nfse
- * Lida com listagem, emissão, cancelamento, PDF e XML de NFS-e.
- * 
- * BUG-03 FIX: Validação robusta de token + erro explícito se não autenticado
+ * use-nfse — hook de NFS-e via NFE.io
+ *
+ * BUG-03 FIX: authHeader robusto
+ * FIX-2026-05: REMOVIDO navigate() que causava redirect para dashboard
+ *              quando token era null ao montar componente (race condition)
  */
-import { useState, useCallback } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 
-export type NfseStatus = "rascunho" | "processando" | "emitida" | "cancelada" | "erro";
-
+// ── Tipos ──────────────────────────────────────────────────────────────────
 export interface NfseEmitida {
-  id: string;
-  cliente_id: string;
-  numero?: string;
-  status: NfseStatus;
-  competencia?: string;
-  data_emissao?: string;
-  valor_servico?: number;
-  tomador_nome?: string;
-  tomador_cnpj_cpf?: string;
-  pdf_url?: string;
-  nfseio_id?: string;
-  created_at: string;
+  id:               string;
+  nfseio_id?:       string;
+  empresa_id?:      string;
+  numero?:          string;
+  competencia?:     string;
+  data_emissao?:    string;
+  tomador_nome?:    string;
+  tomador_cnpj_cpf?:string;
+  valor_servico?:   number;
+  status:           "rascunho" | "processando" | "emitida" | "cancelada" | "erro";
+  descricao?:       string;
+  codigo_servico?:  string;
+  aliquota_iss?:    number;
+  valor_iss?:       number;
+  valor_cofins?:    number;
+  valor_pis?:       number;
+  codigo_verificacao?: string;
 }
 
 export interface NfseRecebida {
-  id: string;
-  cliente_id: string;
-  numero?: string;
-  competencia?: string;
-  data_emissao?: string;
-  valor_servico?: number;
-  prestador_nome?: string;
-  prestador_cnpj?: string;
-  pdf_url?: string;
-  fonte: "nfeio" | "manual" | "serpro";
-  created_at: string;
+  id:               string;
+  empresa_id?:      string;
+  numero?:          string;
+  competencia?:     string;
+  data_emissao?:    string;
+  prestador_nome?:  string;
+  prestador_cnpj?:  string;
+  valor_servico?:   number;
+  valor_iss?:       number;
+  status?:          string;
+  descricao?:       string;
 }
 
-/**
- * Construir Authorization header com validação de token
- * @param token Access token do Supabase
- * @returns Authorization header válido ou null se token inválido
- */
-function buildAuthHeader(token: string | null): Record<string, string> | null {
-  if (!token || typeof token !== "string" || token.trim() === "") {
-    return null; // Token inválido
-  }
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+// ── helper de autenticação ──────────────────────────────────────────────────
+function buildAuthHeader(token: string | null): HeadersInit | null {
+  if (!token || token.trim() === "") return null;
+  return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
 export function useNfse() {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
-  /**
-   * Validar autenticação e redirecionar se necessário
-   */
-  const ensureAuth = useCallback(() => {
-    if (!token) {
-      console.warn("[useNfse] Token ausente — redirecionando para login");
-      toast.error("Sessão expirada. Faça login novamente.");
-      navigate({ to: "/login", search: { from: "/fiscal/nfse" } });
-      return false;
-    }
-    return true;
-  }, [token, navigate]);
 
   // ── Listar emitidas ────────────────────────────────────────────────────
   const listarEmitidas = useCallback(async (
     clienteId?: string, competencia?: string
   ): Promise<NfseEmitida[]> => {
-    if (!ensureAuth()) return [];
-    
+    // Se auth ainda carregando, aguardar silenciosamente
+    if (authLoading) return [];
+    // Se sem token, retornar vazio sem redirect (o guard de rota cuida disso)
+    if (!token) return [];
+
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return [];
-    
+
     const params = new URLSearchParams({ tipo: "emitidas" });
     if (clienteId) params.set("cliente_id", clienteId);
     if (competencia) params.set("competencia", competencia);
-    
+
     try {
       const r = await fetch(`/api/nfse?${params}`, { headers: authHeader });
       if (r.status === 401) {
         console.error("[useNfse/listarEmitidas] 401 — token inválido");
-        ensureAuth();
         return [];
       }
       const d = await r.json().catch(() => ({}));
@@ -100,26 +83,26 @@ export function useNfse() {
       console.error("[useNfse/listarEmitidas] fetch error:", e);
       return [];
     }
-  }, [token, ensureAuth]);
+  }, [token, authLoading]);
 
   // ── Listar recebidas ───────────────────────────────────────────────────
   const listarRecebidas = useCallback(async (
     clienteId?: string, competencia?: string
   ): Promise<NfseRecebida[]> => {
-    if (!ensureAuth()) return [];
-    
+    if (authLoading) return [];
+    if (!token) return [];
+
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return [];
-    
+
     const params = new URLSearchParams({ tipo: "recebidas" });
     if (clienteId) params.set("cliente_id", clienteId);
     if (competencia) params.set("competencia", competencia);
-    
+
     try {
       const r = await fetch(`/api/nfse?${params}`, { headers: authHeader });
       if (r.status === 401) {
         console.error("[useNfse/listarRecebidas] 401 — token inválido");
-        ensureAuth();
         return [];
       }
       const d = await r.json().catch(() => ({}));
@@ -128,235 +111,142 @@ export function useNfse() {
       console.error("[useNfse/listarRecebidas] fetch error:", e);
       return [];
     }
-  }, [token, ensureAuth]);
+  }, [token, authLoading]);
 
   // ── Emitir ─────────────────────────────────────────────────────────────
   const emitir = useCallback(async (
     clienteId: string,
-    nota: {
-      description: string;
-      servicesAmount: number;
-      cityServiceCode: string;
-      issRate?: number;
-      issRetained?: boolean;
+    dados: {
+      tomador_cnpj_cpf: string;
+      tomador_nome: string;
+      tomador_email?: string;
+      descricao: string;
+      valor_servico: number;
+      codigo_servico?: string;
       competencia?: string;
-      borrower: {
-        name: string;
-        federalTaxNumber: string | number;
-        email?: string;
-        address: {
-          country: string;
-          postalCode?: string;
-          street?: string;
-          number?: string;
-          district?: string;
-          state: string;
-          city: { code: string; name: string };
-        };
-      };
+      aliquota_iss?: number;
+      municipio_codigo?: string;
+      regime_especial_tributacao?: string;
     }
-  ) => {
-    if (!ensureAuth()) return null;
-    
+  ): Promise<NfseEmitida | null> => {
+    if (!token) { toast.error("Sessão expirada. Faça login novamente."); return null; }
+
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return null;
-    
+
     setLoading(true);
     try {
       const r = await fetch("/api/nfse", {
         method: "POST",
         headers: authHeader,
-        body: JSON.stringify({ action: "emitir", cliente_id: clienteId, nota }),
+        body: JSON.stringify({ cliente_id: clienteId, ...dados }),
       });
-      
       if (r.status === 401) {
-        console.error("[useNfse/emitir] 401 — token inválido");
-        ensureAuth();
+        toast.error("Sessão expirada. Faça login novamente.");
         return null;
       }
-      
       const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
+      if (!r.ok) {
         const errorMsg = d.error ?? `HTTP ${r.status}`;
         toast.error("Falha ao emitir NFS-e: " + errorMsg);
-        console.error("[useNfse/emitir] Error:", errorMsg);
         return null;
       }
-      toast.success(`NFS-e #${d.numero} emitida com sucesso!`);
-      return d;
+      toast.success("NFS-e enviada para emissão com sucesso!");
+      return d?.nota ?? null;
     } catch (e) {
-      console.error("[useNfse/emitir] catch error:", e);
       toast.error("Erro ao emitir NFS-e: " + (e instanceof Error ? e.message : "Tente novamente"));
       return null;
     } finally {
       setLoading(false);
     }
-  }, [token, ensureAuth]);
+  }, [token]);
 
   // ── Cancelar ───────────────────────────────────────────────────────────
-  const cancelar = useCallback(async (notaId: string, motivo?: string) => {
-    if (!ensureAuth()) return false;
-    
+  const cancelar = useCallback(async (notaId: string, motivo?: string): Promise<boolean> => {
+    if (!token) return false;
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return false;
-    
+
     setLoading(true);
     try {
-      const r = await fetch("/api/nfse", {
+      const r = await fetch(`/api/nfse/${notaId}/cancelar`, {
         method: "POST",
         headers: authHeader,
-        body: JSON.stringify({ action: "cancelar", nota_id: notaId, motivo }),
+        body: JSON.stringify({ motivo: motivo ?? "Cancelado pelo usuário" }),
       });
-      
-      if (r.status === 401) {
-        console.error("[useNfse/cancelar] 401 — token inválido");
-        ensureAuth();
-        return false;
-      }
-      
       const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
-        const errorMsg = d.error ?? `HTTP ${r.status}`;
-        toast.error("Falha ao cancelar NFS-e: " + errorMsg);
-        console.error("[useNfse/cancelar] Error:", errorMsg);
+      if (!r.ok) {
+        toast.error("Falha ao cancelar: " + (d.error ?? `HTTP ${r.status}`));
         return false;
       }
-      toast.success("NFS-e cancelada");
+      toast.success("NFS-e cancelada com sucesso");
       return true;
     } catch (e) {
-      console.error("[useNfse/cancelar] catch error:", e);
-      toast.error("Erro ao cancelar NFS-e: " + (e instanceof Error ? e.message : "Tente novamente"));
+      toast.error("Erro ao cancelar NFS-e");
       return false;
     } finally {
       setLoading(false);
     }
-  }, [token, ensureAuth]);
+  }, [token]);
 
   // ── Baixar PDF ─────────────────────────────────────────────────────────
   const baixarPdf = useCallback(async (notaId: string, nfseioId?: string): Promise<string | null> => {
-    if (!ensureAuth()) return null;
-    
+    if (!token) return null;
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return null;
-    
-    setLoading(true);
+
     try {
-      const r = await fetch("/api/nfse", {
-        method: "POST",
-        headers: authHeader,
-        body: JSON.stringify({ action: "pdf", nota_id: notaId, nfseio_id: nfseioId }),
-      });
-      
-      if (r.status === 401) {
-        console.error("[useNfse/baixarPdf] 401 — token inválido");
-        ensureAuth();
-        return null;
-      }
-      
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
-        const errorMsg = d.error ?? `HTTP ${r.status}`;
-        toast.error("PDF não disponível: " + errorMsg);
-        console.error("[useNfse/baixarPdf] Error:", errorMsg);
-        return null;
-      }
-      return d.pdf_base64 ?? null;
-    } catch (e) {
-      console.error("[useNfse/baixarPdf] catch error:", e);
-      toast.error("Erro ao baixar PDF: " + (e instanceof Error ? e.message : "Tente novamente"));
+      const r = await fetch(`/api/nfse/${notaId}/pdf`, { headers: authHeader });
+      if (!r.ok) return null;
+      const d = await r.json().catch(() => null);
+      return d?.pdf_b64 ?? null;
+    } catch {
       return null;
-    } finally {
-      setLoading(false);
     }
-  }, [token, ensureAuth]);
+  }, [token]);
 
   // ── Baixar XML ─────────────────────────────────────────────────────────
-  const baixarXml = useCallback(async (notaId: string, nfseioId?: string): Promise<string | null> => {
-    if (!ensureAuth()) return null;
-    
+  const baixarXml = useCallback(async (notaId: string): Promise<string | null> => {
+    if (!token) return null;
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return null;
-    
-    setLoading(true);
+
     try {
-      const r = await fetch("/api/nfse", {
-        method: "POST",
-        headers: authHeader,
-        body: JSON.stringify({ action: "xml", nota_id: notaId, nfseio_id: nfseioId }),
-      });
-      
-      if (r.status === 401) {
-        console.error("[useNfse/baixarXml] 401 — token inválido");
-        ensureAuth();
-        return null;
-      }
-      
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
-        const errorMsg = d.error ?? `HTTP ${r.status}`;
-        toast.error("XML não disponível: " + errorMsg);
-        console.error("[useNfse/baixarXml] Error:", errorMsg);
-        return null;
-      }
-      return d.xml ?? null;
-    } catch (e) {
-      console.error("[useNfse/baixarXml] catch error:", e);
-      toast.error("Erro ao baixar XML: " + (e instanceof Error ? e.message : "Tente novamente"));
+      const r = await fetch(`/api/nfse/${notaId}/xml`, { headers: authHeader });
+      if (!r.ok) return null;
+      const d = await r.json().catch(() => null);
+      return d?.xml ?? null;
+    } catch {
       return null;
-    } finally {
-      setLoading(false);
     }
-  }, [token, ensureAuth]);
+  }, [token]);
 
   // ── Sincronizar recebidas ──────────────────────────────────────────────
-  const sincronizarRecebidas = useCallback(async (
-    clienteId: string, cnpj: string
-  ) => {
-    if (!ensureAuth()) return null;
-    
+  const sincronizarRecebidas = useCallback(async (clienteId: string, competencia: string): Promise<boolean> => {
+    if (!token) return false;
     const authHeader = buildAuthHeader(token);
-    if (!authHeader) return null;
-    
+    if (!authHeader) return false;
+
     setLoading(true);
     try {
-      const r = await fetch("/api/nfse", {
+      const r = await fetch("/api/nfse/sincronizar", {
         method: "POST",
         headers: authHeader,
-        body: JSON.stringify({ action: "sincronizar_recebidas", cliente_id: clienteId, cnpj }),
+        body: JSON.stringify({ cliente_id: clienteId, competencia, tipo: "recebidas" }),
       });
-      
-      if (r.status === 401) {
-        console.error("[useNfse/sincronizarRecebidas] 401 — token inválido");
-        ensureAuth();
-        return null;
+      if (!r.ok) {
+        toast.error("Falha ao sincronizar notas recebidas");
+        return false;
       }
-      
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) {
-        const errorMsg = d.error ?? `HTTP ${r.status}`;
-        toast.error("Falha ao sincronizar: " + errorMsg);
-        console.error("[useNfse/sincronizarRecebidas] Error:", errorMsg);
-        return null;
-      }
-      toast.success(`${d.inserted} notas recebidas importadas (total ${d.total})`);
-      return d;
-    } catch (e) {
-      console.error("[useNfse/sincronizarRecebidas] catch error:", e);
-      toast.error("Erro ao sincronizar: " + (e instanceof Error ? e.message : "Tente novamente"));
-      return null;
+      toast.success("Sincronização iniciada com sucesso");
+      return true;
+    } catch {
+      toast.error("Erro ao sincronizar notas");
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [token, ensureAuth]);
+  }, [token]);
 
-  return {
-    loading,
-    listarEmitidas,
-    listarRecebidas,
-    emitir,
-    cancelar,
-    baixarPdf,
-    baixarXml,
-    sincronizarRecebidas,
-  };
+  return { listarEmitidas, listarRecebidas, emitir, cancelar, baixarPdf, baixarXml, sincronizarRecebidas, loading };
 }
