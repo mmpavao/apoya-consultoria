@@ -1,46 +1,24 @@
 /**
- * useCnpjSerpro — enriquece dados do CNPJ via gateway SERPRO local
- * Retorna regime tributário real, situação fiscal, última declaração PGDAS
- * Usado em paralelo com BrasilAPI (cadastral) para o onboarding completo
+ * useCnpjSerpro — enriquece dados do CNPJ via Edge Function Supabase (cnpj-enrich)
+ * A EF chama o gateway MCP SERPRO real (mcp.zapro.tech) server-side
+ * sem expor credenciais no browser e sem depender de /api/serpro/call
  */
 import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface SerproEnrichment {
   regime?: "MEI" | "Simples" | "Lucro Presumido" | "Lucro Real";
   situacaoCadastral?: string;
   optanteSimplesNacional?: boolean;
   optanteMei?: boolean;
-  ultimoPgdasPeriodo?: string;        // 'YYYY-MM'
+  ultimoPgdasPeriodo?: string;        // 'YYYYMM'
   dteAtivo?: boolean;
   parcelamentosAtivos?: number;
   dividaAtivaRfb?: boolean;
   dividaAtivaPgfn?: boolean;
-}
-
-// URL do gateway SERPRO (pode estar na VPS ou local)
-const SERPRO_GATEWAY =
-  typeof window !== "undefined"
-    ? (import.meta.env.VITE_SERPRO_GATEWAY_URL ?? "/api/serpro/call")
-    : "/api/serpro/call";
-
-async function callSerpro(tool: string, params: Record<string, string>): Promise<any> {
-  try {
-    const res = await fetch(SERPRO_GATEWAY, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tool, params }),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    // Desempacota o resultado do MCP
-    const content = data?.content?.[0]?.text ?? data?.result ?? null;
-    if (!content) return null;
-    try { return typeof content === "string" ? JSON.parse(content) : content; }
-    catch { return null; }
-  } catch {
-    return null;
-  }
+  regimeRaw?: string;
+  regimeDataOpcao?: number;
+  regimeAnos?: Array<{ anoCalendario: number; regimeApurado: string }>;
 }
 
 export function useCnpjSerpro() {
@@ -48,52 +26,35 @@ export function useCnpjSerpro() {
     const digits = cnpj.replace(/\D/g, "");
     if (digits.length !== 14) return {};
 
-    const result: SerproEnrichment = {};
+    try {
+      const { data, error } = await supabase.functions.invoke("cnpj-enrich", {
+        body: { cnpj: digits },
+      });
 
-    // Busca em paralelo para máxima velocidade
-    const [regimeRes, dteRes, pgdasRes, sitfisRes] = await Promise.allSettled([
-      callSerpro("serpro_regime", { cnpj: digits, ano: String(new Date().getFullYear()) }),
-      callSerpro("serpro_dte", { cnpj: digits }),
-      callSerpro("serpro_pgdas_ultima", { cnpj: digits }),
-      callSerpro("serpro_sitfis", { cnpj: digits }),
-    ]);
+      if (error || !data?.ok) {
+        console.warn("[useCnpjSerpro] Edge Function error:", error ?? data);
+        return {};
+      }
 
-    // Regime tributário
-    if (regimeRes.status === "fulfilled" && regimeRes.value) {
-      const r = regimeRes.value?.result ?? regimeRes.value;
-      const raw = (r?.regimeApurado ?? r?.regime ?? "").toUpperCase();
-      if (raw.includes("MEI"))                result.regime = "MEI";
-      else if (raw.includes("SIMPLES"))        result.regime = "Simples";
-      else if (raw.includes("PRESUMIDO"))      result.regime = "Lucro Presumido";
-      else if (raw.includes("REAL"))           result.regime = "Lucro Real";
+      const r = data.data as Record<string, any>;
 
-      result.optanteMei = raw.includes("MEI");
-      result.optanteSimplesNacional = raw.includes("SIMPLES") || raw.includes("MEI");
+      return {
+        regime:                   r.regime,
+        situacaoCadastral:        r.situacaoCadastral,
+        optanteMei:               r.regime === "MEI",
+        optanteSimplesNacional:   r.regime === "MEI" || r.regime === "Simples",
+        ultimoPgdasPeriodo:       r.ultimoPgdasPeriodo,
+        dteAtivo:                 r.dteAtivo,
+        dividaAtivaRfb:           r.dividaAtivaRfb  ?? false,
+        dividaAtivaPgfn:          r.dividaAtivaPgfn ?? false,
+        regimeRaw:                r.regimeRaw,
+        regimeDataOpcao:          r.regimeDataOpcao,
+        regimeAnos:               r.regimeAnos,
+      };
+    } catch (err) {
+      console.warn("[useCnpjSerpro] Falha ao chamar cnpj-enrich:", err);
+      return {};
     }
-
-    // DTE
-    if (dteRes.status === "fulfilled" && dteRes.value) {
-      const r = dteRes.value?.result ?? dteRes.value;
-      const ind = r?.indicadorEnquadramento;
-      result.dteAtivo = ind === 2 || (r?.statusEnquadramento ?? "").toLowerCase().includes("optante");
-    }
-
-    // Última declaração PGDAS
-    if (pgdasRes.status === "fulfilled" && pgdasRes.value) {
-      const r = pgdasRes.value?.result ?? pgdasRes.value;
-      const periodo = r?.periodoApuracao ?? r?.periodo ?? "";
-      if (periodo) result.ultimoPgdasPeriodo = periodo;
-    }
-
-    // Situação fiscal (RFC + PGFN)
-    if (sitfisRes.status === "fulfilled" && sitfisRes.value) {
-      const r = sitfisRes.value?.result ?? sitfisRes.value;
-      result.situacaoCadastral = r?.situacaoRFB ?? r?.situacao ?? undefined;
-      result.dividaAtivaRfb   = r?.possuiDebitoRFB  === true;
-      result.dividaAtivaPgfn  = r?.possuiDebitoPGFN === true;
-    }
-
-    return result;
   }, []);
 
   return { enriquecer };

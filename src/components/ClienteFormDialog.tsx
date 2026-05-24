@@ -58,7 +58,8 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
   const [saving, setSaving]   = useState(false);
   const [looking, setLooking] = useState(false);
   const [section, setSection] = useState<SectionId>("identificacao");
-  const [serproInfo, setSerproInfo] = useState<string | null>(null);
+  const [serproInfo,   setSerproInfo]   = useState<string | null>(null);
+  const [serproAlerts, setSerproAlerts] = useState<string[]>([]);
   const cnpjRef = useRef<string>("");
 
   // Resetar form quando o dialog abre
@@ -69,6 +70,8 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
       setForm(cliente ?? EMPTY);
       setSection("identificacao");
       setSerproInfo(null);
+      setSerproAlerts([]);
+      setDadosCnpjParaSocios(null);
     }
   }
 
@@ -136,12 +139,14 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
 
         // Montar mensagem informativa
         const infos: string[] = [];
-        if (serpro.regime)               infos.push(`Regime: ${serpro.regime}`);
-        if (serpro.dteAtivo !== undefined) infos.push(`DTE: ${serpro.dteAtivo ? "Ativo" : "Não enquadrado"}`);
-        if (serpro.ultimoPgdasPeriodo)   infos.push(`Último PGDAS: ${serpro.ultimoPgdasPeriodo}`);
-        if (serpro.dividaAtivaRfb)       infos.push("⚠️ Dívida ativa RFB");
-        if (serpro.dividaAtivaPgfn)      infos.push("⚠️ Dívida ativa PGFN");
-        if (infos.length > 0) setSerproInfo(infos.join(" · "));
+        const alerts: string[] = [];
+        if (serpro.regime)                infos.push(`Regime: ${serpro.regime}`);
+        if (serpro.dteAtivo !== undefined) infos.push(`DTE: ${serpro.dteAtivo ? "✅ Ativo" : "Não enquadrado"}`);
+        if (serpro.ultimoPgdasPeriodo)    infos.push(`Último PGDAS: ${serpro.ultimoPgdasPeriodo}`);
+        if (serpro.dividaAtivaRfb)        alerts.push("Dívida ativa na Receita Federal");
+        if (serpro.dividaAtivaPgfn)       alerts.push("Dívida ativa na PGFN");
+        if (infos.length > 0)  setSerproInfo(infos.join(" · "));
+        if (alerts.length > 0) setSerproAlerts(alerts);
       }
 
       toast.success("Dados preenchidos automaticamente", { id: "cnpj-lookup" });
@@ -259,10 +264,27 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
                 </div>
 
                 {/* Info SERPRO */}
-                {serproInfo && (
-                  <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
-                    <span className="text-blue-600 text-xs font-semibold shrink-0">SERPRO</span>
-                    <p className="text-xs text-blue-700">{serproInfo}</p>
+                {(serproInfo || serproAlerts.length > 0 || (dadosCnpjParaSocios?.socios?.length ?? 0) > 0) && (
+                  <div className="space-y-1.5">
+                    {serproInfo && (
+                      <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
+                        <span className="text-blue-600 text-xs font-semibold shrink-0">SERPRO</span>
+                        <p className="text-xs text-blue-700">{serproInfo}</p>
+                      </div>
+                    )}
+                    {serproAlerts.map((a, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
+                        <span className="text-rose-500 text-sm shrink-0">⚠️</span>
+                        <p className="text-xs text-rose-700"><span className="font-semibold">Pendência fiscal:</span> {a}</p>
+                      </div>
+                    ))}
+                    {(dadosCnpjParaSocios?.socios?.length ?? 0) > 0 && (
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-700">
+                        <span className="font-semibold">👥 {dadosCnpjParaSocios!.socios!.length} sócio(s) encontrado(s):</span>{" "}
+                        {dadosCnpjParaSocios!.socios!.map((s: any) => s.nome).join(" · ")}
+                        <div className="mt-0.5 opacity-70">Serão importados automaticamente ao salvar</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
