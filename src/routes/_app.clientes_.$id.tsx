@@ -164,19 +164,24 @@ function ClienteDetailPage() {
   const [saving, setSaving]     = useState(false);
 
   // ── Checklist de prontidão — queries reais ────────────────────────────────
-  const [temContrato,   setTemContrato]   = useState(false);
-  const [temSocios,     setTemSocios]     = useState(false);
-  const [temDocumentos, setTemDocumentos] = useState(false);
-  const [temServico,    setTemServico]    = useState(false);
+  const [temContrato,    setTemContrato]    = useState(false);
+  const [temCertificado, setTemCertificado] = useState(false);
+  const [temProcuracao,  setTemProcuracao]  = useState(false);
+  const [temSocios,      setTemSocios]      = useState(false);
+  const [temDocumentos,  setTemDocumentos]  = useState(false);
+  const [temServico,     setTemServico]     = useState(false);
 
   useEffect(() => {
     if (!id) return;
     async function loadChecklist() {
-      const [contResp, socResp, docResp, svcResp] = await Promise.all([
+      const [contResp, certResp, socResp, docResp, svcResp] = await Promise.all([
         (supabase as any).from("contrato_cliente")
           .select("id", { count: "exact", head: true })
           .eq("cliente_id", id)
           .not("assinado_em", "is", null),
+        (supabase as any).from("cliente_certificado")
+          .select("id,has_procuracao", { count: "exact" })
+          .eq("cliente_id", id),
         (supabase as any).from("cliente_socio")
           .select("id", { count: "exact", head: true })
           .eq("cliente_id", id),
@@ -189,6 +194,9 @@ function ClienteDetailPage() {
           .eq("status", "ativo"),
       ]);
       setTemContrato((contResp.count ?? 0) > 0);
+      const certs = certResp.data ?? [];
+      setTemCertificado(certs.length > 0);
+      setTemProcuracao(certs.some((c: any) => c.has_procuracao === true));
       setTemSocios((socResp.count ?? 0) > 0);
       setTemDocumentos((docResp.count ?? 0) > 0);
       setTemServico((svcResp.count ?? 0) > 0);
@@ -227,8 +235,14 @@ function ClienteDetailPage() {
   // Callback chamado pelo TabCertificados após upload bem-sucedido
   async function handleCertUpdate() {
     await refetchCliente();
-    // Reforçar tem_certificado true no state local
-    setTemSocios(prev => prev); // força re-render; o refetch já traz os dados certos
+    // Recarregar o checklist buscando os dados reais
+    const certResp = await (supabase as any)
+      .from("cliente_certificado")
+      .select("id,has_procuracao")
+      .eq("cliente_id", id);
+    const certs = certResp.data ?? [];
+    setTemCertificado(certs.length > 0);
+    setTemProcuracao(certs.some((c: any) => c.has_procuracao === true));
   }
 
   async function handleSave() {
@@ -355,7 +369,7 @@ function ClienteDetailPage() {
               {
                 key: "certificado",
                 label: "Certificado Digital",
-                ok: (cliente as any).tem_certificado ?? false,
+                ok: temCertificado,
                 icon: "🔐",
                 tab: "certificados" as Tab,
                 tip: "Certificado A1 ou A3 cadastrado",
@@ -363,7 +377,7 @@ function ClienteDetailPage() {
               {
                 key: "procuracao",
                 label: "Procuração eCAC",
-                ok: (cliente as any).tem_procuracao ?? false,
+                ok: temProcuracao,
                 icon: "🛡️",
                 tab: "certificados" as Tab,
                 tip: "Procuração para acesso ao eCAC/SERPRO",
