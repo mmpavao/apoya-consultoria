@@ -46,9 +46,9 @@ function ValidadeBadge({ data, label }: { data?: string; label: string }) {
   return <Badge className="bg-emerald-100 text-emerald-700 border-0 gap-1"><CheckCircle2 className="h-3 w-3"/>{new Date(data!).toLocaleDateString("pt-BR")}</Badge>;
 }
 
-interface Props { clienteId: string; cnpj?: string; razaoSocial?: string; }
+interface Props { clienteId: string; cnpj?: string; razaoSocial?: string; onCertificateUpdated?: () => void; }
 
-export function TabCertificados({ clienteId, cnpj, razaoSocial }: Props) {
+export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpdated }: Props) {
   const [cert, setCert]           = useState<CertInfo>(EMPTY);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -215,6 +215,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial }: Props) {
       setSelectedFile(null);
       setSenha("");
       toast.success("Certificado cadastrado com sucesso!", { id: "cert-up" });
+      onCertificateUpdated?.();
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? "Falha no upload"), { id: "cert-up" });
     } finally {
@@ -242,6 +243,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial }: Props) {
       await (supabase as any).from("clientes")
         .update({ tem_procuracao: cert.hasProcuracao }).eq("id", clienteId);
       toast.success("Procuração salva");
+      onCertificateUpdated?.();
     } catch (e: any) {
       toast.error("Erro: " + e.message);
     } finally {

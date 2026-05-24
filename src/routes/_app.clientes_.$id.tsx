@@ -151,7 +151,7 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 function ClienteDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const { cliente, loading, error: clienteError, update: updateClienteById } = useClienteById(id);
+  const { cliente, loading, error: clienteError, update: updateClienteById, refetch: refetchCliente } = useClienteById(id);
   const { cobrancas } = useCobrancas();
   const { obrigacoes } = useObrigacoes();
 
@@ -162,6 +162,39 @@ function ClienteDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm]         = useState<Partial<Cliente>>({});
   const [saving, setSaving]     = useState(false);
+
+  // ── Checklist de prontidão — queries reais ────────────────────────────────
+  const [temContrato,   setTemContrato]   = useState(false);
+  const [temSocios,     setTemSocios]     = useState(false);
+  const [temDocumentos, setTemDocumentos] = useState(false);
+  const [temServico,    setTemServico]    = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    async function loadChecklist() {
+      const [contResp, socResp, docResp, svcResp] = await Promise.all([
+        (supabase as any).from("contrato_cliente")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", id)
+          .not("assinado_em", "is", null),
+        (supabase as any).from("cliente_socio")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", id),
+        (supabase as any).from("documento_arquivo")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", id),
+        (supabase as any).from("cliente_servico")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", id)
+          .eq("status", "ativo"),
+      ]);
+      setTemContrato((contResp.count ?? 0) > 0);
+      setTemSocios((socResp.count ?? 0) > 0);
+      setTemDocumentos((docResp.count ?? 0) > 0);
+      setTemServico((svcResp.count ?? 0) > 0);
+    }
+    loadChecklist();
+  }, [id]);
 
   // Sincronizar form quando cliente carrega
   useEffect(() => {
@@ -190,6 +223,13 @@ function ClienteDetailPage() {
   const obgPendente = obgCliente.filter(o => o.status === "pendente" || o.status === "atrasada").length;
   const obgAtrasada = obgCliente.filter(o => o.status === "atrasada").length;
   const st          = STATUS_CFG[cliente.status];
+
+  // Callback chamado pelo TabCertificados após upload bem-sucedido
+  async function handleCertUpdate() {
+    await refetchCliente();
+    // Reforçar tem_certificado true no state local
+    setTemSocios(prev => prev); // força re-render; o refetch já traz os dados certos
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -307,7 +347,7 @@ function ClienteDetailPage() {
               {
                 key: "contrato",
                 label: "Contrato",
-                ok: (cliente as any).contrato_assinado ?? false,
+                ok: temContrato,
                 icon: "📄",
                 tab: "contratos" as Tab,
                 tip: "Contrato de prestação de serviços assinado",
@@ -331,7 +371,7 @@ function ClienteDetailPage() {
               {
                 key: "documentos",
                 label: "Documentos",
-                ok: false,
+                ok: temDocumentos,
                 icon: "📁",
                 tab: "documentos" as Tab,
                 tip: "Documentos societários e fiscais arquivados",
@@ -339,7 +379,7 @@ function ClienteDetailPage() {
               {
                 key: "socios",
                 label: "Quadro Societário",
-                ok: false,
+                ok: temSocios,
                 icon: "👥",
                 tab: "socios" as Tab,
                 tip: "Sócios cadastrados com % de participação",
@@ -347,7 +387,7 @@ function ClienteDetailPage() {
               {
                 key: "servico",
                 label: "Serviço Ativo",
-                ok: false,
+                ok: temServico,
                 icon: "✅",
                 tab: "servicos" as Tab,
                 tip: "Contrato de serviço contábil vigente",
@@ -499,7 +539,7 @@ function ClienteDetailPage() {
       {tab === "socios" && <TabSocios clienteId={id} />}
 
       {tab === "certificados" && (
-        <TabCertificados clienteId={id} cnpj={cliente?.cnpj} />
+        <TabCertificados clienteId={id} cnpj={cliente?.cnpj} razaoSocial={cliente?.razaoSocial} onCertificateUpdated={handleCertUpdate} />
       )}
 
       {tab === "servicos" && <TabServicos clienteId={id} />}
