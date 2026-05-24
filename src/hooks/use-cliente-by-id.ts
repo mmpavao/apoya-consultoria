@@ -54,7 +54,6 @@ function fromDb(row: Record<string, unknown>): Cliente {
     ...(row.data_suspensao     != null  ? { data_suspensao:     row.data_suspensao as string }     : {}),
     ...(row.motivo_suspensao   != null  ? { motivo_suspensao:   row.motivo_suspensao as string }   : {}),
     createdAt:   row.created_at as string,
-    updatedAt:   row.updated_at as string | undefined,
   };
 }
 
@@ -129,7 +128,7 @@ export function useClienteById(id: string) {
     if ((patch as any).tem_certificado !== undefined) dbPatch.tem_certificado = (patch as any).tem_certificado;
     if ((patch as any).tem_procuracao  !== undefined) dbPatch.tem_procuracao  = (patch as any).tem_procuracao;
 
-    const { error: err } = await supabase
+    const { error: err } = await (supabase as any)
       .from("clientes")
       .update(dbPatch)
       .eq("id", id);

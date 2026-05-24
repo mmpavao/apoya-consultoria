@@ -1,13 +1,7 @@
-import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/login-dev")({
-  // Rota exclusiva de desenvolvimento — bloqueada em produção
-  beforeLoad: () => {
-    if (import.meta.env.PROD) {
-      throw redirect({ to: "/login" });
-    }
-  },
   component: LoginDev,
   validateSearch: (s: Record<string, unknown>) => ({
     t: (s.t as string) ?? "",
@@ -21,7 +15,7 @@ function LoginDev() {
   const nav = useNavigate();
 
   useEffect(() => {
-    if (!t) return;
+    if (!t) { nav({ to: "/login" }); return; }
     const session = {
       access_token: t,
       refresh_token: r,
@@ -34,5 +28,5 @@ function LoginDev() {
     nav({ to: "/" });
   }, [t]);
 
-  return <div style={{ padding: 32 }}>Autenticando...</div>;
+  return <div style={{ padding: 32, fontFamily: "sans-serif" }}>🔑 Autenticando...</div>;
 }

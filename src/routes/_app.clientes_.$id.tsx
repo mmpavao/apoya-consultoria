@@ -37,6 +37,9 @@ import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { TabFinanceiro } from "@/components/cliente/TabFinanceiro";
 import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
 import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
+import { TabSocios } from "@/components/cliente/TabSocios";
+import { TabCertificados } from "@/components/cliente/TabCertificados";
+import { Shield, FileKey2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
   component: ClienteDetailPage,
@@ -127,13 +130,15 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "financeiro" | "motor_docs" | "motor_apuracao" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
+type Tab = "geral" | "fiscal" | "financeiro" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "geral",          label: "Visão Geral",   icon: Building2   },
   { id: "fiscal",         label: "Fiscal",         icon: FileText    },
   { id: "financeiro",     label: "Financeiro",     icon: DollarSign  },
   { id: "motor_docs",     label: "Doc. Fiscais",   icon: TrendingUp  },
   { id: "motor_apuracao", label: "Apuração",       icon: BarChart3   },
+  { id: "socios",         label: "Sócios",         icon: Users       },
+  { id: "certificados",   label: "Certificados",   icon: Shield      },
   { id: "servicos",       label: "Serviços",       icon: Briefcase   },
   { id: "contratos",      label: "Contratos",      icon: ReceiptText  },
   { id: "documentos",     label: "Documentos",     icon: FileText    },
@@ -293,6 +298,80 @@ function ClienteDetailPage() {
           <KpiMini label="Total pago"    value={fmtBRL(totalPago)} tone="success" sub={`${cobCliente.filter(c=>c.status==="paga").length} pagas`} />
           <KpiMini label="Obrigações"    value={obgPendente} tone={obgAtrasada > 0 ? "danger" : obgPendente > 0 ? "warning" : "success"} sub={obgAtrasada > 0 ? `${obgAtrasada} atrasada${obgAtrasada>1?"s":""}` : "Em dia"} />
         </div>
+
+        {/* ── Checklist de prontidão contábil ── */}
+        <div className="mt-4 pt-4 border-t border-border/40">
+          <p className="text-xs font-medium text-muted-foreground mb-2.5">Prontidão para atendimento</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              {
+                key: "contrato",
+                label: "Contrato",
+                ok: (cliente as any).contrato_assinado ?? false,
+                icon: "📄",
+                tab: "contratos" as Tab,
+                tip: "Contrato de prestação de serviços assinado",
+              },
+              {
+                key: "certificado",
+                label: "Certificado Digital",
+                ok: (cliente as any).tem_certificado ?? false,
+                icon: "🔐",
+                tab: "certificados" as Tab,
+                tip: "Certificado A1 ou A3 cadastrado",
+              },
+              {
+                key: "procuracao",
+                label: "Procuração eCAC",
+                ok: (cliente as any).tem_procuracao ?? false,
+                icon: "🛡️",
+                tab: "certificados" as Tab,
+                tip: "Procuração para acesso ao eCAC/SERPRO",
+              },
+              {
+                key: "documentos",
+                label: "Documentos",
+                ok: false,
+                icon: "📁",
+                tab: "documentos" as Tab,
+                tip: "Documentos societários e fiscais arquivados",
+              },
+              {
+                key: "socios",
+                label: "Quadro Societário",
+                ok: false,
+                icon: "👥",
+                tab: "socios" as Tab,
+                tip: "Sócios cadastrados com % de participação",
+              },
+              {
+                key: "servico",
+                label: "Serviço Ativo",
+                ok: false,
+                icon: "✅",
+                tab: "servicos" as Tab,
+                tip: "Contrato de serviço contábil vigente",
+              },
+            ].map(item => (
+              <button
+                key={item.key}
+                title={item.tip}
+                onClick={() => setTab(item.tab)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer
+                  ${item.ok
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                    : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+                  }`}>
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+                {item.ok
+                  ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  : <AlertTriangle className="h-3 w-3 text-rose-400" />
+                }
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ── Tabs ── */}
@@ -417,6 +496,12 @@ function ClienteDetailPage() {
       )}
 
       {/* ═════════════════════ ABA: SERVIÇOS ═════════════════════ */}
+      {tab === "socios" && <TabSocios clienteId={id} />}
+
+      {tab === "certificados" && (
+        <TabCertificados clienteId={id} cnpj={cliente?.cnpj} />
+      )}
+
       {tab === "servicos" && <TabServicos clienteId={id} />}
 
       {/* ═════════════════════ ABA: CONTRATOS ════════════════════ */}

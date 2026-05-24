@@ -27,6 +27,17 @@ export interface CnpjDados {
   capitalSocial?: number;
   optanteSimplesNacional?: boolean;
   optanteMei?: boolean;
+  socios?: Array<{
+    nome: string;
+    cnpjCpf: string;
+    qualificacao: string;
+    codigoQualificacao: number;
+    faixaEtaria?: string;
+    dataEntrada?: string;
+    nomeRepresentante?: string;
+    cpfRepresentante?: string;
+    qualificacaoRepresentante?: string;
+  }>;
 }
 
 export function useCnpjLookup() {
@@ -70,6 +81,17 @@ export function useCnpjLookup() {
             capitalSocial:       d.capital_social ? Number(d.capital_social) : undefined,
             optanteSimplesNacional: d.opcao_pelo_simples ?? undefined,
             optanteMei:          d.opcao_pelo_mei ?? undefined,
+            socios: Array.isArray(d.qsa) ? d.qsa.map((s: any) => ({
+              nome:                     s.nome_socio ?? "",
+              cnpjCpf:                  s.cnpj_cpf_do_socio ?? "",
+              qualificacao:             s.qualificacao_socio ?? "",
+              codigoQualificacao:       Number(s.codigo_qualificacao_socio ?? 0),
+              faixaEtaria:              s.faixa_etaria ?? undefined,
+              dataEntrada:              s.data_entrada_sociedade ?? undefined,
+              nomeRepresentante:        s.nome_representante_legal ?? undefined,
+              cpfRepresentante:         s.cpf_representante_legal ?? undefined,
+              qualificacaoRepresentante: s.qualificacao_representante_legal ?? undefined,
+            })) : [],
           };
         }
       }

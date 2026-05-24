@@ -17,6 +17,7 @@ import { useClientes, type Cliente, type Regime, type FormaPagamento } from "@/h
 import { formatCNPJ, isValidCNPJ, onlyDigits } from "@/lib/cnpj";
 import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { useCnpjSerpro } from "@/hooks/use-cnpj-serpro";
+import { useSocios } from "@/hooks/use-socios";
 
 const REGIMES: Regime[] = ["MEI", "Simples", "Lucro Presumido", "Lucro Real", "Doméstica"];
 const FORMAS: FormaPagamento[] = ["PIX", "Boleto", "Débito automático"];
@@ -48,6 +49,8 @@ const SECTIONS: { id: SectionId; label: string; icon: any }[] = [
 
 export function ClienteFormDialog({ open, onClose, cliente }: Props) {
   const { clientes, createCliente, updateCliente } = useClientes();
+  const { importarDosCNPJ } = useSocios(null);
+  const [dadosCnpjParaSocios, setDadosCnpjParaSocios] = useState<any>(null);
   const { buscar: buscarBrasil, loading: loadingBrasil } = useCnpjLookup();
   const { enriquecer: enriquecerSerpro }                 = useCnpjSerpro();
 
@@ -116,6 +119,10 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
         }));
       }
 
+      // Guardar sócios para importação após salvar
+      if (cadastral?.socios && cadastral.socios.length > 0) {
+        setDadosCnpjParaSocios(cadastral);
+      }
       toast.loading("Consultando SERPRO…", { id: "cnpj-lookup" });
 
       // 2. SERPRO — regime real + situação fiscal (pode demorar mais)
@@ -166,8 +173,13 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
         await updateCliente(cliente.id, payload);
         toast.success("Cliente atualizado");
       } else {
-        await createCliente(payload as any);
+        const criado = await createCliente(payload as any);
         toast.success("Cliente cadastrado");
+        // Importar sócios automaticamente se temos dados da Receita
+        if (criado?.id && dadosCnpjParaSocios?.socios?.length) {
+          await importarDosCNPJ(criado.id, dadosCnpjParaSocios.socios);
+          toast.success(`${dadosCnpjParaSocios.socios.length} sócio(s) importados da Receita Federal`);
+        }
       }
       onClose();
     } catch (e: any) {
