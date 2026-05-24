@@ -63,6 +63,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
   const [sectionErrors, setSectionErrors] = useState<Set<SectionId>>(new Set());
   const [serproInfo,   setSerproInfo]   = useState<string | null>(null);
   const [serproAlerts, setSerproAlerts] = useState<string[]>([]);
+  const [aliquotaInfo, setAliquotaInfo]   = useState<string | null>(null);
   const cnpjRef = useRef<string>("");
 
   // Resetar form quando o dialog abre
@@ -76,6 +77,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
       setSerproAlerts([]);
       setDadosCnpjParaSocios(null);
       setSectionErrors(new Set());
+      setAliquotaInfo(null);
     }
   }
 
@@ -151,6 +153,15 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
         if (serpro.dividaAtivaPgfn)       alerts.push("Dívida ativa na PGFN");
         if (infos.length > 0)  setSerproInfo(infos.join(" · "));
         if (alerts.length > 0) setSerproAlerts(alerts);
+        // Info de alíquota vindas do CNAE
+        if (serpro.anexoSimples || serpro.codigoServicoNfse) {
+          const fiscalPartes: string[] = [];
+          if (serpro.anexoSimples)       fiscalPartes.push(`Anexo ${serpro.anexoSimples}`);
+          if (serpro.cnaeDescricao)      fiscalPartes.push(serpro.cnaeDescricao);
+          if (serpro.descricaoServico)   fiscalPartes.push(`Serviço: ${serpro.descricaoServico}`);
+          if (serpro.aliquotaIss !== undefined) fiscalPartes.push(`ISS: ${serpro.aliquotaIss}%`);
+          if (fiscalPartes.length > 0)   setAliquotaInfo(fiscalPartes.join(" · "));
+        }
       }
 
       toast.success("Dados preenchidos automaticamente", { id: "cnpj-lookup" });
@@ -297,7 +308,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
                 </div>
 
                 {/* Info SERPRO */}
-                {(serproInfo || serproAlerts.length > 0 || (dadosCnpjParaSocios?.socios?.length ?? 0) > 0) && (
+                {(serproInfo || serproAlerts.length > 0 || (dadosCnpjParaSocios?.socios?.length ?? 0) > 0 || !!aliquotaInfo) && (
                   <div className="space-y-1.5">
                     {serproInfo && (
                       <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
@@ -316,6 +327,16 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
                         <span className="font-semibold">👥 {dadosCnpjParaSocios!.socios!.length} sócio(s) encontrado(s):</span>{" "}
                         {dadosCnpjParaSocios!.socios!.map((s: any) => s.nome).join(" · ")}
                         <div className="mt-0.5 opacity-70">Serão importados automaticamente ao salvar</div>
+                      </div>
+                    )}
+                    {aliquotaInfo && (
+                      <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                        <span className="text-amber-600 text-sm shrink-0">📊</span>
+                        <div className="text-xs text-amber-700">
+                          <span className="font-semibold">Fiscal preenchido automaticamente</span>
+                          <p className="mt-0.5 opacity-80">{aliquotaInfo}</p>
+                          <p className="mt-0.5 opacity-60">Ver aba Fiscal para revisar código de serviço e alíquota ISS</p>
+                        </div>
                       </div>
                     )}
                   </div>

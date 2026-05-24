@@ -19,6 +19,13 @@ export interface SerproEnrichment {
   regimeRaw?: string;
   regimeDataOpcao?: number;
   regimeAnos?: Array<{ anoCalendario: number; regimeApurado: string }>;
+  // Fiscal calculado pelo CNAE
+  cnaePrincipal?: string;
+  cnaeDescricao?: string;
+  anexoSimples?: string;
+  codigoServicoNfse?: string;
+  aliquotaIss?: number;
+  descricaoServico?: string;
 }
 
 export function useCnpjSerpro() {
@@ -50,6 +57,13 @@ export function useCnpjSerpro() {
         regimeRaw:                r.regimeRaw,
         regimeDataOpcao:          r.regimeDataOpcao,
         regimeAnos:               r.regimeAnos,
+        // Fiscal calculado pela EF
+        cnaePrincipal:            r.cnaePrincipal,
+        cnaeDescricao:            r.cnaeDescricao,
+        anexoSimples:             r.anexoSimples,
+        codigoServicoNfse:        r.codigoServicoNfse,
+        aliquotaIss:              r.aliquotaIss !== undefined ? Number(r.aliquotaIss) : undefined,
+        descricaoServico:         r.descricaoServico,
       };
     } catch (err) {
       console.warn("[useCnpjSerpro] Falha ao chamar cnpj-enrich:", err);
