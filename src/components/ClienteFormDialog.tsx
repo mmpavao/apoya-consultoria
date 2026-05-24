@@ -31,8 +31,10 @@ interface Props {
 const EMPTY: Partial<Cliente> = {
   razaoSocial: "", nomeFantasia: "", cnpj: "", regime: "Simples", regimeHibrido: false,
   status: "ativo", tier: "Simples",
+  responsavel: "APOYA",
   email: "", telefone: "", whatsapp: "",
   valorHonorario: undefined, diaVencimento: 20,
+  formaPagamento: "PIX",
   temEmpregados: false, temIncentivoFiscal: false,
   endereco: { cep: "", logradouro: "", numero: "", complemento: "", bairro: "", municipio: "", uf: "" },
 };
@@ -58,6 +60,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
   const [saving, setSaving]   = useState(false);
   const [looking, setLooking] = useState(false);
   const [section, setSection] = useState<SectionId>("identificacao");
+  const [sectionErrors, setSectionErrors] = useState<Set<SectionId>>(new Set());
   const [serproInfo,   setSerproInfo]   = useState<string | null>(null);
   const [serproAlerts, setSerproAlerts] = useState<string[]>([]);
   const cnpjRef = useRef<string>("");
@@ -72,6 +75,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
       setSerproInfo(null);
       setSerproAlerts([]);
       setDadosCnpjParaSocios(null);
+      setSectionErrors(new Set());
     }
   }
 
@@ -165,11 +169,22 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
 
   // ── Salvar ────────────────────────────────────────────────
   async function handleSubmit() {
-    if (!form.razaoSocial?.trim()) { toast.error("Razão Social obrigatória"); return; }
-    if (!isValidCNPJ(form.cnpj ?? "")) { toast.error("CNPJ inválido"); return; }
-
+    // Validações com navegação automática para a aba com erro
+    if (!form.cnpj?.trim() || !isValidCNPJ(form.cnpj ?? "")) {
+      toast.error("CNPJ inválido ou não preenchido");
+      setSection("identificacao"); return;
+    }
+    if (!form.razaoSocial?.trim()) {
+      toast.error("Razão Social obrigatória");
+      setSection("identificacao"); return;
+    }
     const dup = clientes.find(c => onlyDigits(c.cnpj ?? "") === onlyDigits(form.cnpj ?? "") && c.id !== cliente?.id);
-    if (dup) { toast.error(`CNPJ já cadastrado: ${dup.razaoSocial}`); return; }
+    if (dup) { toast.error(`CNPJ já cadastrado: ${dup.razaoSocial}`); setSection("identificacao"); return; }
+
+    // Garantir responsavel preenchido (campo NOT NULL no banco)
+    if (!form.responsavel?.trim()) {
+      setForm(p => ({ ...p, responsavel: "APOYA" }));
+    }
 
     setSaving(true);
     try {
@@ -188,7 +203,20 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
       }
       onClose();
     } catch (e: any) {
-      toast.error("Erro ao salvar: " + (e?.message ?? "tente novamente"));
+      const msg = e?.message ?? "tente novamente";
+      // Mapear erros do banco para mensagens amigáveis
+      if (msg.includes("responsavel")) {
+        toast.error("Campo Responsável é obrigatório");
+        setSection("configuracoes");
+      } else if (msg.includes("cnpj") && msg.includes("unique")) {
+        toast.error("CNPJ já cadastrado em outro cliente");
+        setSection("identificacao");
+      } else if (msg.includes("regime")) {
+        toast.error("Selecione um Regime Tributário");
+        setSection("fiscal");
+      } else {
+        toast.error("Erro ao salvar: " + msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -214,15 +242,20 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
             <button
               key={s.id}
               type="button"
-              onClick={e => { e.stopPropagation(); setSection(s.id); }}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+              onClick={e => { e.stopPropagation(); setSection(s.id); setSectionErrors(prev => { const n = new Set(prev); n.delete(s.id); return n; }); }}
+              className={`relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                 section === s.id
                   ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  : sectionErrors.has(s.id)
+                    ? "border-rose-400 text-rose-500"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <s.icon className="h-3 w-3" />
               {s.label}
+              {sectionErrors.has(s.id) && (
+                <span className="ml-0.5 inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+              )}
             </button>
           ))}
         </div>
