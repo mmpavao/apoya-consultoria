@@ -11,7 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseServiceFetch } from "@/lib/supabase-server";
 
 const NFSEIO_BASE = "https://api.nfe.io/v1";
-const FALLBACK_EMITENTE_ID = "10ecf6c4445648549695358f7ac944e7"; // ZAP TECHNOLOGY (DEV)
+const FALLBACK_EMITENTE_ID = "d8e1f4b5f4674fdaaaf034e5a837b85d"; // APOYA AUDITORIA (PROD)
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -186,8 +186,17 @@ export const Route = createFileRoute("/api/nfse/")({
           if (!localId) return err("Falha ao criar rascunho no banco", 500);
 
           try {
+            // Enriquecer payload com campos obrigatórios para Simples Nacional
+            const notaEnriquecida = {
+              ...nota,
+              // Campos obrigatórios para emitentes do Simples Nacional em Caçapava/SP
+              taxationType: nota.taxationType ?? "WithinCity",
+              issRetained: nota.issRetained ?? nota.issRetained ?? false,
+              // federalServiceCode padrão para serviços contábeis se não informado
+              federalServiceCode: nota.federalServiceCode ?? "17.20",
+            };
             const { data: result } = await nfseio<any>("POST",
-              `/companies/${emitenteId}/serviceinvoices`, nota);
+              `/companies/${emitenteId}/serviceinvoices`, notaEnriquecida);
 
             const nfseioId = result?.id;
             const numero = String(result?.number ?? "");
