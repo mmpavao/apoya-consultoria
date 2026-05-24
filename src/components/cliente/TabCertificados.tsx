@@ -1,13 +1,13 @@
 /**
- * TabCertificados — Gestão de certificado digital (A1/A3) e procuração eCAC
- * Faz upload para Supabase Storage, armazena metadados em cliente_certificado.
- * O certificado fica disponível para injetar no SERPRO/NFE.io via secrets.
+ * TabCertificados — Upload simples de certificado digital A1/A3
+ * Fluxo: usuário arrasta o .pfx + informa senha → sistema extrai dados
+ * automaticamente. Nenhum campo manual de razão social ou CNPJ.
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  Shield, ShieldCheck, ShieldAlert, ShieldOff, Upload, Key,
-  AlertTriangle, CheckCircle2, Clock, Loader2, RefreshCw, FileKey2,
-  CalendarClock, Info, Eye, EyeOff,
+  FileKey2, Shield, ShieldOff, Upload, Eye, EyeOff,
+  CheckCircle2, AlertTriangle, Clock, Loader2, X,
+  RefreshCw, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,56 +16,51 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface CertData {
-  id?: string;
-  tipo: "A1" | "A3";
-  pfxNomeRazao?: string;
-  pfxCnpj?: string;
-  pfxSerial?: string;
-  pfxValidade?: string;
-  hasProcuracao: boolean;
-  procuracaoValidade?: string;
-  procuracaoVerificadaEm?: string;
-  nfseioEntregue: boolean;
-  nfseioEntregueEm?: string;
-  storagePath?: string;
-  storageUrl?: string;
+interface CertInfo {
+  id?:                   string;
+  tipo:                  "A1" | "A3";
+  pfxNomeRazao?:         string;
+  pfxCnpj?:              string;
+  pfxSerial?:            string;
+  pfxValidade?:          string;
+  hasProcuracao:         boolean;
+  procuracaoValidade?:   string;
+  nfseioEntregue:        boolean;
+  nfseioEntregueEm?:     string;
+  nfseioId?:             string;
 }
 
-const EMPTY: CertData = {
-  tipo: "A1", hasProcuracao: false, nfseioEntregue: false,
-};
+const EMPTY: CertInfo = { tipo: "A1", hasProcuracao: false, nfseioEntregue: false };
 
-function diasParaVencer(data?: string): number | null {
-  if (!data) return null;
-  const diff = new Date(data).getTime() - Date.now();
-  return Math.ceil(diff / 86400000);
+function diasParaVencer(iso?: string): number | null {
+  if (!iso) return null;
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
 function ValidadeBadge({ data, label }: { data?: string; label: string }) {
   const dias = diasParaVencer(data);
   if (dias === null) return <span className="text-muted-foreground text-xs">Não informada</span>;
-  if (dias < 0)  return <Badge className="bg-rose-100 text-rose-700 border-0 gap-1"><ShieldOff className="h-3 w-3" />{label} expirado</Badge>;
-  if (dias < 30) return <Badge className="bg-amber-100 text-amber-700 border-0 gap-1"><AlertTriangle className="h-3 w-3" />Vence em {dias}d</Badge>;
-  if (dias < 90) return <Badge className="bg-yellow-100 text-yellow-700 border-0 gap-1"><Clock className="h-3 w-3" />Vence em {dias}d</Badge>;
-  return <Badge className="bg-emerald-100 text-emerald-700 border-0 gap-1"><CheckCircle2 className="h-3 w-3" />{new Date(data!).toLocaleDateString("pt-BR")}</Badge>;
+  if (dias < 0)   return <Badge className="bg-rose-100 text-rose-700 border-0 gap-1"><ShieldOff className="h-3 w-3"/>{label} expirado</Badge>;
+  if (dias < 30)  return <Badge className="bg-amber-100 text-amber-700 border-0 gap-1"><AlertTriangle className="h-3 w-3"/>Vence em {dias}d</Badge>;
+  if (dias < 90)  return <Badge className="bg-yellow-100 text-yellow-700 border-0 gap-1"><Clock className="h-3 w-3"/>Vence em {dias}d</Badge>;
+  return <Badge className="bg-emerald-100 text-emerald-700 border-0 gap-1"><CheckCircle2 className="h-3 w-3"/>{new Date(data!).toLocaleDateString("pt-BR")}</Badge>;
 }
 
-interface Props { clienteId: string; cnpj?: string; }
+interface Props { clienteId: string; cnpj?: string; razaoSocial?: string; }
 
-export function TabCertificados({ clienteId, cnpj }: Props) {
-  const [cert, setCert]           = useState<CertData>(EMPTY);
-  const [loading, setLoading]     = useState(false);
+export function TabCertificados({ clienteId, cnpj, razaoSocial }: Props) {
+  const [cert, setCert]           = useState<CertInfo>(EMPTY);
+  const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
   const [senha, setSenha]         = useState("");
-  const [senhaConf, setSenhaConf] = useState("");
-  const [saving, setSaving]       = useState(false);
+  const [dragOver, setDragOver]   = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [savingProc, setSavingProc]     = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Carregar dados do certificado
   useEffect(() => {
-    async function loadCert() {
+    (async () => {
       setLoading(true);
       try {
         const { data } = await (supabase as any)
@@ -73,104 +68,163 @@ export function TabCertificados({ clienteId, cnpj }: Props) {
           .select("*")
           .eq("cliente_id", clienteId)
           .maybeSingle();
-
         if (data) {
           setCert({
-            id:                    data.id,
-            tipo:                  data.tipo ?? "A1",
-            pfxNomeRazao:          data.pfx_nome_razao,
-            pfxCnpj:               data.pfx_cnpj,
-            pfxSerial:             data.pfx_serial,
-            pfxValidade:           data.pfx_validade,
-            hasProcuracao:         data.has_procuracao ?? false,
-            procuracaoValidade:    data.procuracao_validade,
-            procuracaoVerificadaEm: data.procuracao_verificada_em,
-            nfseioEntregue:        !!data.nfseio_cert_id,
-            nfseioEntregueEm:      data.nfseio_cert_uploaded_at,
-            storagePath:           data.storage_path,
-            storageUrl:            data.storage_url,
+            id:                  data.id,
+            tipo:                data.tipo ?? "A1",
+            pfxNomeRazao:        data.pfx_nome_razao,
+            pfxCnpj:             data.pfx_cnpj,
+            pfxSerial:           data.pfx_serial,
+            pfxValidade:         data.pfx_validade,
+            hasProcuracao:       data.has_procuracao ?? false,
+            procuracaoValidade:  data.procuracao_validade,
+            nfseioEntregue:      !!data.nfseio_cert_id,
+            nfseioEntregueEm:    data.nfseio_cert_uploaded_at,
+            nfseioId:            data.nfseio_cert_id,
           });
         }
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
-    }
-    loadCert();
+    })();
   }, [clienteId]);
 
-  // Upload do arquivo PFX
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) validateAndSetFile(file);
+  }, []);
+
+  function validateAndSetFile(file: File) {
     if (!file.name.match(/\.(pfx|p12)$/i)) {
       toast.error("Apenas arquivos .pfx ou .p12 são aceitos");
       return;
     }
-    if (!senha || senha.length < 4) {
-      toast.error("Informe a senha do certificado antes de fazer upload");
-      return;
-    }
-    if (senha !== senhaConf) {
-      toast.error("As senhas não conferem");
-      return;
-    }
+    setSelectedFile(file);
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) { toast.error("Selecione o arquivo .pfx"); return; }
+    if (!senha || senha.length < 4) { toast.error("Informe a senha do certificado"); return; }
 
     setUploading(true);
-    toast.loading("Enviando certificado…", { id: "cert-upload" });
+    toast.loading("Processando certificado…", { id: "cert-up" });
+
     try {
-      const cnpjLimpo = (cnpj ?? "").replace(/\D/g, "");
-      const path = `certificados/${clienteId}/${Date.now()}_cert.pfx`;
+      // 1. Converter para base64
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-      const { error: upErr } = await supabase.storage
-        .from("documentos")
-        .upload(path, file, { upsert: true, contentType: "application/x-pkcs12" });
+      // 2. Extrair metadados via Edge Function
+      let certMeta = {
+        nomeRazao: razaoSocial ?? "",
+        cnpj:      (cnpj ?? "").replace(/\D/g, ""),
+        serial:    "",
+        validoAte: "",
+        tipo:      "A1" as "A1" | "A3",
+        nfseioId:  undefined as string | undefined,
+      };
 
-      if (upErr) throw upErr;
+      try {
+        const { data: parsed } = await supabase.functions.invoke(
+          "parse-certificate",
+          { body: { pfxBase64: b64, password: senha } }
+        );
+        if (parsed?.ok) {
+          certMeta = { ...certMeta, ...parsed };
+        }
+      } catch { /* fallback: usa dados do cliente */ }
 
-      const { data: urlData } = supabase.storage
-        .from("documentos")
-        .getPublicUrl(path);
+      // 3. Upload Supabase Storage (bucket privado)
+      const storagePath = `certificados/${clienteId}/${Date.now()}_cert.pfx`;
+      const { error: storErr } = await supabase.storage
+        .from("documentos-clientes")
+        .upload(storagePath, selectedFile, { upsert: true, contentType: "application/x-pkcs12" });
+      if (storErr) throw storErr;
 
-      // Salvar metadados (sem criptografia no MVP — flag para futuro)
+      // 4. Upload NFE.io via Edge Function
+      let nfseioId: string | undefined;
+      let nfseioUploadedAt: string | undefined;
+      try {
+        const { data: nfResp } = await supabase.functions.invoke("upload-certificate-nfeio", {
+          body: { pfxBase64: b64, password: senha, cnpj: certMeta.cnpj }
+        });
+        if (nfResp?.ok && nfResp.certId) {
+          nfseioId = nfResp.certId;
+          nfseioUploadedAt = new Date().toISOString();
+        }
+      } catch { /* NFE.io não crítico */ }
+
+      // 5. Persistir no banco
       const row: Record<string, unknown> = {
-        cliente_id:   clienteId,
-        tipo:         cert.tipo,
-        pfx_cnpj:     cnpjLimpo || undefined,
-        pfx_nome_razao: cert.pfxNomeRazao,
-        has_procuracao: cert.hasProcuracao,
-        procuracao_validade: cert.procuracaoValidade || undefined,
-        storage_path: path,
-        storage_url:  urlData?.publicUrl,
+        cliente_id:              clienteId,
+        tipo:                    certMeta.tipo,
+        pfx_cnpj:                certMeta.cnpj || undefined,
+        pfx_nome_razao:          certMeta.nomeRazao || undefined,
+        pfx_serial:              certMeta.serial || undefined,
+        pfx_validade:            certMeta.validoAte || undefined,
+        nfseio_cert_id:          nfseioId || undefined,
+        nfseio_cert_uploaded_at: nfseioUploadedAt || undefined,
+        has_procuracao:          cert.hasProcuracao,
+        procuracao_validade:     cert.procuracaoValidade || null,
       };
 
       if (cert.id) {
         await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
       } else {
-        const { data: ins } = await (supabase as any).from("cliente_certificado").insert(row).select().single();
-        if (ins) setCert(p => ({ ...p, id: (ins as any).id }));
+        const { data: ins } = await (supabase as any)
+          .from("cliente_certificado").insert(row).select().single();
+        if (ins) row.id = (ins as any).id;
       }
 
-      // Atualizar flag no cliente
-      await (supabase as any).from("clientes").update({ tem_certificado: true }).eq("id", clienteId);
+      // 6. Flag tem_certificado
+      await (supabase as any).from("clientes")
+        .update({ tem_certificado: true }).eq("id", clienteId);
 
+      // 7. Obrigação de alerta de vencimento (60 dias antes)
+      if (certMeta.validoAte) {
+        const dtAlerta = new Date(certMeta.validoAte);
+        dtAlerta.setDate(dtAlerta.getDate() - 60);
+        await (supabase as any).from("obrigacoes").upsert({
+          cliente_id:   clienteId,
+          codigo:       `CERT-VENC-${clienteId.slice(0, 8)}`,
+          nome:         "Renovação de Certificado Digital",
+          descricao:    `Certificado A1 vence em ${new Date(certMeta.validoAte).toLocaleDateString("pt-BR")}. Iniciar processo de renovação com a AC.`,
+          tipo:         "certificado",
+          regime:       "todos",
+          vencimento:   dtAlerta.toISOString().split("T")[0],
+          status:       "pendente",
+          cliente_nome: razaoSocial ?? "",
+        }, { onConflict: "codigo" });
+      }
+
+      // 8. Atualizar state
       setCert(p => ({
         ...p,
-        storagePath: path,
-        storageUrl: urlData?.publicUrl,
+        id:              (row.id as string) ?? p.id,
+        tipo:            certMeta.tipo,
+        pfxNomeRazao:    certMeta.nomeRazao || razaoSocial,
+        pfxCnpj:         certMeta.cnpj,
+        pfxSerial:       certMeta.serial,
+        pfxValidade:     certMeta.validoAte,
+        nfseioEntregue:  !!nfseioId,
+        nfseioEntregueEm: nfseioUploadedAt,
+        nfseioId,
       }));
 
-      toast.success("Certificado enviado com sucesso!", { id: "cert-upload" });
-      setSenha(""); setSenhaConf("");
+      setSelectedFile(null);
+      setSenha("");
+      toast.success("Certificado cadastrado com sucesso!", { id: "cert-up" });
     } catch (err: any) {
-      toast.error("Erro no upload: " + err.message, { id: "cert-upload" });
+      toast.error("Erro: " + (err.message ?? "Falha no upload"), { id: "cert-up" });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
 
-  // Salvar configurações de procuração
   async function saveProcuracao() {
-    setSaving(true);
+    setSavingProc(true);
     try {
       const row = {
         cliente_id:          clienteId,
@@ -181,16 +235,17 @@ export function TabCertificados({ clienteId, cnpj }: Props) {
       if (cert.id) {
         await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
       } else {
-        const { data: ins } = await (supabase as any).from("cliente_certificado").insert(row).select().single();
+        const { data: ins } = await (supabase as any)
+          .from("cliente_certificado").insert(row).select().single();
         if (ins) setCert(p => ({ ...p, id: (ins as any).id }));
       }
-      // Atualizar flag procuração no cliente
-      await (supabase as any).from("clientes").update({ tem_procuracao: cert.hasProcuracao }).eq("id", clienteId);
-      toast.success("Configuração de procuração salva");
+      await (supabase as any).from("clientes")
+        .update({ tem_procuracao: cert.hasProcuracao }).eq("id", clienteId);
+      toast.success("Procuração salva");
     } catch (e: any) {
-      toast.error("Erro ao salvar: " + e.message);
+      toast.error("Erro: " + e.message);
     } finally {
-      setSaving(false);
+      setSavingProc(false);
     }
   }
 
@@ -200,204 +255,211 @@ export function TabCertificados({ clienteId, cnpj }: Props) {
     </div>
   );
 
-  const temCert     = !!cert.storagePath;
-  const diasCert    = diasParaVencer(cert.pfxValidade);
-  const diasProc    = diasParaVencer(cert.procuracaoValidade);
+  const temCert  = !!cert.pfxValidade || cert.nfseioEntregue;
+  const diasCert = diasParaVencer(cert.pfxValidade);
+  const diasProc = diasParaVencer(cert.procuracaoValidade);
 
   return (
-    <div className="space-y-5">
-      {/* Status geral */}
+    <div className="space-y-6">
+
+      {/* Status cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Card certificado */}
-        <div className={`rounded-xl p-4 border-2 flex items-start gap-3
-          ${temCert
-            ? diasCert !== null && diasCert < 30 ? "border-amber-400 bg-amber-50" : "border-emerald-400 bg-emerald-50"
-            : "border-border bg-muted/30"}`}>
-          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0
-            ${temCert ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
-            <FileKey2 className="h-5 w-5" />
+        <div className={`rounded-xl p-4 border-2 flex items-start gap-3 ${
+          temCert
+            ? (diasCert !== null && diasCert < 30 ? "border-amber-400 bg-amber-50" : "border-emerald-400 bg-emerald-50")
+            : "border-border bg-muted/30"
+        }`}>
+          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${temCert ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+            <FileKey2 className="h-5 w-5"/>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-sm">Certificado Digital</p>
-            <p className="text-xs mt-0.5 text-muted-foreground">{cert.tipo}</p>
-            {temCert
-              ? <ValidadeBadge data={cert.pfxValidade} label="Cert." />
-              : <span className="text-xs text-rose-600 font-medium">Não cadastrado</span>
-            }
+            <p className="text-xs text-muted-foreground">{cert.tipo}</p>
+            {cert.pfxNomeRazao && <p className="text-xs font-medium truncate mt-0.5" title={cert.pfxNomeRazao}>{cert.pfxNomeRazao}</p>}
+            <div className="mt-1">
+              {temCert ? <ValidadeBadge data={cert.pfxValidade} label="Cert."/> : <span className="text-xs text-rose-600 font-medium">Não cadastrado</span>}
+            </div>
           </div>
         </div>
 
-        {/* Card procuração */}
-        <div className={`rounded-xl p-4 border-2 flex items-start gap-3
-          ${cert.hasProcuracao
-            ? diasProc !== null && diasProc < 30 ? "border-amber-400 bg-amber-50" : "border-emerald-400 bg-emerald-50"
-            : "border-border bg-muted/30"}`}>
-          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0
-            ${cert.hasProcuracao ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
-            <Shield className="h-5 w-5" />
+        <div className={`rounded-xl p-4 border-2 flex items-start gap-3 ${
+          cert.hasProcuracao
+            ? (diasProc !== null && diasProc < 30 ? "border-amber-400 bg-amber-50" : "border-emerald-400 bg-emerald-50")
+            : "border-border bg-muted/30"
+        }`}>
+          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${cert.hasProcuracao ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+            <Shield className="h-5 w-5"/>
           </div>
           <div>
             <p className="font-semibold text-sm">Procuração eCAC</p>
-            <p className="text-xs mt-0.5 text-muted-foreground">Acesso ao eCAC/SERPRO</p>
-            {cert.hasProcuracao
-              ? <ValidadeBadge data={cert.procuracaoValidade} label="Proc." />
-              : <span className="text-xs text-rose-600 font-medium">Não cadastrada</span>
-            }
+            <p className="text-xs text-muted-foreground">Acesso SERPRO/RFB</p>
+            <div className="mt-1">
+              {cert.hasProcuracao ? <ValidadeBadge data={cert.procuracaoValidade} label="Proc."/> : <span className="text-xs text-rose-600 font-medium">Não cadastrada</span>}
+            </div>
           </div>
         </div>
 
-        {/* Card NFE.io */}
-        <div className={`rounded-xl p-4 border-2 flex items-start gap-3
-          ${cert.nfseioEntregue ? "border-emerald-400 bg-emerald-50" : "border-border bg-muted/30"}`}>
-          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0
-            ${cert.nfseioEntregue ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
-            <Key className="h-5 w-5" />
+        <div className={`rounded-xl p-4 border-2 flex items-start gap-3 ${cert.nfseioEntregue ? "border-emerald-400 bg-emerald-50" : "border-border bg-muted/30"}`}>
+          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${cert.nfseioEntregue ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+            <CheckCircle2 className="h-5 w-5"/>
           </div>
           <div>
             <p className="font-semibold text-sm">NFE.io</p>
-            <p className="text-xs mt-0.5 text-muted-foreground">Certificado na plataforma</p>
-            {cert.nfseioEntregue
-              ? <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> Entregue
-                </Badge>
-              : <span className="text-xs text-muted-foreground">Pendente</span>
-            }
+            <p className="text-xs text-muted-foreground">Emissão de NFS-e</p>
+            <div className="mt-1">
+              {cert.nfseioEntregue
+                ? <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Ativo</Badge>
+                : <span className="text-xs text-muted-foreground">Aguardando certificado</span>
+              }
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Upload certificado A1 */}
-      <div className="surface-card rounded-xl p-5 border border-border/50 space-y-4">
-        <h4 className="font-semibold flex items-center gap-2">
-          <Upload className="h-4 w-4 text-apoya-orange" /> Upload do Certificado Digital
-        </h4>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Tipo de Certificado</Label>
-            <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm mt-1"
-              value={cert.tipo}
-              onChange={e => setCert(p => ({ ...p, tipo: e.target.value as "A1" | "A3" }))}>
-              <option value="A1">A1 — Arquivo .pfx/.p12 (software)</option>
-              <option value="A3">A3 — Token/Smartcard (hardware)</option>
-            </select>
-          </div>
-          <div>
-            <Label>Razão Social no Certificado</Label>
-            <Input placeholder="Igual à Receita Federal" value={cert.pfxNomeRazao ?? ""}
-              onChange={e => setCert(p => ({ ...p, pfxNomeRazao: e.target.value }))}
-              className="mt-1" />
-          </div>
+      {/* Upload */}
+      <div className="surface-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Upload className="h-4 w-4 text-apoya-orange"/>
+          <h3 className="font-semibold text-sm">
+            {temCert ? "Substituir Certificado" : "Cadastrar Certificado"}
+          </h3>
+          {temCert && <Badge variant="outline" className="text-xs ml-auto">Substitui o anterior</Badge>}
         </div>
 
-        {cert.tipo === "A1" && (
-          <>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 text-xs text-amber-800">
-              <Info className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>O arquivo .pfx é armazenado de forma segura e nunca é exposto ao navegador.
-              A senha é usada apenas para descriptografar ao enviar para NFE.io ou SERPRO.</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Senha do Certificado</Label>
-                <div className="relative mt-1">
-                  <Input type={showSenha ? "text" : "password"} placeholder="Senha do .pfx"
-                    value={senha} onChange={e => setSenha(e.target.value)} />
-                  <button type="button" className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowSenha(p => !p)}>
-                    {showSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+        {/* Drop zone */}
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={() => fileRef.current?.click()}
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all select-none ${
+            dragOver ? "border-apoya-orange bg-orange-50 scale-[1.01]"
+            : selectedFile ? "border-emerald-400 bg-emerald-50"
+            : "border-border hover:border-apoya-orange/50 hover:bg-muted/30"
+          }`}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pfx,.p12"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) validateAndSetFile(f); }}
+          />
+          {selectedFile ? (
+            <div className="flex items-center justify-center gap-3">
+              <FileKey2 className="h-8 w-8 text-emerald-600 shrink-0"/>
+              <div className="text-left">
+                <p className="font-medium text-sm text-emerald-700">{selectedFile.name}</p>
+                <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024).toFixed(1)} KB — pronto para envio</p>
               </div>
-              <div>
-                <Label>Confirmar Senha</Label>
-                <Input type="password" placeholder="Repita a senha" className="mt-1"
-                  value={senhaConf} onChange={e => setSenhaConf(e.target.value)} />
-              </div>
+              <button
+                onClick={e => { e.stopPropagation(); setSelectedFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                className="ml-auto p-1 rounded hover:bg-emerald-100"
+              >
+                <X className="h-4 w-4 text-emerald-600"/>
+              </button>
             </div>
-
-            <div>
-              <input ref={fileRef} type="file" accept=".pfx,.p12" className="hidden"
-                onChange={handleFileUpload} />
-              <Button variant="outline" onClick={() => fileRef.current?.click()}
-                disabled={uploading || !senha || !senhaConf}>
-                {uploading
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando…</>
-                  : <><Upload className="h-4 w-4 mr-2" />
-                    {temCert ? "Substituir arquivo .pfx" : "Selecionar arquivo .pfx / .p12"}</>
-                }
-              </Button>
-              {temCert && (
-                <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Certificado armazenado com segurança
-                </p>
-              )}
+          ) : (
+            <div className="space-y-2">
+              <FileKey2 className={`h-10 w-10 mx-auto ${dragOver ? "text-apoya-orange" : "text-muted-foreground"}`}/>
+              <p className="font-medium text-sm">Arraste o arquivo .pfx aqui</p>
+              <p className="text-xs text-muted-foreground">ou clique para selecionar · aceita .pfx e .p12</p>
             </div>
-          </>
-        )}
-
-        {cert.tipo === "A3" && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-            <p className="font-medium mb-1">Certificado A3 (Token/Smartcard)</p>
-            <p>Certificados A3 não são armazenados no sistema. O token físico deve ser conectado
-            na máquina onde o software contábil é executado. Registre aqui apenas as informações
-            de validade e controle.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Procuração eCAC */}
-      <div className="surface-card rounded-xl p-5 border border-border/50 space-y-4">
-        <h4 className="font-semibold flex items-center gap-2">
-          <Shield className="h-4 w-4 text-apoya-orange" /> Procuração eCAC / SERPRO
-        </h4>
-
-        <div className="flex items-center gap-3">
-          <input type="checkbox" id="has_proc" className="h-4 w-4 accent-apoya-orange"
-            checked={cert.hasProcuracao}
-            onChange={e => setCert(p => ({ ...p, hasProcuracao: e.target.checked }))} />
-          <label htmlFor="has_proc" className="text-sm cursor-pointer">
-            Procuração cadastrada no eCAC para acesso via SERPRO
-          </label>
+          )}
         </div>
 
-        {cert.hasProcuracao && (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Validade da Procuração</Label>
-              <Input type="date" className="mt-1" value={cert.procuracaoValidade ?? ""}
-                onChange={e => setCert(p => ({ ...p, procuracaoValidade: e.target.value }))} />
-            </div>
-            {cert.procuracaoVerificadaEm && (
-              <div>
-                <Label>Última verificação SERPRO</Label>
-                <p className="text-sm mt-2 text-muted-foreground">
-                  {new Date(cert.procuracaoVerificadaEm).toLocaleString("pt-BR")}
-                </p>
-              </div>
-            )}
+        {/* Senha */}
+        <div className="space-y-1.5">
+          <Label htmlFor="cert-senha" className="text-sm">Senha do certificado</Label>
+          <div className="relative max-w-xs">
+            <Input
+              id="cert-senha"
+              type={showSenha ? "text" : "password"}
+              placeholder="Senha do .pfx"
+              value={senha}
+              onChange={e => setSenha(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleUpload()}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSenha(p => !p)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showSenha ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+            </button>
           </div>
-        )}
+          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+            <Info className="h-3 w-3 shrink-0"/>
+            Nome, CNPJ e validade são lidos automaticamente do certificado
+          </p>
+        </div>
 
-        <Button onClick={saveProcuracao} disabled={saving} size="sm">
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          Salvar configuração
+        <Button
+          onClick={handleUpload}
+          disabled={!selectedFile || !senha || uploading}
+          className="w-full bg-apoya-orange hover:bg-apoya-orange/90 text-white gap-2"
+        >
+          {uploading
+            ? <><Loader2 className="h-4 w-4 animate-spin"/>Processando…</>
+            : <><Upload className="h-4 w-4"/>Enviar certificado</>
+          }
         </Button>
       </div>
 
-      {/* Info técnica */}
-      <div className="surface-card rounded-xl p-4 border border-border/50 bg-muted/20">
-        <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-          <Info className="h-3.5 w-3.5" /> Como o certificado é usado
-        </p>
-        <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong>SERPRO:</strong> Injeção automática via MCP para consultas de DAS, PGDAS, situação fiscal e procurações eCAC</li>
-          <li><strong>NFE.io:</strong> Upload automático para emissão de NFS-e em nome do cliente</li>
-          <li><strong>SEFAZ:</strong> Assinatura de NF-e e NFC-e (via integração futura)</li>
-          <li>O arquivo fica em storage privado — nunca acessível publicamente via URL</li>
-        </ul>
+      {/* Dados extraídos (read-only) */}
+      {temCert && (cert.pfxNomeRazao || cert.pfxCnpj || cert.pfxValidade) && (
+        <div className="surface-card p-5 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados do certificado atual</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            {cert.pfxNomeRazao && (
+              <div><span className="text-xs text-muted-foreground block">Titular</span><span className="font-medium">{cert.pfxNomeRazao}</span></div>
+            )}
+            {cert.pfxCnpj && (
+              <div><span className="text-xs text-muted-foreground block">CNPJ</span><span className="font-mono">{cert.pfxCnpj}</span></div>
+            )}
+            {cert.pfxValidade && (
+              <div><span className="text-xs text-muted-foreground block">Validade</span><ValidadeBadge data={cert.pfxValidade} label="Cert."/></div>
+            )}
+            {cert.pfxSerial && (
+              <div><span className="text-xs text-muted-foreground block">Serial</span><span className="font-mono text-xs text-muted-foreground">{cert.pfxSerial}</span></div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Procuração */}
+      <div className="surface-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-apoya-orange"/>
+          <h3 className="font-semibold text-sm">Procuração eCAC</h3>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={cert.hasProcuracao}
+            onChange={e => setCert(p => ({ ...p, hasProcuracao: e.target.checked }))}
+            className="h-4 w-4 accent-apoya-orange"
+          />
+          <span className="text-sm">Procuração eCAC concedida</span>
+        </label>
+        {cert.hasProcuracao && (
+          <div className="space-y-1.5">
+            <Label className="text-sm">Validade da procuração</Label>
+            <Input
+              type="date"
+              value={cert.procuracaoValidade?.split("T")[0] ?? ""}
+              onChange={e => setCert(p => ({ ...p, procuracaoValidade: e.target.value }))}
+              className="max-w-xs"
+            />
+          </div>
+        )}
+        <Button onClick={saveProcuracao} disabled={savingProc} variant="outline" size="sm" className="gap-2">
+          {savingProc ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+          Salvar
+        </Button>
       </div>
+
     </div>
   );
 }
