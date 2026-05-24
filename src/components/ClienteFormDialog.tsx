@@ -140,7 +140,10 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
         setForm(prev => ({
           ...prev,
           // Regime SERPRO tem prioridade (é a fonte oficial)
-          regime: serpro.regime ?? prev.regime,
+          regime:            serpro.regime             ?? prev.regime,
+          // Campos fiscais calculados pelo CNAE via EF
+          codigoServicoNfse: serpro.codigoServicoNfse  ?? prev.codigoServicoNfse,
+          aliquotaIss:       serpro.aliquotaIss        ?? prev.aliquotaIss,
         }));
 
         // Montar mensagem informativa
@@ -192,20 +195,26 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
     const dup = clientes.find(c => onlyDigits(c.cnpj ?? "") === onlyDigits(form.cnpj ?? "") && c.id !== cliente?.id);
     if (dup) { toast.error(`CNPJ já cadastrado: ${dup.razaoSocial}`); setSection("identificacao"); return; }
 
-    // Garantir responsavel preenchido (campo NOT NULL no banco)
-    if (!form.responsavel?.trim()) {
-      setForm(p => ({ ...p, responsavel: "APOYA" }));
-    }
-
     setSaving(true);
     try {
-      const payload = { ...form, cnpj: formatCNPJ(form.cnpj ?? "") };
+      // Garantir responsavel no payload (NOT NULL no banco) — não usar setForm (async)
+      const payload = {
+        ...form,
+        cnpj: formatCNPJ(form.cnpj ?? ""),
+        responsavel: form.responsavel?.trim() || "APOYA",
+      };
       if (cliente?.id) {
-        await updateCliente(cliente.id, payload);
-        toast.success("Cliente atualizado");
+        const ok = await updateCliente(cliente.id, payload);
+        if (!ok) { setSaving(false); return; }
+        toast.success("Cliente atualizado com sucesso!");
       } else {
         const criado = await createCliente(payload as any);
-        toast.success("Cliente cadastrado");
+        if (!criado) {
+          // createCliente já exibiu toast.error — apenas parar aqui
+          setSaving(false);
+          return;
+        }
+        toast.success("Cliente cadastrado com sucesso!");
         // Importar sócios automaticamente se temos dados da Receita
         if (criado?.id && dadosCnpjParaSocios?.socios?.length) {
           await importarDosCNPJ(criado.id, dadosCnpjParaSocios.socios);
@@ -544,7 +553,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
           <Button variant="outline" onClick={e => { e.stopPropagation(); onClose(); }} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={e => { e.stopPropagation(); handleSubmit(); }} disabled={saving || looking}>
+          <Button onClick={e => { e.stopPropagation(); handleSubmit(); }} disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando…</> : (cliente ? "Salvar alterações" : "Cadastrar cliente")}
           </Button>
         </DialogFooter>
