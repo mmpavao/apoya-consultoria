@@ -10,6 +10,7 @@ import { useTarefas, TarefaTipo, TarefaPrioridade, calcularSlaHoras } from "@/ho
 import { TODOS_RESPONSAVEIS, TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_EMOJI, TIPO_DOT } from "./tarefa-utils";
 import { useClientes } from "@/hooks/use-clientes";
 import { toast } from "sonner";
+import { createPortal } from "react-dom";
 
 interface Props {
   open: boolean;
@@ -96,7 +97,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) { reset(); onClose(); } }}
@@ -320,5 +321,5 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }

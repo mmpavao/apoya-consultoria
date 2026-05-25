@@ -154,7 +154,8 @@
     display: flex;
     min-height: 100vh;
     min-height: 100dvh;
-    overflow: hidden;
+    /* overflow: clip em vez de hidden — não cria stacking context para fixed */
+    overflow: clip;
     position: relative;
   }
 
@@ -203,7 +204,8 @@
     margin-left: var(--sidebar-width);
     position: relative;
     z-index: 1;
-    overflow: hidden;
+    /* overflow: clip não quebra fixed positioning de modais filhos */
+    overflow: clip;
     transition: margin-left 220ms var(--transition-smooth);
   }
 

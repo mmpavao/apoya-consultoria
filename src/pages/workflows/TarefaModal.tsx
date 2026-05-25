@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Button }   from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input }    from "@/components/ui/input";
@@ -182,7 +183,7 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog" aria-modal="true"
@@ -556,5 +557,5 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
