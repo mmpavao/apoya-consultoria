@@ -9,16 +9,16 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -29,22 +29,9 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Fix wrangler config
-        run: |
-          python3 -c "
-          import json
-          with open('dist/server/wrangler.json') as f:
-              c = json.load(f)
-          c['name'] = 'apoya-gestao'
-          c['assets'] = {'directory': '../client', 'binding': 'ASSETS'}
-          with open('dist/server/wrangler.json', 'w') as f:
-              json.dump(c, f, indent=2)
-          print('wrangler.json configurado')
-          "
-
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy --config dist/server/wrangler.json
         env:
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_EMAIL: talkzzbot@gmail.com
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
