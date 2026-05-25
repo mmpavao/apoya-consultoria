@@ -3,14 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Calendar, CheckCircle2, Clock, Loader2,
-  RefreshCw, TrendingUp, Plus} from "lucide-react";
+  TrendingUp, Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { ObrigacaoFormDialog } from "@/components/ObrigacaoFormDialog";
-// import { obrigacoesStore, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/lib/obrigacoes-store";
 
 export const Route = createFileRoute("/_app/obrigacoes")({
   component: ObrigacoesPage,
@@ -37,20 +37,22 @@ const fmtDate = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR"
 
 function ObrigacoesPage(){
   const now = new Date();
-  const [ano, setAno]       = useState(now.getFullYear());
-  const [mes, setMes]       = useState(now.getMonth()+1);
-  const { obrigacoes: items, loading: obgLoading, refetch: refresh } = useObrigacoes();
-  const [query, setQuery]   = useState("");
-  const [status, setStatus] = useState<"todos"|ObrigacaoStatus>("todos");
+  const [ano, setAno]           = useState(now.getFullYear());
+  const [mes, setMes]           = useState(now.getMonth()+1);
+  const { obrigacoes: items, loading: obgLoading, refetch: refresh, updateStatus } = useObrigacoes();
+  const [query, setQuery]       = useState("");
+  const [status, setStatus]     = useState<"todos"|ObrigacaoStatus>("todos");
   const [dialogOb, setDialogOb] = useState(false);
-  const [tipo, setTipo]     = useState("todos");
-  const [sel, setSel]       = useState<Set<string>>(new Set());
-  const [busy, setBusy]     = useState(false);
+  // Bug 2 fix: estado para edição individual
+  const [editItem, setEditItem] = useState<Obrigacao | null>(null);
+  const [tipo, setTipo]         = useState("todos");
+  const [sel, setSel]           = useState<Set<string>>(new Set());
+  const [busy, setBusy]         = useState(false);
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(()=>{
+    refresh();
     const fn=()=>refresh();
-    fn();
     window.addEventListener("apoya:obrigacoes:changed",fn);
     window.addEventListener("apoya:clientes:changed",fn);
     return ()=>{ window.removeEventListener("apoya:obrigacoes:changed",fn); window.removeEventListener("apoya:clientes:changed",fn); };
@@ -92,10 +94,18 @@ function ObrigacoesPage(){
     const ids=filtered.filter(o=>sel.has(o.id)&&o.status!=="concluida").map(o=>o.id);
     if(!ids.length){ toast.error("Selecione obrigações não concluídas"); return; }
     setBusy(true);
-    toast.success(`${ids.length} obrigações marcadas como concluídas`); await refresh();
-    await new Promise(r=>setTimeout(r,400));
+    // Bug 1 fix: chamar updateStatus real para cada item
+    await Promise.all(ids.map(id => updateStatus(id, "concluida")));
+    await refresh();
     toast.success(`${ids.length} obrigação(ões) concluída(s)!`);
     setBusy(false); setSel(new Set());
+  }
+
+  // Bug 1 fix: função de concluir individual que chama updateStatus real
+  async function concluirUnica(ob: Obrigacao) {
+    await updateStatus(ob.id, "concluida");
+    await refresh();
+    toast.success(`"${ob.tipo}" marcada como concluída!`);
   }
 
   const cols: ColDef<Obrigacao>[] = [
@@ -145,15 +155,26 @@ function ObrigacoesPage(){
       cell: o=><InlineBadge color={S_C[o.status]} dot>{S_L[o.status]}</InlineBadge>,
     },
     {
-      key:"acoes", header:"", headerClassName:"w-16 text-right", className:"w-16 text-right",
+      key:"acoes", header:"", headerClassName:"w-20 text-right", className:"w-20 text-right",
       cell: o=>(
-        o.status!=="concluida" ? (
-          <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 opacity-0 group-hover:opacity-100 transition-all"
-            title="Marcar como concluída"
-            onClick={()=>{ toast.success("Concluída!"); refresh(); }}>
-            <CheckCircle2 className="h-3.5 w-3.5"/>
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          {/* Bug 2 fix: botão editar abre modal com item */}
+          <button
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Editar"
+            onClick={()=>setEditItem(o)}>
+            <Pencil className="h-3.5 w-3.5"/>
           </button>
-        ) : null
+          {/* Bug 1 fix: chama updateStatus real */}
+          {o.status!=="concluida" && (
+            <button
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700"
+              title="Marcar como concluída"
+              onClick={()=>concluirUnica(o)}>
+              <CheckCircle2 className="h-3.5 w-3.5"/>
+            </button>
+          )}
+        </div>
       ),
     },
   ];
@@ -165,12 +186,18 @@ function ObrigacoesPage(){
         title="Obrigações"
         subtitle={`Calendário fiscal · ${MESES[mes-1]} ${ano}`}
         actions={
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
-              onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
-            <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
-              onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs gap-1.5"
+              onClick={()=>setDialogOb(true)}>
+              + Nova
+            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+                onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
+              <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+                onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
+            </div>
           </div>
         }
       />
@@ -182,7 +209,6 @@ function ObrigacoesPage(){
         <KpiCard icon={TrendingUp}    tone="warning" label="Em andamento" value={kpi.andamento} />
         <KpiCard icon={CheckCircle2}  tone="success" label="Concluídas"   value={kpi.concluida} />
       </KpiGrid>
-
 
       {/* Barra ações em lote */}
       {sel.size>0 && (
@@ -221,7 +247,7 @@ function ObrigacoesPage(){
               </SelectContent>
             </Select>
             <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger className="h-8 w-40 rounded-lg text-xs"><SelectValue/></SelectTrigger>
+              <SelectTrigger className="h-8 w-36 rounded-lg text-xs"><SelectValue/></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
                 {tipos.map(t=><SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -235,11 +261,22 @@ function ObrigacoesPage(){
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
 
+      {/* Bug 2 fix: modal nova obrigação */}
       <ObrigacaoFormDialog
         open={dialogOb}
         onClose={() => setDialogOb(false)}
-        onCreated={() => {}}
+        onCreated={() => { setDialogOb(false); refresh(); }}
       />
+
+      {/* Bug 2 fix: modal edição individual — renderizado condicionalmente */}
+      {editItem && (
+        <ObrigacaoFormDialog
+          open={!!editItem}
+          onClose={() => setEditItem(null)}
+          onCreated={() => { setEditItem(null); refresh(); }}
+          obrigacao={editItem}
+        />
+      )}
     </div>
   );
 }

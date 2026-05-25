@@ -26,6 +26,7 @@ import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
 import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
+import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
 import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
 import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
 import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
@@ -123,6 +124,11 @@ const ApiWaSendRoute = ApiWaSendRouteImport.update({
 const ApiWaInstancesRoute = ApiWaInstancesRouteImport.update({
   id: '/api/wa/instances',
   path: '/api/wa/instances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsuariosConvidarRoute = ApiUsuariosConvidarRouteImport.update({
+  id: '/api/usuarios/convidar',
+  path: '/api/usuarios/convidar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSerproStatusRoute = ApiSerproStatusRouteImport.update({
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
+  '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal/': typeof AppFiscalIndexRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
+  '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal': typeof AppFiscalIndexRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
+  '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
@@ -324,6 +333,7 @@ export interface FileRouteTypes {
     | '/api/das/gerar'
     | '/api/serpro/call'
     | '/api/serpro/status'
+    | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
     | '/fiscal/'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/api/das/gerar'
     | '/api/serpro/call'
     | '/api/serpro/status'
+    | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
     | '/fiscal'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/api/das/gerar'
     | '/api/serpro/call'
     | '/api/serpro/status'
+    | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
     | '/_app/fiscal/'
@@ -409,6 +421,7 @@ export interface RootRouteChildren {
   ApiDasGerarRoute: typeof ApiDasGerarRoute
   ApiSerproCallRoute: typeof ApiSerproCallRoute
   ApiSerproStatusRoute: typeof ApiSerproStatusRoute
+  ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
   ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiWaSendRoute: typeof ApiWaSendRoute
   ApiNfseIndexRoute: typeof ApiNfseIndexRoute
@@ -534,6 +547,13 @@ declare module '@tanstack/react-router' {
       path: '/api/wa/instances'
       fullPath: '/api/wa/instances'
       preLoaderRoute: typeof ApiWaInstancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/usuarios/convidar': {
+      id: '/api/usuarios/convidar'
+      path: '/api/usuarios/convidar'
+      fullPath: '/api/usuarios/convidar'
+      preLoaderRoute: typeof ApiUsuariosConvidarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/serpro/status': {
@@ -688,6 +708,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDasGerarRoute: ApiDasGerarRoute,
   ApiSerproCallRoute: ApiSerproCallRoute,
   ApiSerproStatusRoute: ApiSerproStatusRoute,
+  ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
   ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiWaSendRoute: ApiWaSendRoute,
   ApiNfseIndexRoute: ApiNfseIndexRoute,

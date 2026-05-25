@@ -9,13 +9,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useClientes } from "@/hooks/use-clientes";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import type { ObrigacaoTipo } from "@/hooks/use-obrigacoes";
+import type { Obrigacao, ObrigacaoTipo } from "@/hooks/use-obrigacoes";
 
-type Props = { open: boolean; onClose: () => void; onCreated?: () => void; };
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onCreated?: () => void;
+  /** Quando fornecido, abre em modo EDIÇÃO */
+  obrigacao?: Obrigacao;
+};
 
 const TIPOS: ObrigacaoTipo[] = [
   "DAS","DASN-Simei","DCTFWeb","EFD-Contribuições","EFD-ICMS/IPI",
   "EFD-Reinf","ECF","ECD","DIRBI","DEFIS","NFSe","FGTS Digital","eSocial",
+];
+
+const STATUS_OPTS = [
+  { value: "pendente",      label: "Pendente" },
+  { value: "em_andamento",  label: "Em andamento" },
+  { value: "concluida",     label: "Concluída" },
+  { value: "atrasada",      label: "Atrasada" },
 ];
 
 const DESC_AUTO: Record<ObrigacaoTipo, string> = {
@@ -34,30 +47,56 @@ const DESC_AUTO: Record<ObrigacaoTipo, string> = {
   "eSocial": "Obrigação eSocial",
 };
 
-const now = new Date();
-const prevMonth = `${now.getFullYear()}-${String(now.getMonth() || 12).padStart(2, "0")}`;
-const nextMonth20 = new Date(now.getFullYear(), now.getMonth() + 1, 20).toISOString().split("T")[0];
+const now        = new Date();
+const prevMonth  = `${now.getFullYear()}-${String(now.getMonth() || 12).padStart(2,"0")}`;
+const nextMonth20= new Date(now.getFullYear(), now.getMonth()+1, 20).toISOString().split("T")[0];
 
-export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
-  const { clientes } = useClientes();
-  const { profile } = useAuth();
+type FormState = {
+  clienteId: string; tipo: ObrigacaoTipo | "";
+  descricao: string; competencia: string;
+  vencimento: string; responsavel: string; status: string;
+};
+
+export function ObrigacaoFormDialog({ open, onClose, onCreated, obrigacao }: Props) {
+  const { clientes }   = useClientes();
+  const { profile }    = useAuth();
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+  const isEdit = !!obrigacao;
+
+  const [form, setForm] = useState<FormState>({
     clienteId: "", tipo: "" as ObrigacaoTipo | "",
-    descricao: "", competencia: prevMonth, vencimento: nextMonth20,
-    responsavel: "",
+    descricao: "", competencia: prevMonth,
+    vencimento: nextMonth20, responsavel: "", status: "pendente",
   });
 
+  // Preencher form ao abrir
   useEffect(() => {
     if (!open) return;
-    // profile.nome é o campo correto (não full_name)
-    setForm(f => ({ ...f, clienteId: "", tipo: "", descricao: "", responsavel: profile?.nome ?? "" }));
-  }, [open, profile]);
+    if (obrigacao) {
+      // Modo edição — pré-preencher com dados existentes
+      setForm({
+        clienteId:   obrigacao.clienteId,
+        tipo:        obrigacao.tipo as ObrigacaoTipo,
+        descricao:   obrigacao.descricao ?? "",
+        competencia: obrigacao.competencia ?? prevMonth,
+        vencimento:  obrigacao.vencimento,
+        responsavel: obrigacao.responsavel ?? "",
+        status:      obrigacao.status,
+      });
+    } else {
+      // Modo criação — limpar
+      setForm({
+        clienteId: "", tipo: "", descricao: "",
+        competencia: prevMonth, vencimento: nextMonth20,
+        responsavel: profile?.nome ?? "", status: "pendente",
+      });
+    }
+  }, [open, obrigacao, profile]);
 
-  const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const up = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   function handleTipo(t: ObrigacaoTipo) {
-    setForm(f => ({ ...f, tipo: t, descricao: DESC_AUTO[t] ?? "" }));
+    setForm(f => ({ ...f, tipo: t, descricao: isEdit ? f.descricao : (DESC_AUTO[t] ?? "") }));
   }
 
   const cliente = clientes.find(c => c.id === form.clienteId);
@@ -68,21 +107,43 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("obrigacoes").insert({
-      id: crypto.randomUUID(),                          // obrigatório no schema
-      cliente_id: form.clienteId,
-      cliente_nome: cliente?.razaoSocial ?? "",
-      regime: cliente?.regime ?? "Simples Nacional",
-      tipo: form.tipo,
-      descricao: form.descricao,
-      competencia: form.competencia,
-      vencimento: form.vencimento,
-      status: "pendente",
-      responsavel: form.responsavel,
-    });
-    setSaving(false);
-    if (error) { toast.error("Erro ao criar obrigação: " + error.message); return; }
-    toast.success("Obrigação cadastrada!");
+
+    if (isEdit) {
+      // UPDATE
+      const { error } = await (supabase as any).from("obrigacoes").update({
+        cliente_id:   form.clienteId,
+        cliente_nome: cliente?.razaoSocial ?? obrigacao!.clienteNome,
+        tipo:         form.tipo,
+        descricao:    form.descricao,
+        competencia:  form.competencia,
+        vencimento:   form.vencimento,
+        status:       form.status,
+        responsavel:  form.responsavel,
+      }).eq("id", obrigacao!.id);
+
+      setSaving(false);
+      if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+      toast.success("Obrigação atualizada!");
+    } else {
+      // INSERT
+      const { error } = await (supabase as any).from("obrigacoes").insert({
+        id:           crypto.randomUUID(),
+        cliente_id:   form.clienteId,
+        cliente_nome: cliente?.razaoSocial ?? "",
+        regime:       cliente?.regime ?? "Simples Nacional",
+        tipo:         form.tipo,
+        descricao:    form.descricao,
+        competencia:  form.competencia,
+        vencimento:   form.vencimento,
+        status:       "pendente",
+        responsavel:  form.responsavel,
+      });
+
+      setSaving(false);
+      if (error) { toast.error("Erro ao criar obrigação: " + error.message); return; }
+      toast.success("Obrigação cadastrada!");
+    }
+
     window.dispatchEvent(new Event("apoya:obrigacoes:changed"));
     onCreated?.();
     onClose();
@@ -92,8 +153,10 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Obrigação Fiscal</DialogTitle>
-          <DialogDescription>Cadastre uma obrigação fiscal para acompanhamento.</DialogDescription>
+          <DialogTitle>{isEdit ? "Editar Obrigação" : "Nova Obrigação Fiscal"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "Atualize os dados da obrigação fiscal." : "Cadastre uma obrigação fiscal para acompanhamento."}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
@@ -128,15 +191,29 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
               <Input type="date" value={form.vencimento} onChange={e => up("vencimento", e.target.value)} />
             </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label>Responsável</Label>
-            <Input value={form.responsavel} onChange={e => up("responsavel", e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Responsável</Label>
+              <Input value={form.responsavel} onChange={e => up("responsavel", e.target.value)} />
+            </div>
+            {isEdit && (
+              <div className="grid gap-1.5">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => up("status", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? "Salvar alterações" : "Criar obrigação"}
           </Button>
         </DialogFooter>
       </DialogContent>
