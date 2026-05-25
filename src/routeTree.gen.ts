@@ -22,6 +22,7 @@ import { Route as AppDocumentosRouteImport } from './routes/_app.documentos'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
+import { Route as AppCrmRouteImport } from './routes/_app.crm'
 import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
@@ -104,6 +105,11 @@ const AppClientesRoute = AppClientesRouteImport.update({
 const AppAutomacoesRoute = AppAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCrmRoute = AppCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiNfseIndexRoute = ApiNfseIndexRouteImport.update({
@@ -276,6 +282,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
   '/_app/automacoes': typeof AppAutomacoesRoute
+  '/_app/crm': typeof AppCrmRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/documentos': typeof AppDocumentosRoute
@@ -677,6 +684,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAutomacoesRoute: AppAutomacoesRoute,
+      AppCrmRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppDocumentosRoute: AppDocumentosRoute,
