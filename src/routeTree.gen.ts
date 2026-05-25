@@ -17,6 +17,7 @@ import { Route as AppWorkflowsRouteImport } from './routes/_app.workflows'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
+import { Route as AppDocumentosRouteImport } from './routes/_app.documentos'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
@@ -69,6 +70,11 @@ const AppObrigacoesRoute = AppObrigacoesRouteImport.update({
 const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentosRoute = AppDocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
   getParentRoute: () => AppRoute,
 } as any)
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/documentos': typeof AppDocumentosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/documentos': typeof AppDocumentosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/_app/automacoes': typeof AppAutomacoesRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/documentos': typeof AppDocumentosRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/automacoes'
     | '/clientes'
     | '/configuracoes'
+    | '/documentos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/automacoes'
     | '/clientes'
     | '/configuracoes'
+    | '/documentos'
     | '/financeiro'
     | '/obrigacoes'
     | '/whatsapp'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/_app/automacoes'
     | '/_app/clientes'
     | '/_app/configuracoes'
+    | '/_app/documentos'
     | '/_app/financeiro'
     | '/_app/obrigacoes'
     | '/_app/whatsapp'
@@ -355,6 +367,13 @@ declare module '@tanstack/react-router' {
       path: '/financeiro'
       fullPath: '/financeiro'
       preLoaderRoute: typeof AppFinanceiroRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/documentos': {
+      id: '/_app/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof AppDocumentosRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/configuracoes': {
@@ -462,6 +481,7 @@ interface AppRouteChildren {
   AppAutomacoesRoute: typeof AppAutomacoesRoute
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppDocumentosRoute: typeof AppDocumentosRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
@@ -479,6 +499,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAutomacoesRoute: AppAutomacoesRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppDocumentosRoute: AppDocumentosRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
   AppWhatsappRoute: AppWhatsappRoute,
