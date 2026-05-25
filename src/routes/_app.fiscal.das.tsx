@@ -80,14 +80,28 @@ function DasPage() {
   const toggleOne = (id:string) => { const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
 
   async function gerarLote() {
-    const ids = filtered.filter(g=>sel.has(g.id)&&(g.status==="pendente"||g.status==="erro")).map(g=>g.id);
+    const ids = filtered.filter(g=>sel.has(g.id)&&(g.status==="pendente"||g.status==="erro")).map(g=>g.clienteId);
     if(!ids.length){ toast.error("Selecione ao menos 1 DAS pendente"); return; }
     setBusy(true);
     toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, {id:"das-lote"});
     try {
-      toast.info(`Geração de DAS em lote disponível via integração SERPRO. (${ids.length} guias selecionadas)`);
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", {id:"das-lote"}); return; }
+      let geradas = 0; let erros = 0;
+      for (const clienteId of ids) {
+        const res = await fetch("/api/das/gerar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+          body: JSON.stringify({ mode: "individual", cliente_id: clienteId, competencia: comp }),
+        });
+        const data = await res.json() as any;
+        if (data.ok && data.geradas > 0) geradas++;
+        else erros++;
+      }
       await refresh();
-      toast.success(`${ids.length} DAS processado(s)`, {id:"das-lote"});
+      if (erros === 0) toast.success(`${geradas} DAS gerada(s) via SERPRO`, {id:"das-lote"});
+      else toast.warning(`${geradas} gerada(s) · ${erros} com erro. Veja coluna Status.`, {id:"das-lote"});
+      setSel(new Set());
     } catch (e: any) {
       toast.error("Erro ao gerar DAS: " + (e?.message ?? "Tente novamente"), {id:"das-lote"});
     } finally {
@@ -150,7 +164,21 @@ function DasPage() {
           {(g.status==="pendente"||g.status==="erro") && (
             <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               title="Gerar DAS"
-              onClick={() => { toast.info("Geração individual disponível via integração SERPRO.", {id:`das-${g.id}`}); }}>
+              onClick={async () => {
+                const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+                if (!session) { toast.error("Sessão expirada"); return; }
+                toast.loading("Gerando DAS via SERPRO…", {id:`das-${g.id}`});
+                try {
+                  const res = await fetch("/api/das/gerar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ mode: "individual", cliente_id: g.clienteId, competencia: g.competencia }),
+                  });
+                  const data = await res.json() as any;
+                  if (data.ok && data.geradas > 0) { toast.success(`DAS gerada: ${data.resultados?.[0]?.codigo_barras?.slice(0,20) ?? "✓"}`, {id:`das-${g.id}`}); await refresh(); }
+                  else { toast.error(data.error ?? data.resultados?.[0]?.error ?? "Erro SERPRO", {id:`das-${g.id}`}); }
+                } catch(e:any) { toast.error(e.message, {id:`das-${g.id}`}); }
+              }}>
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           )}

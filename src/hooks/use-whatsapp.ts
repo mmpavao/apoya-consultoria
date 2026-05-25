@@ -1,104 +1,129 @@
 /**
- * Hook: useWhatsapp
- * Lê histórico de mensagens da tabela mensagem_whatsapp no Supabase.
+ * use-whatsapp — hook de mensagens WhatsApp
+ * ATUALIZADO: envio real via /api/wa/send (Evolution API)
+ *             fallback para enfileiramento se API falhar
  */
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export type MsgStatus = "enviada" | "entregue" | "lida" | "erro" | "pendente";
-export type MsgTipo   = "text" | "template" | "media" | "audio" | "document";
 export type MsgDirecao = "enviada" | "recebida";
 
 export interface MensagemWA {
   id: string;
-  clienteId: string;
+  cliente_id: string | null;
   telefone: string;
   direcao: MsgDirecao;
-  tipo: MsgTipo;
+  tipo: string;
   conteudo: string;
-  arquivoUrl?: string;
   status: MsgStatus;
-  ehAutomatica: boolean;
-  lidaEm?: string;
-  createdAt: string;
+  created_at: string;
+  evolution_id?: string | null;
 }
 
-function fromDb(r: Record<string, unknown>): MensagemWA {
+/* ─── Normalizar registro do banco ───────────────────────────────────────── */
+function toMensagem(r: any): MensagemWA {
   return {
-    id:           r.id as string,
-    clienteId:    r.cliente_id as string,
-    telefone:     (r.telefone as string) ?? "—",
-    direcao:      (r.direcao as MsgDirecao) ?? "enviada",
-    tipo:         (r.tipo as MsgTipo)      ?? "text",
-    conteudo:     (r.conteudo as string)   ?? "",
-    arquivoUrl:   r.arquivo_url as string | undefined,
-    status:       (r.status as MsgStatus)  ?? "pendente",
-    ehAutomatica: Boolean(r.eh_automatica),
-    lidaEm:       r.lida_em as string | undefined,
-    createdAt:    r.created_at as string,
+    id:         r.id,
+    cliente_id: r.cliente_id ?? null,
+    telefone:   r.telefone ?? "",
+    direcao:    (r.direcao as MsgDirecao) ?? "enviada",
+    tipo:       r.tipo ?? "texto",
+    conteudo:   r.conteudo ?? "",
+    status:     (r.status as MsgStatus) ?? "pendente",
+    created_at: r.created_at ?? r.criado_em ?? new Date().toISOString(),
+    evolution_id: r.evolution_id ?? null,
   };
 }
 
-export function useWhatsapp() {
+/* ─── Hook principal ─────────────────────────────────────────────────────── */
+export function useWhatsapp(clienteId?: string) {
+  const { session } = useAuth();
   const [mensagens, setMensagens] = useState<MensagemWA[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
+  // ── Buscar mensagens ───────────────────────────────────────────────────
   const fetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      const { data, error: err } = await db
-        .from("mensagem_whatsapp")
-        .select(`
-          id, cliente_id, telefone, direcao, tipo, conteudo,
-          arquivo_url, status, eh_automatica, lida_em, created_at
-        `)
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (err) throw err;
-      setMensagens((data ?? []).map(fromDb));
-      setError(null);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao carregar mensagens";
-      setError(msg);
+      let q = db.from("mensagem_whatsapp").select("*").order("created_at", { ascending: false }).limit(100);
+      if (clienteId) q = q.eq("cliente_id", clienteId);
+      const { data, error: e } = await q;
+      if (e) throw e;
+      setMensagens((data ?? []).map(toMensagem));
+    } catch (e: any) {
+      setError(e.message ?? "Erro ao buscar mensagens");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clienteId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const enfileirar = useCallback(async (
-    clienteId: string,
+  // ── Enviar mensagem (REAL via Evolution API) ───────────────────────────
+  const enviar = useCallback(async (
     telefone: string,
-    conteudo: string,
-    tipo: MsgTipo = "text"
-  ) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { error: err } = await db
-        .from("mensagem_whatsapp")
-        .insert({
-          cliente_id: clienteId,
-          telefone,
-          tipo,
-          conteudo,
-          direcao: "enviada",
-          status: "pendente",
-          eh_automatica: false,
-        });
-      if (err) throw err;
-      toast.success("Mensagem enfileirada para envio");
-      await fetch();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao enfileirar mensagem");
+    mensagem: string,
+    opts?: {
+      cliente_id?: string;
+      instance_id?: string;
+      tipo?: string;
     }
-  }, [fetch]);
+  ): Promise<{ ok: boolean; mensagem_id?: string; error?: string }> => {
+    if (!session?.access_token) {
+      toast.error("Sessão expirada. Faça login novamente.");
+      return { ok: false, error: "Sem sessão" };
+    }
 
-  return { mensagens, loading, error, refresh: fetch, enfileirar };
+    try {
+      const res = await globalThis.fetch("/api/wa/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          telefone,
+          mensagem,
+          cliente_id: opts?.cliente_id ?? clienteId ?? null,
+          instance_id: opts?.instance_id,
+          tipo: opts?.tipo ?? "text",
+        }),
+      });
+
+      const data = await res.json() as any;
+
+      if (!res.ok || !data.ok) {
+        const msg = data.error ?? "Falha ao enviar mensagem";
+        toast.error(msg);
+        // Recarregar para ver mensagem registrada com status=erro
+        await fetch();
+        return { ok: false, error: msg, mensagem_id: data.mensagem_id };
+      }
+
+      toast.success(`Mensagem enviada via ${data.instancia ?? "WhatsApp"}`);
+      await fetch();
+      return { ok: true, mensagem_id: data.mensagem_id };
+
+    } catch (e: any) {
+      toast.error("Erro de rede ao enviar mensagem");
+      return { ok: false, error: e.message };
+    }
+  }, [session, clienteId, fetch]);
+
+  // ── Alias legado (enfileirar) — mantido para compatibilidade ──────────
+  const enfileirar = useCallback(async (
+    telefone: string,
+    mensagem: string,
+    opts?: { cliente_id?: string; instance_id?: string }
+  ) => {
+    return enviar(telefone, mensagem, opts);
+  }, [enviar]);
+
+  return { mensagens, loading, error, refresh: fetch, enviar, enfileirar };
 }
