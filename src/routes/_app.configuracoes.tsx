@@ -372,11 +372,30 @@ function IntegracoesSuapbaseTab() {
 const MCP_URL = "https://apoya-mcp.talkzzbot.workers.dev/mcp";
 
 const MCP_TOOLS = [
-  "clientes_listar","cliente_buscar","cliente_criar",
+  // Clientes
+  "clientes_listar","cliente_buscar","cliente_criar","cliente_atualizar","cliente_excluir","cliente_socios_listar","cliente_socio_criar",
+  // Usuários e Permissões
+  "usuarios_listar","usuario_buscar","usuario_role_atualizar","usuario_convidar","permissoes_listar","permissoes_atualizar","convites_listar",
+  // Obrigações
   "obrigacoes_listar","obrigacao_criar","obrigacao_atualizar",
-  "cobrancas_listar","lancamentos_listar","lancamento_criar",
-  "apuracao_buscar","apuracao_registrar",
-  "serpro_consultar","nfse_emitir","documento_registrar","agente_log",
+  // Financeiro / Cobranças
+  "cobrancas_listar","cobranca_criar","cobranca_atualizar","lancamentos_listar","lancamento_criar","apuracao_buscar","apuracao_registrar",
+  // Tarefas / Workflows
+  "tarefas_listar","tarefa_buscar","tarefa_criar","tarefa_atualizar","tarefa_comentar",
+  // WhatsApp
+  "whatsapp_enviar","whatsapp_conversas_listar","whatsapp_mensagens_listar","whatsapp_mensagens_pendentes","whatsapp_instancias",
+  // Fiscal
+  "nfse_emitir","nfse_listar","das_listar","das_gerar","serpro_consultar",
+  // Documentos
+  "documentos_listar","documento_registrar",
+  // Escritório
+  "escritorio_config_ler","escritorio_config_atualizar","integracoes_listar","integracao_toggle",
+  // Automações
+  "automacoes_listar","automacao_toggle",
+  // MCP Keys
+  "mcp_keys_listar","mcp_key_revogar","mcp_key_excluir",
+  // Logs
+  "agente_log","logs_listar","calendario_fiscal",
 ];
 
 const SNIPPETS: Record<string, string> = {
@@ -415,6 +434,7 @@ function McpTab() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [showRevogadas, setShowRevogadas] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
   const [activeSnippet, setActiveSnippet] = useState<"base44" | "claude" | "n8n">("base44");
 
@@ -456,7 +476,13 @@ function McpTab() {
 
   const revokeKey = async (id: string) => {
     await supabase.from("mcp_api_keys" as any).update({ is_active: false }).eq("id", id);
-    toast.success("Key revogada");
+    toast.success("Key revogada com sucesso");
+    loadKeys();
+  };
+
+  const deleteKey = async (id: string) => {
+    await supabase.from("mcp_api_keys" as any).delete().eq("id", id);
+    toast.success("Key excluída permanentemente");
     loadKeys();
   };
 
@@ -611,8 +637,8 @@ function McpTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {keys.map(k => (
-                  <tr key={k.id} className="hover:bg-muted/20 transition-colors">
+                {keys.filter(k => showRevogadas || k.is_active).map(k => (
+                  <tr key={k.id} className={`hover:bg-muted/20 transition-colors ${!k.is_active ? "opacity-50" : ""}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-sm">{k.agent_name}</p>
                       {k.description && <p className="text-xs text-muted-foreground">{k.description}</p>}
@@ -631,15 +657,25 @@ function McpTab() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {k.is_active && (
-                        <button
-                          onClick={() => revokeKey(k.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                          title="Revogar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {k.is_active ? (
+                          <button
+                            onClick={() => revokeKey(k.id)}
+                            className="text-xs text-muted-foreground hover:text-amber-500 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                            title="Revogar acesso (mantém histórico)"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />Revogar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => deleteKey(k.id)}
+                            className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                            title="Excluir permanentemente"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />Excluir
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
