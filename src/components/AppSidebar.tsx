@@ -13,6 +13,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Bot,
+  UserRoundSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const items: NavItem[] = [
   { to: "/clientes",     label: "Clientes",    icon: Building2 },
   { to: "/obrigacoes",   label: "Obrigações",  icon: Calendar },
   { to: "/workflows",    label: "Workflows",   icon: Workflow },
+  { to: "/crm",          label: "CRM",         icon: UserRoundSearch },
   { to: "/documentos",   label: "Documentos",  icon: FolderOpen },
   { to: "/fiscal/das",   label: "Fiscal",      icon: Receipt },
   { to: "/financeiro",   label: "Financeiro",  icon: DollarSign },
