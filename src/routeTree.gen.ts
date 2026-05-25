@@ -30,6 +30,7 @@ import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
 import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
 import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
 import { Route as ApiCobrancaWebhookRouteImport } from './routes/api/cobranca/webhook'
+import { Route as ApiCobrancaSetupWebhookRouteImport } from './routes/api/cobranca/setup-webhook'
 import { Route as ApiCobrancaReguaRouteImport } from './routes/api/cobranca/regua'
 import { Route as ApiCobrancaEmitirRouteImport } from './routes/api/cobranca/emitir'
 import { Route as ApiCheckoutIdRouteImport } from './routes/api/checkout/$id'
@@ -144,6 +145,11 @@ const ApiCobrancaWebhookRoute = ApiCobrancaWebhookRouteImport.update({
   path: '/api/cobranca/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCobrancaSetupWebhookRoute = ApiCobrancaSetupWebhookRouteImport.update({
+  id: '/api/cobranca/setup-webhook',
+  path: '/api/cobranca/setup-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCobrancaReguaRoute = ApiCobrancaReguaRouteImport.update({
   id: '/api/cobranca/regua',
   path: '/api/cobranca/regua',
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
   '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
+  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
   '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
+  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
@@ -277,6 +285,7 @@ export interface FileRoutesById {
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
   '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
+  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/checkout/$id'
     | '/api/cobranca/emitir'
     | '/api/cobranca/regua'
+    | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/serpro/call'
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/api/checkout/$id'
     | '/api/cobranca/emitir'
     | '/api/cobranca/regua'
+    | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/serpro/call'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/api/checkout/$id'
     | '/api/cobranca/emitir'
     | '/api/cobranca/regua'
+    | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/serpro/call'
@@ -392,6 +404,7 @@ export interface RootRouteChildren {
   ApiCheckoutIdRoute: typeof ApiCheckoutIdRoute
   ApiCobrancaEmitirRoute: typeof ApiCobrancaEmitirRoute
   ApiCobrancaReguaRoute: typeof ApiCobrancaReguaRoute
+  ApiCobrancaSetupWebhookRoute: typeof ApiCobrancaSetupWebhookRoute
   ApiCobrancaWebhookRoute: typeof ApiCobrancaWebhookRoute
   ApiDasGerarRoute: typeof ApiDasGerarRoute
   ApiSerproCallRoute: typeof ApiSerproCallRoute
@@ -551,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCobrancaWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cobranca/setup-webhook': {
+      id: '/api/cobranca/setup-webhook'
+      path: '/api/cobranca/setup-webhook'
+      fullPath: '/api/cobranca/setup-webhook'
+      preLoaderRoute: typeof ApiCobrancaSetupWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cobranca/regua': {
       id: '/api/cobranca/regua'
       path: '/api/cobranca/regua'
@@ -663,6 +683,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCheckoutIdRoute: ApiCheckoutIdRoute,
   ApiCobrancaEmitirRoute: ApiCobrancaEmitirRoute,
   ApiCobrancaReguaRoute: ApiCobrancaReguaRoute,
+  ApiCobrancaSetupWebhookRoute: ApiCobrancaSetupWebhookRoute,
   ApiCobrancaWebhookRoute: ApiCobrancaWebhookRoute,
   ApiDasGerarRoute: ApiDasGerarRoute,
   ApiSerproCallRoute: ApiSerproCallRoute,
