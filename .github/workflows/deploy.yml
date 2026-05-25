@@ -1,0 +1,49 @@
+name: Deploy — Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # permite rodar manualmente pelo GitHub UI
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Fix wrangler config
+        run: |
+          python3 -c "
+          import json
+          with open('dist/server/wrangler.json') as f:
+              c = json.load(f)
+          c['name'] = 'apoya-gestao'
+          c['assets'] = {'directory': '../client', 'binding': 'ASSETS'}
+          with open('dist/server/wrangler.json', 'w') as f:
+              json.dump(c, f, indent=2)
+          print('✅ wrangler.json configurado')
+          "
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy --config dist/server/wrangler.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
