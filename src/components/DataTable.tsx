@@ -10,31 +10,37 @@ import { ReactNode } from "react";
 export interface ColDef<T> {
   key: string;
   header: ReactNode;
-  cell: (row: T) => ReactNode;
+  cell?: (row: T) => ReactNode;
+  render?: (row: T) => ReactNode;  // alias de cell
+  width?: number;
   headerClassName?: string;
   className?: string;
 }
 
 interface DataTableProps<T> {
   rows: T[];
-  cols: ColDef<T>[];
-  getKey: (row: T) => string;
+  cols?: ColDef<T>[];
+  columns?: ColDef<T>[];   // alias de cols
+  getKey?: (row: T) => string;
   selected?: Set<string>;
   onToggleAll?: () => void;
   onToggleRow?: (key: string) => void;
   onRowClick?: (row: T) => void;
   emptyIcon?: ReactNode;
+  emptyState?: ReactNode;  // alias de emptyIcon
   emptyText?: string;
   toolbar?: ReactNode;
   rowClassName?: (row: T) => string;
 }
 
 export function DataTable<T>({
-  rows, cols, getKey,
+  rows, cols: _cols, columns, getKey = (r: T) => (r as any).id ?? Math.random().toString(),
   selected, onToggleAll, onToggleRow,
-  emptyIcon, emptyText = "Nenhum resultado",
+  emptyIcon, emptyState, emptyText = "Nenhum resultado",
   toolbar, rowClassName, onRowClick,
 }: DataTableProps<T>) {
+  const cols = (_cols ?? columns ?? []) as ColDef<T>[];
+  const emptyDisplay = emptyIcon ?? emptyState;
   const hasSelection = selected !== undefined && !!onToggleAll && !!onToggleRow;
   const allChecked   = hasSelection && rows.length > 0 && selected!.size === rows.length;
   const someChecked  = hasSelection && selected!.size > 0 && selected!.size < rows.length;
@@ -73,7 +79,7 @@ export function DataTable<T>({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={cols.length + (hasSelection ? 1 : 0)} className="py-20 text-center">
-                  {emptyIcon && <div className="mb-3 flex justify-center opacity-30">{emptyIcon}</div>}
+                  {emptyDisplay && <div className="mb-3 flex justify-center opacity-30">{emptyDisplay}</div>}
                   <p className="text-sm text-muted-foreground">{emptyText}</p>
                 </td>
               </tr>
@@ -107,7 +113,7 @@ export function DataTable<T>({
                       </td>
                     )}
                     {cols.map((col) => (
-                      <td key={col.key} className={col.className}>{col.cell(row)}</td>
+                      <td key={col.key} className={col.className}>{(col.render ?? col.cell)?.(row)}</td>
                     ))}
                   </tr>
                 );
@@ -170,17 +176,19 @@ export function TableSearch({
 }
 
 export function TableFooter({
-  total, filtered, selected,
-}: { total: number; filtered: number; selected?: number }) {
+  total, filtered, selected, pageSize, page, children,
+}: { total: number; filtered?: number; selected?: number; pageSize?: number; page?: number; children?: React.ReactNode }) {
+  const shown = filtered ?? (pageSize && page ? Math.min(pageSize * page, total) : total);
   return (
     <div className="flex items-center gap-3 border-t border-border/70 px-5 py-3 text-xs text-muted-foreground">
-      <span>{filtered} resultado{filtered !== 1 ? "s" : ""}</span>
-      {filtered !== total && <span className="text-muted-foreground/50">de {total} total</span>}
+      <span>{shown} resultado{shown !== 1 ? "s" : ""}</span>
+      {filtered !== undefined && filtered !== total && <span className="text-muted-foreground/50">de {total} total</span>}
       {!!selected && selected > 0 && (
-        <span className="ml-auto font-semibold text-foreground">
+        <span className="font-semibold text-foreground">
           {selected} selecionado{selected !== 1 ? "s" : ""}
         </span>
       )}
+      {children && <div className="ml-auto flex items-center gap-2">{children}</div>}
     </div>
   );
 }

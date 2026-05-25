@@ -79,7 +79,7 @@ export function useServicoCatalogo() {
   useEffect(() => { load(); }, [load]);
 
   const criar = useCallback(async (payload: Partial<ServicoCatalogo>) => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("servico_catalogo")
       .insert(payload)
       .select()
@@ -140,7 +140,7 @@ export function useClienteServicos(clienteId: string) {
         .order("data_vencimento", { ascending: false }),
     ]);
     setServicos((sv ?? []) as ClienteServico[]);
-    setPagamentos((pg ?? []) as ServicoPagamento[]);
+    setPagamentos((pg ?? []) as unknown as ServicoPagamento[]);
     setLoading(false);
   }, [clienteId]);
 
@@ -196,7 +196,7 @@ export function useClienteServicos(clienteId: string) {
   }, [clienteId, load]);
 
   const atualizarPagamento = useCallback(async (id: string, payload: Partial<ServicoPagamento>) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("servico_pagamento")
       .update(payload)
       .eq("id", id);

@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader, PageTabs, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
+import { PageHeader, PageTabs, KpiGrid, KpiCard , TabsSimple} from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
 import { useSerpro } from "@/hooks/use-serpro";
 import { SERPRO_TOOLS, SERPRO_CATEGORIES, checkEligibility } from "@/lib/serpro/tools-catalog";
@@ -276,7 +276,7 @@ function SerproPage() {
               <SelectContent>
                 {clientes.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.nome} — {c.cnpj ?? c.cpf ?? "—"}
+                    {(c as any).razaoSocial ?? (c as any).nome} — {c.cnpj ?? c.cpf ?? "—"}
                     {c.regime ? ` (${c.regime})` : ""}
                   </SelectItem>
                 ))}
@@ -309,15 +309,14 @@ function SerproPage() {
       {cliente && (
         <KpiGrid cols={3}>
           <KpiCard label="Tools disponíveis" value={kpi.disponivel} tone="success" />
-          <KpiCard label="Bloqueadas" value={kpi.bloqueadas} tone={kpi.bloqueadas > 0 ? "warning" : "neutral"} subtitle="cert/proc/regime" />
+          <KpiCard label="Bloqueadas" value={kpi.bloqueadas} tone={kpi.bloqueadas > 0 ? "warning" : "neutral"} />
           <KpiCard label="Total no catálogo" value={kpi.total} tone="neutral" />
         </KpiGrid>
       )}
 
       {/* Filtros de categoria + busca */}
       <div className="space-y-3">
-        <PageTabs
-          tabs={CATEGORY_TABS}
+        <TabsSimple tabs={CATEGORY_TABS}
           activeTab={catTab}
           onTabChange={setCatTab}
         />

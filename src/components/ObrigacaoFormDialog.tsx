@@ -35,7 +35,7 @@ const DESC_AUTO: Record<ObrigacaoTipo, string> = {
 };
 
 const now = new Date();
-const prevMonth = `${now.getFullYear()}-${String(now.getMonth()).padStart(2,"0") || "12"}`;
+const prevMonth = `${now.getFullYear()}-${String(now.getMonth() || 12).padStart(2, "0")}`;
 const nextMonth20 = new Date(now.getFullYear(), now.getMonth() + 1, 20).toISOString().split("T")[0];
 
 export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
@@ -50,7 +50,8 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setForm(f => ({ ...f, clienteId: "", tipo: "", descricao: "", responsavel: profile?.full_name ?? "" }));
+    // profile.nome é o campo correto (não full_name)
+    setForm(f => ({ ...f, clienteId: "", tipo: "", descricao: "", responsavel: profile?.nome ?? "" }));
   }, [open, profile]);
 
   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -68,9 +69,10 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
     }
     setSaving(true);
     const { error } = await supabase.from("obrigacoes").insert({
+      id: crypto.randomUUID(),                          // obrigatório no schema
       cliente_id: form.clienteId,
       cliente_nome: cliente?.razaoSocial ?? "",
-      regime: cliente?.regime ?? "",
+      regime: cliente?.regime ?? "Simples Nacional",
       tipo: form.tipo,
       descricao: form.descricao,
       competencia: form.competencia,
@@ -98,7 +100,11 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated }: Props) {
             <Label>Cliente *</Label>
             <Select value={form.clienteId} onValueChange={v => up("clienteId", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-              <SelectContent>{clientes.filter(c => c.status === "ativo").map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {clientes.filter(c => c.status === "ativo").map(c =>
+                  <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>
+                )}
+              </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1.5">

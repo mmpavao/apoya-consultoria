@@ -473,7 +473,7 @@ function AutomacaoModal({
               <div>
                 <label className="block text-xs font-semibold mb-1.5">Tipo de gatilho</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.entries(GATILHO_CFG) as [TipoGatilho, typeof GATILHO_CFG[string]][]).map(([key, cfg]) => {
+                  {(Object.entries(GATILHO_CFG) as [TipoGatilho, { label: string; icon: any; desc: string }][]).map(([key, cfg]) => {
                     const Icon = cfg.icon;
                     return (
                       <button key={key} onClick={() => up("tipo_gatilho", key)}
@@ -563,7 +563,7 @@ function AutomacaoModal({
               <div>
                 <label className="block text-xs font-semibold mb-1.5">Tipo de ação</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.entries(ACAO_CFG) as [TipoAcao, typeof ACAO_CFG[string]][]).map(([key, cfg]) => {
+                  {(Object.entries(ACAO_CFG) as [TipoAcao, { label: string; icon: any }][]).map(([key, cfg]) => {
                     const Icon = cfg.icon;
                     return (
                       <button key={key} onClick={() => up("tipo_acao", key)}
@@ -685,14 +685,13 @@ function AutomacoesPage() {
 
   const carregar = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("automacoes_config")
+    const { data, error } = await (supabase as any).from("automacoes_config")
       .select("*")
       .order("created_at", { ascending: true });
     if (error) {
       toast.error("Erro ao carregar automações");
     } else {
-      setAutomacoes((data ?? []) as Automacao[]);
+      setAutomacoes((data ?? []) as unknown as Automacao[]);
     }
     setLoading(false);
   }, []);
@@ -701,8 +700,7 @@ function AutomacoesPage() {
 
   /* Toggle ativa/pausada */
   const handleToggle = async (id: string, novoStatus: AutoStatus) => {
-    const { error } = await supabase
-      .from("automacoes_config")
+    const { error } = await (supabase as any).from("automacoes_config")
       .update({ status: novoStatus })
       .eq("id", id);
     if (error) { toast.error("Erro ao atualizar status"); return; }
@@ -734,13 +732,12 @@ function AutomacoesPage() {
       execucoes_hoje:  0,
       total_execucoes: 0,
     };
-    const { data, error } = await supabase
-      .from("automacoes_config")
+    const { data, error } = await (supabase as any).from("automacoes_config")
       .insert(payload)
       .select()
       .single();
     if (error) { toast.error("Erro ao criar automação: " + error.message); return; }
-    setAutomacoes(prev => [data as Automacao, ...prev]);
+    setAutomacoes(prev => [data as unknown as Automacao, ...prev]);
     setModalAberto(false);
     toast.success(`🚀 "${form.nome}" criada com sucesso!`, {
       description: form.status === "ativa" ? "Ativa — será executada no próximo ciclo" : "Salva em modo pausado",
@@ -768,14 +765,13 @@ function AutomacoesPage() {
         ? `${fmtDias(form.dias_semana)} às ${form.horario}`
         : form.tipo_gatilho === "evento" ? `Ao: ${form.evento_gatilho}` : "Manual",
     };
-    const { data, error } = await supabase
-      .from("automacoes_config")
+    const { data, error } = await (supabase as any).from("automacoes_config")
       .update(payload)
       .eq("id", editando.id)
       .select()
       .single();
     if (error) { toast.error("Erro ao salvar: " + error.message); return; }
-    setAutomacoes(prev => prev.map(a => a.id === editando.id ? data as Automacao : a));
+    setAutomacoes(prev => prev.map(a => a.id === editando.id ? data as unknown as Automacao : a));
     setEditando(null);
     toast.success(`✅ "${form.nome}" atualizada`);
   };
@@ -783,8 +779,7 @@ function AutomacoesPage() {
   /* Excluir */
   const handleExcluir = async () => {
     if (!excluindo) return;
-    const { error } = await supabase
-      .from("automacoes_config")
+    const { error } = await (supabase as any).from("automacoes_config")
       .delete()
       .eq("id", excluindo.id);
     if (error) { toast.error("Erro ao excluir: " + error.message); return; }

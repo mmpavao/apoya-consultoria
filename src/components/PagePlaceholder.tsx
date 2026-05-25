@@ -104,13 +104,13 @@ const TONE_ICON: Record<KpiTone, string> = {
 };
 
 export function KpiCard({
-  icon: Icon,
+  icon: Icon = undefined,
   label,
   value,
   hint,
   tone = "neutral",
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   label: string;
   value: ReactNode;
   hint?: ReactNode;
@@ -118,9 +118,11 @@ export function KpiCard({
 }) {
   return (
     <div className="surface-card flex items-center gap-3 p-4">
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", TONE_ICON[tone])}>
-        <Icon className="h-[18px] w-[18px]" />
-      </div>
+      {Icon && (
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", TONE_ICON[tone])}>
+          <Icon className="h-[18px] w-[18px]" />
+        </div>
+      )}
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
@@ -140,16 +142,19 @@ export function KpiCard({
 export function Pagination({
   page,
   totalPages,
-  onChange,
+  onChange: _onChange,
+  onPageChange,
   pageSize,
   total,
 }: {
   page: number;
   totalPages: number;
-  onChange: (p: number) => void;
+  onChange?: (p: number) => void;
+  onPageChange?: (p: number) => void;  // alias
   pageSize?: number;
   total?: number;
 }) {
+  const onChange = _onChange ?? onPageChange ?? (() => {});
   if (totalPages <= 1) return null;
   const from = pageSize && total ? Math.min((page - 1) * pageSize + 1, total) : null;
   const to   = pageSize && total ? Math.min(page * pageSize, total) : null;
@@ -210,6 +215,40 @@ export function PlaceholderBlock({
         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
         {module}
       </div>
+    </div>
+  );
+}
+
+/** Tabs sem router — para uso com estado local */
+export function TabsSimple({
+  tabs,
+  activeTab,
+  onTabChange,
+}: {
+  tabs: Array<{ id: string; label: string; icon?: LucideIcon }>;
+  activeTab: string;
+  onTabChange: (id: string) => void;
+}) {
+  return (
+    <div className="flex border-b border-border">
+      {tabs.map(t => {
+        const Icon = t.icon;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onTabChange(t.id)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              activeTab === t.id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {Icon && <Icon className="w-3.5 h-3.5" />}
+            {t.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

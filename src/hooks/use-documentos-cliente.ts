@@ -86,8 +86,7 @@ export function useDocumentosCliente(clienteId: string) {
   }, [clienteId, load]);
 
   const atualizarPasta = useCallback(async (id: string, payload: Partial<DocumentoPasta>) => {
-    const { error } = await supabase
-      .from("documento_pasta")
+    const { error } = await (supabase.from("documento_pasta") as any)
       .update(payload)
       .eq("id", id);
     if (error) { toast.error("Erro ao atualizar pasta"); throw error; }

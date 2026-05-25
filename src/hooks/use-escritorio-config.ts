@@ -116,8 +116,7 @@ export function useEscritorioConfig() {
       if (payload[f] !== undefined) patch[f] = payload[f];
     }
 
-    const { error: err } = await supabase
-      .from("escritorio_config")
+    const { error: err } = await (supabase as any).from("escritorio_config")
       .update(patch)
       .eq("id", config.id);
 

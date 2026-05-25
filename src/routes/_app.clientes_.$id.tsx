@@ -398,14 +398,14 @@ function ClienteDetailPage() {
                 label: "Serviço Ativo",
                 ok: temServico,
                 icon: "✅",
-                tab: "comercial",
+                tab: "comercial" as Tab,
                 tip: "Contrato de serviço contábil vigente",
               },
             ].map(item => (
               <button
                 key={item.key}
                 title={item.tip}
-                onClick={() => setTab(item.tab)}
+                onClick={() => setTab(item.tab as any)}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer
                   ${item.ok
                     ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
@@ -428,7 +428,7 @@ function ClienteDetailPage() {
         {TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(t.id as any)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               tab === t.id
                 ? "border-primary text-primary"

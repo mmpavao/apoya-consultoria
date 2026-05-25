@@ -181,7 +181,7 @@ export const Route = createFileRoute("/api/nfse/")({
             issretido: nota.issRetained ?? false,
             created_by: userId,
           });
-          const localId = Array.isArray(rascunho) ? rascunho[0]?.id : rascunho?.id;
+          const localId = Array.isArray(rascunho) ? (rascunho[0] as any)?.id : (rascunho as any)?.id;
           if (!localId) return err("Falha ao criar rascunho no banco", 500);
 
           try {

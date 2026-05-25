@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_app")({
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       const from = window.location.pathname + window.location.search;
-      throw redirect({ to: "/login", search: { from: from !== "/" ? from : undefined } });
+      throw redirect({ to: "/login" as any, search: { from: (from !== "/" ? from : undefined) } } as any);
     }
   },
 });
@@ -39,7 +39,7 @@ function AppShell() {
   useEffect(() => {
     if (!loading && !user) {
       const from = window.location.pathname + window.location.search;
-      navigate({ to: "/login", search: { from: from !== "/" ? from : undefined } });
+      navigate({ to: "/login" as any, search: { from: (from !== "/" ? from : undefined) } } as any);
     }
   }, [loading, user, navigate]);
 
@@ -62,7 +62,7 @@ function AppShell() {
 
   const handleLogout = async () => {
     await signOut();
-    navigate({ to: "/login" });
+    navigate({ to: "/login" as any });
   };
 
   return (

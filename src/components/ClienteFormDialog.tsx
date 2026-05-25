@@ -24,7 +24,8 @@ const FORMAS: FormaPagamento[] = ["PIX", "Boleto", "Débito automático"];
 
 interface Props {
   open: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  onOpenChange?: (v: boolean) => void;
   cliente?: Cliente;
 }
 
@@ -49,7 +50,7 @@ const SECTIONS: { id: SectionId; label: string; icon: any }[] = [
   { id: "configuracoes", label: "Configurações",  icon: Users     },
 ];
 
-export function ClienteFormDialog({ open, onClose, cliente }: Props) {
+export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Props) {
   const { clientes, createCliente, updateCliente } = useClientes();
   const { importarDosCNPJ } = useSocios(null);
   const [dadosCnpjParaSocios, setDadosCnpjParaSocios] = useState<any>(null);
@@ -221,7 +222,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
           toast.success(`${dadosCnpjParaSocios.socios.length} sócio(s) importados da Receita Federal`);
         }
       }
-      onClose();
+      onClose?.(); onOpenChange?.(false);
     } catch (e: any) {
       const msg = e?.message ?? "tente novamente";
       // Mapear erros do banco para mensagens amigáveis
@@ -243,7 +244,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+    <Dialog open={open} onOpenChange={v => { if (!v) { onClose?.(); onOpenChange?.(false); } }}>
       <DialogContent className="max-h-[92vh] overflow-hidden flex flex-col sm:max-w-2xl p-0">
 
         {/* Header */}
@@ -550,7 +551,7 @@ export function ClienteFormDialog({ open, onClose, cliente }: Props) {
 
         {/* Footer */}
         <DialogFooter className="px-6 py-4 border-t border-border/60 shrink-0 gap-2">
-          <Button variant="outline" onClick={e => { e.stopPropagation(); onClose(); }} disabled={saving}>
+          <Button variant="outline" onClick={e => { e.stopPropagation(); onClose?.(); onOpenChange?.(false); }} disabled={saving}>
             Cancelar
           </Button>
           <Button onClick={e => { e.stopPropagation(); handleSubmit(); }} disabled={saving}>

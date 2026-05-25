@@ -123,7 +123,7 @@ function mapContratoFromDb(row: any): ContratoCliente {
     status: row.status,
     valor_total: row.valor_total ?? 0,
     data_inicio: normalizarData(row.data_inicio) || new Date(),
-    data_fim: normalizarData(row.data_fim),
+    data_fim: normalizarData(row.data_fim) ?? undefined,
     corpo_html: row.corpo_html,
     clausulas: row.clausulas ?? [],
     servicos_ids: row.servicos_ids ?? [],
@@ -141,9 +141,9 @@ function mapContratoFromDb(row: any): ContratoCliente {
     signatario_whatsapp: row.signatario_whatsapp,
     notificacao_canal: row.notificacao_canal ?? "email",
     deadline_days: row.deadline_days ?? 5,
-    enviado_em: normalizarData(row.enviado_em),
-    assinado_em: normalizarData(row.assinado_em),
-    cancelado_em: normalizarData(row.cancelado_em),
+    enviado_em: normalizarData(row.enviado_em) ?? undefined,
+    assinado_em: normalizarData(row.assinado_em) ?? undefined,
+    cancelado_em: normalizarData(row.cancelado_em) ?? undefined,
     observacoes: row.observacoes,
     created_at: normalizarData(row.created_at) || new Date(),
     updated_at: normalizarData(row.updated_at) || new Date(),
@@ -233,20 +233,35 @@ export function useContratosCliente(clienteId: string) {
   // ── CRUD básico ────────────────────────────────────────────
   const criar = useCallback(async (clienteId: string, dados: NovoContratoPayload) => {
     try {
+      const dataInicio = dados.data_inicio instanceof Date 
+        ? dados.data_inicio.toISOString().split('T')[0]
+        : (dados.data_inicio as string | undefined);
+      const dataFim = dados.data_fim instanceof Date
+        ? dados.data_fim.toISOString().split('T')[0]
+        : (dados.data_fim as string | undefined);
+
       const payload = {
         cliente_id: clienteId,
-        ...dados,
-        data_inicio: dados.data_inicio instanceof Date 
-          ? dados.data_inicio.toISOString().split('T')[0]
-          : dados.data_inicio,
-        data_fim: dados.data_fim instanceof Date 
-          ? dados.data_fim.toISOString().split('T')[0]
-          : dados.data_fim,
+        titulo: dados.titulo,
+        tipo: dados.tipo,
+        valor_total: dados.valor_total,
+        data_inicio: dataInicio,
+        data_fim: dataFim ?? null,
+        corpo_html: dados.corpo_html ?? null,
+        clausulas: (dados.clausulas ?? []) as any,
+        servicos_ids: dados.servicos_ids ?? [],
+        signatario_nome: dados.signatario_nome ?? null,
+        signatario_email: dados.signatario_email ?? null,
+        signatario_whatsapp: dados.signatario_whatsapp ?? null,
+        notificacao_canal: dados.notificacao_canal ?? "email",
+        deadline_days: dados.deadline_days ?? 5,
+        observacoes: dados.observacoes ?? null,
+        status: "rascunho",
       };
       
       const { data, error } = await supabase
         .from("contrato_cliente")
-        .insert(payload)
+        .insert(payload as any)
         .select()
         .single();
       
@@ -276,8 +291,8 @@ export function useContratosCliente(clienteId: string) {
         payload.data_fim = dados.data_fim.toISOString().split('T')[0] as any;
       }
       
-      const { error } = await supabase
-        .from("contrato_cliente")
+      const { error } = await (supabase
+        .from("contrato_cliente") as any)
         .update(payload)
         .eq("id", id);
       

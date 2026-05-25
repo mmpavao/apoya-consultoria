@@ -105,7 +105,7 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
           <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
             <div className="space-y-1.5">
               <Label>Nome do serviço *</Label>
-              <Input value={form.nome} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))}
+              <Input value={form.nome} onChange={e => setForm((p: any) => ({ ...p, nome: e.target.value }))}
                 placeholder="Ex: Honorário Mensal MEI" />
             </div>
             <Button type="button" variant="outline" size="sm" className="h-10" onClick={gerarCodigo}>
@@ -126,14 +126,14 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
 
           <div className="space-y-1.5">
             <Label>Descrição</Label>
-            <Textarea value={form.descricao} onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))}
+            <Textarea value={form.descricao} onChange={e => setForm((p: any) => ({ ...p, descricao: e.target.value }))}
               placeholder="Descreva o que inclui este serviço…" rows={3} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Categoria</Label>
-              <Select value={form.categoria} onValueChange={v => setForm(p => ({ ...p, categoria: v }))}>
+              <Select value={form.categoria} onValueChange={v => setForm((p: any) => ({ ...p, categoria: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="mensal">Mensal</SelectItem>
@@ -145,7 +145,7 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => setForm(p => ({ ...p, tipo: v }))}>
+              <Select value={form.tipo} onValueChange={v => setForm((p: any) => ({ ...p, tipo: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="servico">Serviço</SelectItem>
@@ -160,11 +160,11 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
             <div className="space-y-1.5">
               <Label>Valor padrão (R$) *</Label>
               <Input type="number" value={form.valor_padrao}
-                onChange={e => setForm(p => ({ ...p, valor_padrao: e.target.value }))} />
+                onChange={e => setForm((p: any) => ({ ...p, valor_padrao: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Unidade de cobrança</Label>
-              <Select value={form.unidade} onValueChange={v => setForm(p => ({ ...p, unidade: v }))}>
+              <Select value={form.unidade} onValueChange={v => setForm((p: any) => ({ ...p, unidade: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="mensal">Por mês</SelectItem>
@@ -179,11 +179,11 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Ordem de exibição</Label>
-              <Input type="number" value={form.ordem} onChange={e => setForm(p => ({ ...p, ordem: e.target.value }))} />
+              <Input type="number" value={form.ordem} onChange={e => setForm((p: any) => ({ ...p, ordem: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Tags (separadas por vírgula)</Label>
-              <Input value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))}
+              <Input value={form.tags} onChange={e => setForm((p: any) => ({ ...p, tags: e.target.value }))}
                 placeholder="mensal, mei, rotina" />
             </div>
           </div>

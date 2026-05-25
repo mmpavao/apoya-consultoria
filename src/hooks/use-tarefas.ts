@@ -90,17 +90,9 @@ export type TarefaFilters = {
   periodo_fim?: string;
 };
 
-// SLA em horas por tipo
-const SLA_POR_TIPO: Record<TarefaTipo | string, number> = {
-  fiscal: 72,
-  dp: 24,
-  financeiro: 72,
-  societario: 72,
-  compliance: 72,
-  contabilidade: 72,
-  atendimento: 48,
-  comercial: 48,
-  interno: 72,
+const SLA_POR_TIPO: Record<string, number> = {
+  fiscal: 72, dp: 24, financeiro: 72, societario: 72, compliance: 72,
+  contabilidade: 72, atendimento: 48, comercial: 48, interno: 72,
 };
 
 export function calcularSlaHoras(tipo: TarefaTipo, tags?: string[]): number {
@@ -112,11 +104,16 @@ export function calcularSlaStatus(data_prazo: string | undefined, status: Tarefa
   if (!data_prazo || status === "concluida" || status === "cancelada") return "no_prazo";
   const now = new Date();
   const prazo = new Date(data_prazo);
-  const diffMs = prazo.getTime() - now.getTime();
-  const diffH = diffMs / (1000 * 60 * 60);
-  if (diffMs < 0) return diffH < -24 ? "expirada" : "atrasada";
-  return diffH < 0.25 * (SLA_POR_TIPO["interno"]) ? "atencao" : "no_prazo";
+  const diffH = (prazo.getTime() - now.getTime()) / (1000 * 60 * 60);
+  if (diffH < -24) return "expirada";
+  if (diffH < 0) return "atrasada";
+  if (diffH < 12) return "atencao";
+  return "no_prazo";
 }
+
+// Helper seguro para cast Supabase
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tb = () => (supabase as any).from("tarefas");
 
 export function useTarefas(filters?: TarefaFilters) {
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -127,21 +124,20 @@ export function useTarefas(filters?: TarefaFilters) {
     setLoading(true);
     setError(null);
     try {
-      let query = supabase.from("tarefas").select("*").order("created_at", { ascending: false });
-      if (filters?.status) query = query.eq("status", filters.status);
-      if (filters?.tipo) query = query.eq("tipo", filters.tipo);
-      if (filters?.prioridade) query = query.eq("prioridade", filters.prioridade);
-      if (filters?.responsavel) query = query.eq("responsavel", filters.responsavel);
-      if (filters?.cliente_id) query = query.eq("cliente_id", filters.cliente_id);
-      if (filters?.sla_status) query = query.eq("sla_status", filters.sla_status);
-      if (filters?.search) query = query.ilike("titulo", `%${filters.search}%`);
-      if (filters?.periodo_inicio) query = query.gte("created_at", filters.periodo_inicio);
-      if (filters?.periodo_fim) query = query.lte("created_at", filters.periodo_fim);
-      const { data, error: err } = await query;
+      let q = tb().select("*").order("created_at", { ascending: false });
+      if (filters?.status)    q = q.eq("status", filters.status);
+      if (filters?.tipo)      q = q.eq("tipo", filters.tipo);
+      if (filters?.prioridade)q = q.eq("prioridade", filters.prioridade);
+      if (filters?.responsavel)q = q.eq("responsavel", filters.responsavel);
+      if (filters?.cliente_id)q = q.eq("cliente_id", filters.cliente_id);
+      if (filters?.sla_status)q = q.eq("sla_status", filters.sla_status);
+      if (filters?.search)    q = q.ilike("titulo", `%${filters.search}%`);
+      if (filters?.periodo_inicio) q = q.gte("created_at", filters.periodo_inicio);
+      if (filters?.periodo_fim)    q = q.lte("created_at", filters.periodo_fim);
+      const { data, error: err } = await q;
       if (err) throw err;
-      const items = (data ?? []) as unknown as Tarefa[];
-      // Recalcular sla_status no frontend
-      const enriched = items.map(t => ({
+      const raw = (data ?? []) as unknown as Tarefa[];
+      const enriched = raw.map(t => ({
         ...t,
         sla_status: calcularSlaStatus(t.data_prazo, t.status),
         subtarefas: Array.isArray(t.subtarefas) ? t.subtarefas : [],
@@ -156,6 +152,7 @@ export function useTarefas(filters?: TarefaFilters) {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filters)]);
 
   useEffect(() => { fetchTarefas(); }, [fetchTarefas]);
@@ -168,62 +165,49 @@ export function useTarefas(filters?: TarefaFilters) {
       subtarefas: data.subtarefas ?? [],
       comentarios: [],
       historico: [{
-        campo: "status",
-        de: "",
-        para: "aberta",
-        por: data.criado_por ?? "sistema",
-        em: new Date().toISOString(),
+        campo: "status", de: "", para: "aberta",
+        por: data.criado_por ?? "sistema", em: new Date().toISOString(),
       }],
       tags: data.tags ?? [],
       anexos: [],
     };
-    const { data: row, error: err } = await supabase.from("tarefas").insert(payload).select().single();
+    const { data: row, error: err } = await tb().insert(payload).select().single();
     if (err) throw err;
     await fetchTarefas();
     return row as unknown as Tarefa;
   }, [fetchTarefas]);
 
   const atualizarTarefa = useCallback(async (id: string, updates: Partial<Tarefa>, quem: string) => {
-    // Buscar tarefa atual para historico
     const atual = tarefas.find(t => t.id === id);
     const historico_entry: HistoricoItem[] = [];
     if (atual) {
       for (const key of Object.keys(updates) as (keyof Tarefa)[]) {
         const de = String(atual[key] ?? "");
         const para = String(updates[key] ?? "");
-        if (de !== para) {
-          historico_entry.push({ campo: key, de, para, por: quem, em: new Date().toISOString() });
-        }
+        if (de !== para) historico_entry.push({ campo: key, de, para, por: quem, em: new Date().toISOString() });
       }
     }
-    const historico_atual = atual?.historico ?? [];
-    const payload = {
+    const payload: Record<string, unknown> = {
       ...updates,
-      historico: [...historico_atual, ...historico_entry],
+      historico: [...(atual?.historico ?? []), ...historico_entry],
     };
-    if (updates.status === "concluida") {
-      (payload as Record<string, unknown>).concluida_em = new Date().toISOString();
-    }
-    const { error: err } = await supabase.from("tarefas").update(payload).eq("id", id);
+    if (updates.status === "concluida") payload.concluida_em = new Date().toISOString();
+    const { error: err } = await tb().update(payload).eq("id", id);
     if (err) throw err;
     await fetchTarefas();
   }, [tarefas, fetchTarefas]);
 
   const adicionarComentario = useCallback(async (id: string, comentario: Omit<ComentarioItem, "id" | "timestamp">) => {
     const atual = tarefas.find(t => t.id === id);
-    const novo: ComentarioItem = {
-      id: crypto.randomUUID(),
-      ...comentario,
-      timestamp: new Date().toISOString(),
-    };
+    const novo: ComentarioItem = { id: crypto.randomUUID(), ...comentario, timestamp: new Date().toISOString() };
     const comentarios = [...(atual?.comentarios ?? []), novo];
-    const { error: err } = await supabase.from("tarefas").update({ comentarios }).eq("id", id);
+    const { error: err } = await tb().update({ comentarios }).eq("id", id);
     if (err) throw err;
     await fetchTarefas();
   }, [tarefas, fetchTarefas]);
 
   const deletarTarefa = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from("tarefas").delete().eq("id", id);
+    const { error: err } = await tb().delete().eq("id", id);
     if (err) throw err;
     await fetchTarefas();
   }, [fetchTarefas]);

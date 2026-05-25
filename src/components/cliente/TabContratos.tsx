@@ -136,7 +136,7 @@ function ContratoRow({
                || actionLoading === `${contrato.id}_resend`
                || actionLoading === `${contrato.id}_cancel`;
   const signUrl = contrato.clicksign_url ?? contrato.clicksign_sign_url;
-  const pdfUrl  = contrato.clicksign_pdf_url ?? contrato.clicksign_signed_pdf;
+  const pdfUrl  = contrato.clicksign_signed_pdf ?? contrato.clicksign_signed_pdf;
   const csStatus = contrato.clicksign_status ?? "nao_enviado";
 
   return (
@@ -211,8 +211,8 @@ function ContratoRow({
                 </Button>
               )}
               <span className="text-xs text-emerald-600 font-medium">
-                {contrato.clicksign_assinado_em
-                  ? `Assinado em ${new Date(contrato.clicksign_assinado_em).toLocaleDateString("pt-BR")}`
+                {contrato.assinado_em
+                  ? `Assinado em ${contrato.assinado_em instanceof Date ? contrato.assinado_em : new Date(contrato.assinado_em as string).toLocaleDateString("pt-BR")}`
                   : "Assinado"}
               </span>
             </>
@@ -235,10 +235,10 @@ function ContratoRow({
                     <Copy className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                   </button>
                 </div>
-                {contrato.clicksign_enviado_em && (
+                {contrato.enviado_em && (
                   <div className="flex gap-2">
                     <span className="text-muted-foreground w-28 shrink-0">Enviado em:</span>
-                    <span>{new Date(contrato.clicksign_enviado_em).toLocaleString("pt-BR")}</span>
+                    <span>{contrato.enviado_em instanceof Date ? contrato.enviado_em.toLocaleString("pt-BR") : new Date(contrato.enviado_em as string).toLocaleString("pt-BR")}</span>
                   </div>
                 )}
                 {signUrl && (
@@ -376,12 +376,12 @@ function ModalNovoContrato({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Data de início</Label>
-              <Input type="date" value={form.data_inicio ?? ""}
+              <Input type="date" value={form.data_inicio instanceof Date ? form.data_inicio.toISOString().split("T")[0] : (form.data_inicio ?? "")}
                 onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Data de fim (opcional)</Label>
-              <Input type="date" value={form.data_fim ?? ""}
+              <Input type="date" value={form.data_fim instanceof Date ? form.data_fim.toISOString().split("T")[0] : (form.data_fim ?? "")}
                 onChange={e => setForm(f => ({ ...f, data_fim: e.target.value || undefined }))} />
             </div>
           </div>

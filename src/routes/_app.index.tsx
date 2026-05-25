@@ -452,7 +452,7 @@ function Dashboard() {
             {clientesRecentes.map((c) => (
               <Link
                 key={c.id}
-                to={`/clientes/${c.id}`}
+                to={`/clientes/${c.id}` as any}
                 className="flex items-center gap-4 border-t border-border/60 px-6 py-4 transition-colors hover:bg-muted/30"
               >
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">

@@ -12,8 +12,18 @@ import { cn } from "@/lib/utils";
 const DEPARTAMENTOS_SUGERIDOS = ["fiscal", "financeiro", "contábil", "dp", "atendimento", "comercial"];
 
 export function WhatsappInstancesPanel() {
-  const { instances, loading, error, creating, create, connect, refresh, logout, remove, reload } = useWaInstances();
+  const {
+    instances, loading, error,
+    refresh: fetchInstances,
+    createInstance,
+    connectInstance,
+    refreshStatus,
+    logoutInstance,
+    deleteInstance,
+  } = useWaInstances();
+
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [qrInstance, setQrInstance] = useState<WaInstance | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WaInstance | null>(null);
 
@@ -42,7 +52,7 @@ export function WhatsappInstancesPanel() {
             <p className="text-sm font-medium text-foreground">Erro ao carregar instâncias</p>
             <p className="text-xs text-muted-foreground mt-1">{error}</p>
           </div>
-          <Button size="sm" variant="outline" onClick={reload}>
+          <Button size="sm" variant="outline" onClick={fetchInstances}>
             <RefreshCw className="h-4 w-4 mr-1" /> Tentar novamente
           </Button>
         </div>
@@ -71,15 +81,18 @@ export function WhatsappInstancesPanel() {
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {inst.status !== "connected" && (
-                  <Button size="sm" variant="default" onClick={() => { setQrInstance(inst); connect(inst.id).catch(e => toast.error(e.message)); }}>
+                  <Button size="sm" variant="default" onClick={() => {
+                    setQrInstance(inst);
+                    connectInstance(inst.id).catch((e: Error) => toast.error(e.message));
+                  }}>
                     <QrCode className="h-4 w-4" /> {inst.qr_code ? "Ver QR" : "Conectar"}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" onClick={() => refresh(inst.id).catch(e => toast.error(e.message))}>
+                <Button size="sm" variant="outline" onClick={() => refreshStatus(inst.id).catch((e: Error) => toast.error(e.message))}>
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
                 {inst.status === "connected" && (
-                  <Button size="sm" variant="outline" onClick={() => logout(inst.id).then(() => toast.success("Desconectada"))}>
+                  <Button size="sm" variant="outline" onClick={() => logoutInstance(inst.id).then(() => toast.success("Desconectada"))}>
                     <WifiOff className="h-3.5 w-3.5" /> Desconectar
                   </Button>
                 )}
@@ -97,15 +110,24 @@ export function WhatsappInstancesPanel() {
         onOpenChange={setOpen}
         loading={creating}
         onCreate={async (name, deps) => {
+          setCreating(true);
           try {
-            const r = await create(name, deps);
+            const r = await createInstance(name, deps);
             toast.success("Instância criada. Gerando QR code…");
             setOpen(false);
-            const placeholder: WaInstance = { id: r.id, nome: r.nome, display_name: name, departamentos: deps, numero: null, status: "connecting", qr_code: null, last_qr_at: null, last_connected_at: null, created_at: "" };
+            const placeholder: WaInstance = {
+              id: r.id, nome: r.nome, display_name: name, departamentos: deps,
+              numero: null, status: "connecting", qr_code: null,
+              last_qr_at: null, last_connected_at: null, created_at: "",
+            };
             setQrInstance(placeholder);
-            try { await connect(r.id); } catch (e: any) { toast.error(e?.message ?? "Falha ao gerar QR"); }
-          } catch (e: any) {
-            toast.error(e?.message ?? "Falha ao criar instância");
+            try { await connectInstance(r.id); } catch (e: unknown) {
+              toast.error((e as Error)?.message ?? "Falha ao gerar QR");
+            }
+          } catch (e: unknown) {
+            toast.error((e as Error)?.message ?? "Falha ao criar instância");
+          } finally {
+            setCreating(false);
           }
         }}
       />
@@ -113,7 +135,7 @@ export function WhatsappInstancesPanel() {
       <QRDialog
         instance={activeQr}
         onClose={() => setQrInstance(null)}
-        onRefresh={() => activeQr && connect(activeQr.id).catch(e => toast.error(e.message))}
+        onRefresh={() => activeQr && connectInstance(activeQr.id).catch((e: Error) => toast.error(e.message))}
       />
 
       <DeleteDialog
@@ -121,11 +143,11 @@ export function WhatsappInstancesPanel() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={async (inst) => {
           try {
-            await remove(inst.id);
+            await deleteInstance(inst.id);
             toast.success("Instância removida");
             setDeleteTarget(null);
-          } catch (e: any) {
-            toast.error(e?.message ?? "Falha ao excluir instância");
+          } catch (e: unknown) {
+            toast.error((e as Error)?.message ?? "Falha ao excluir instância");
           }
         }}
       />
@@ -134,14 +156,15 @@ export function WhatsappInstancesPanel() {
 }
 
 function StatusBadge({ status }: { status: WaInstance["status"] }) {
-  const map: Record<WaInstance["status"], { label: string; cls: string; Icon: any }> = {
+  type StatusKey = "connected" | "connecting" | "creating" | "disconnected" | "error";
+  const map: Record<StatusKey, { label: string; cls: string; Icon: React.ElementType }> = {
     connected:    { label: "Conectada",    cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", Icon: CheckCircle2 },
     connecting:   { label: "Conectando…",  cls: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400", Icon: Loader2 },
     creating:     { label: "Criando…",     cls: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400", Icon: Loader2 },
-    created:      { label: "Criada",       cls: "border-muted bg-muted text-muted-foreground", Icon: Smartphone },
     disconnected: { label: "Desconectada", cls: "border-destructive/30 bg-destructive/10 text-destructive", Icon: XCircle },
+    error:        { label: "Erro",         cls: "border-destructive/30 bg-destructive/10 text-destructive", Icon: XCircle },
   };
-  const m = map[status] ?? map.disconnected;
+  const m = map[status as StatusKey] ?? map.disconnected;
   const Icon = m.Icon;
   return (
     <Badge variant="outline" className={cn("gap-1 rounded-full border whitespace-nowrap", m.cls)}>
@@ -150,6 +173,9 @@ function StatusBadge({ status }: { status: WaInstance["status"] }) {
     </Badge>
   );
 }
+
+// Import React for ElementType
+import React from "react";
 
 function CreateDialog({
   open, onOpenChange, loading, onCreate,
@@ -201,7 +227,8 @@ function CreateDialog({
               ))}
             </div>
             <div className="flex gap-2 pt-1">
-              <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Outro departamento…" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }} />
+              <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Outro departamento…"
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }} />
               <Button type="button" size="sm" variant="outline" onClick={addCustom}>Adicionar</Button>
             </div>
             {deps.length > 0 && (
@@ -220,9 +247,9 @@ function CreateDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => onCreate(name, deps)} disabled={loading || !name.trim() || deps.length === 0}>
+          <Button disabled={!name.trim() || loading} onClick={() => onCreate(name.trim(), deps)}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Criar e gerar QR
+            Criar instância
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -233,48 +260,45 @@ function CreateDialog({
 function QRDialog({
   instance, onClose, onRefresh,
 }: {
-  instance: WaInstance | null; onClose: () => void; onRefresh: () => void;
+  instance: WaInstance | null;
+  onClose: () => void;
+  onRefresh: () => void;
 }) {
   if (!instance) return null;
-  const qr = instance.qr_code ?? null;
-
   return (
-    <Dialog open={!!instance} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent>
+    <Dialog open={!!instance} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Conectar {instance.display_name}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-2">
           {instance.status === "connected" ? (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <CheckCircle2 className="h-10 w-10 text-emerald-500" />
-              <p className="text-sm font-medium">Conectada com sucesso!</p>
+            <div className="flex flex-col items-center gap-2">
+              <CheckCircle2 className="h-16 w-16 text-emerald-500" />
+              <p className="text-sm font-medium text-emerald-600">Conectada com sucesso!</p>
               {instance.numero && <p className="text-xs text-muted-foreground">+{instance.numero}</p>}
             </div>
-          ) : qr ? (
+          ) : instance.qr_code ? (
             <>
-              <img
-                src={qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`}
-                alt="QR Code"
-                className="h-64 w-64 rounded-lg border bg-white p-2"
-              />
-              <div className="text-center text-xs text-muted-foreground">
-                <p>Abra o WhatsApp no celular &gt; Dispositivos conectados &gt; Conectar dispositivo</p>
-                <p className="mt-1">O QR atualiza automaticamente a cada minuto.</p>
-              </div>
+              <img src={instance.qr_code} alt="QR Code" className="h-56 w-56 rounded-lg border" />
+              <p className="text-center text-xs text-muted-foreground">
+                Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo
+              </p>
             </>
           ) : (
             <div className="flex flex-col items-center gap-2 py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Aguardando QR code…</p>
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Gerando QR code…</p>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onRefresh}>
-            <RefreshCw className="h-4 w-4" /> Gerar novo QR
-          </Button>
-          <Button onClick={onClose}>Fechar</Button>
+          {instance.status !== "connected" && (
+            <Button size="sm" variant="outline" onClick={onRefresh}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Atualizar QR
+            </Button>
+          )}
+          <Button size="sm" onClick={onClose}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -286,58 +310,28 @@ function DeleteDialog({
 }: {
   instance: WaInstance | null;
   onClose: () => void;
-  onConfirm: (inst: WaInstance) => Promise<void> | void;
+  onConfirm: (inst: WaInstance) => Promise<void>;
 }) {
-  const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   if (!instance) return null;
-  const expected = instance.nome;
-  const matches = typed.trim() === expected;
-
   return (
-    <Dialog
-      open={!!instance}
-      onOpenChange={(v) => { if (!v) { setTyped(""); setBusy(false); onClose(); } }}
-    >
-      <DialogContent>
+    <Dialog open={!!instance} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-destructive">Excluir instância</DialogTitle>
+          <DialogTitle>Excluir instância</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <p>
-            Esta ação é <strong>irreversível</strong>. A instância será desconectada na Evolution API e removida do banco junto com sua referência nas conversas.
-          </p>
-          <div className="surface-card space-y-1 p-3 text-xs">
-            <p><span className="text-muted-foreground">Nome:</span> <strong>{instance.display_name}</strong></p>
-            <p><span className="text-muted-foreground">Identificador:</span> <code>@{instance.nome}</code></p>
-            {instance.numero && <p><span className="text-muted-foreground">Número:</span> +{instance.numero}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label>
-              Para confirmar, digite <code className="rounded bg-muted px-1 py-0.5 text-xs">{expected}</code>
-            </Label>
-            <Input
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              placeholder={expected}
-              autoFocus
-            />
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Tem certeza que deseja excluir <strong>{instance.display_name}</strong>? Esta ação desconectará o número e não pode ser desfeita.
+        </p>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button
-            variant="destructive"
-            disabled={!matches || busy}
-            onClick={async () => {
-              setBusy(true);
-              try { await onConfirm(instance); }
-              finally { setBusy(false); setTyped(""); }
-            }}
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Excluir definitivamente
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="destructive" disabled={loading} onClick={async () => {
+            setLoading(true);
+            await onConfirm(instance);
+            setLoading(false);
+          }}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Excluir
           </Button>
         </DialogFooter>
       </DialogContent>

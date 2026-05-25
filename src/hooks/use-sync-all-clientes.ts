@@ -96,7 +96,7 @@ export function useSyncAllClientes() {
           if (r.situacaoCadastral)           patch.situacao_cadastral  = r.situacaoCadastral;
 
           if (Object.keys(patch).length > 0) {
-            const { error: upErr } = await supabase.from("clientes").update(patch).eq("id", c.id);
+            const { error: upErr } = await (supabase as any).from("clientes").update(patch).eq("id", c.id);
             if (upErr) {
               result = { ...result, status: "erro", msg: upErr.message };
             } else {

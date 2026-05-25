@@ -32,7 +32,7 @@ function LoginDev() {
   const nav = useNavigate();
 
   useEffect(() => {
-    if (!t) { nav({ to: "/login" }); return; }
+    if (!t) { nav({ to: "/login" as any }); return; }
     try {
       const session = {
         access_token: t,

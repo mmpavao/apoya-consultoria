@@ -341,7 +341,7 @@ function ClientesPage(){
         </>
       )}
 
-      <ClienteFormDialog open={dialogOpen} onOpenChange={setDialog} cliente={editing}/>
+      <ClienteFormDialog open={dialogOpen} onOpenChange={setDialog} cliente={editing ?? undefined}/>
 
       <AlertDialog open={!!toDelete} onOpenChange={o=>{if(!o)setToDelete(null);}}>
         <AlertDialogContent>

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { PageHeader, PageTabs, TabsSimple, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { useNfse, type NfseEmitida, type NfseRecebida } from "@/hooks/use-nfse";
 import { useClientes } from "@/hooks/use-clientes";
@@ -128,7 +128,7 @@ function NfsePage() {
   }
 
   async function handleXml(nota: NfseEmitida) {
-    const xml = await baixarXml(nota.id, nota.nfseio_id);
+    const xml = await baixarXml(nota.id);
     if (xml) downloadText(xml, `NFS-e_${nota.numero ?? nota.id}.xml`);
   }
 
@@ -196,7 +196,7 @@ function NfsePage() {
     { key: "data_emissao", header: "Emissão", width: 100, render: r => fmtDate(r.data_emissao) },
     { key: "valor_servico", header: "Valor", width: 120, render: r => fmtBRL(r.valor_servico) },
     { key: "fonte", header: "Fonte", width: 80, render: r => (
-      <InlineBadge color={r.fonte === "nfeio" ? "blue" : "gray"}>{r.fonte}</InlineBadge>
+      <InlineBadge color={(r as any).fonte === "nfeio" ? "blue" : "gray"}>{(r as any).fonte}</InlineBadge>
     )},
   ];
 
@@ -233,8 +233,7 @@ function NfsePage() {
       </KpiGrid>
 
       {/* Sub-tabs */}
-      <PageTabs
-        tabs={[
+      <TabsSimple tabs={[
           { id: "emitidas", label: `Emitidas (${emitidas.length})` },
           { id: "recebidas", label: `Recebidas (${recebidas.length})` },
         ]}
@@ -268,7 +267,7 @@ function NfsePage() {
           <SelectContent>
             <SelectItem value="todos">Todos os clientes</SelectItem>
             {clientes.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+              <SelectItem key={c.id} value={c.id}>{(c as any).razaoSocial ?? (c as any).nome}</SelectItem>
             ))}
           </SelectContent>
         </Select>
