@@ -54,7 +54,7 @@ const SUB_TABS: { id: FiscalTab; label: string }[] = [
   { id: "emitidas", label: "NF Emitidas"   },
   { id: "recebidas",label: "NF Recebidas"  },
   { id: "emitir",   label: "Emitir NFS-e"  },
-  { id: "serpro",   label: "Consultas SERPRO" },
+  { id: "serpro",   label: "Consultas Fiscais" },
 ];
 
 // ── badge inline ───────────────────────────────────────────────────────────
@@ -339,6 +339,14 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
   const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseEmitidas(cliente.id, competencia);
 
+  // Auto-sync ao montar — busca automaticamente sem precisar clicar
+  useEffect(() => {
+    if (cliente.cnpj) {
+      sincronizar(cliente.cnpj);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente.cnpj]);
+
   const filtradas = notas.filter(n => {
     const q = query.trim().toLowerCase();
     return !q || `${n.tomador_nome ?? ""} ${n.numero ?? ""}`.toLowerCase().includes(q);
@@ -384,7 +392,7 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
             className="h-8 gap-1.5 bg-[oklch(0.66_0.195_44)] hover:opacity-90 text-white"
             onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing || fetching}>
             {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-            {syncing ? "Sincronizando…" : "Sincronizar MCP"}
+            {syncing ? "Sincronizando…" : "Sincronizar"}
           </Button>
         )}
       </div>
@@ -414,7 +422,7 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
         <div className="surface-card flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
           <ReceiptText className="h-8 w-8 opacity-30" />
           <p className="text-sm font-medium">Nenhuma NFS-e emitida{mes ? " neste período" : ""}</p>
-          <p className="text-xs opacity-60">Clique em "Sincronizar MCP" para buscar as notas do cliente</p>
+          <p className="text-xs opacity-60">Buscando notas emitidas…</p>
           {cliente.cnpj && (
             <Button size="sm" variant="outline" className="mt-1 gap-1.5"
               onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing}>
@@ -489,6 +497,14 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
   const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseRecebidas(cliente.id, competencia);
 
+  // Auto-sync ao montar
+  useEffect(() => {
+    if (cliente.cnpj) {
+      sincronizar(cliente.cnpj);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente.cnpj]);
+
   const CAMADA_CLS: Record<number, string> = {
     1: "bg-emerald-50 text-emerald-700 border-emerald-200",
     2: "bg-blue-50 text-blue-700 border-blue-200",
@@ -518,7 +534,7 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
             className="h-8 gap-1.5 bg-[oklch(0.66_0.195_44)] hover:opacity-90 text-white"
             onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing || fetching}>
             {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-            {syncing ? "Sincronizando…" : "Sincronizar MCP"}
+            {syncing ? "Sincronizando…" : "Sincronizar"}
           </Button>
         )}
       </div>
@@ -548,7 +564,7 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
         <div className="surface-card flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
           <FileText className="h-8 w-8 opacity-30" />
           <p className="text-sm font-medium">Nenhuma NFS-e recebida{mes ? " neste período" : ""}</p>
-          <p className="text-xs opacity-60">Clique em "Sincronizar MCP" para buscar as notas recebidas</p>
+          <p className="text-xs opacity-60">Buscando notas recebidas…</p>
           {cliente.cnpj && (
             <Button size="sm" variant="outline" className="mt-1 gap-1.5"
               onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing}>

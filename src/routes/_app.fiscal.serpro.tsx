@@ -1,5 +1,5 @@
 /**
- * Página /fiscal/serpro — Console SERPRO
+ * Página /fiscal/serpro — Consultas Fiscais
  * Consultas por cliente com validação de elegibilidade.
  * Substituição do mock anterior por chamadas reais ao MCP.
  */
@@ -22,7 +22,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/fiscal/serpro")({
   component: SerproPage,
-  head: () => ({ meta: [{ title: "Console SERPRO · APOYA Gestão" }] }),
+  head: () => ({ meta: [{ title: "Consultas Fiscais · APOYA Gestão" }] }),
 });
 
 // ─── tipos ────────────────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ function SerproPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Console SERPRO"
+        title="Consultas Fiscais"
         subtitle="61 tools disponíveis · Consultas fiscais em tempo real"
         actions={
           <div className="flex items-center gap-2">
