@@ -37,6 +37,17 @@ export const SERPRO_TOOLS: SerproToolDef[] = [
     regimes: ["ALL"],
   },
 
+
+  // ── NF-e CASCATA — busca automática multi-fonte ────────────────────────
+  {
+    name: "nfe_buscar_cascata",
+    description: "Busca NF-e emitidas/recebidas do cliente com cascata automática de fontes (SEFAZ → SERPRO → Infosimples → NFE.io). Retorna camada_usada (1-4) e log_cascata.",
+    category: "nfe",
+    params: ["cnpj_cliente", "tipo"],
+    requiresCert: false,
+    requiresProc: false,
+    regimes: ["ALL"],
+  },
   // ── MEI — CCMEI e Cadastro ─────────────────────────────────────────────
   {
     name: "serpro_ccmei_emitir",
@@ -676,6 +687,7 @@ export const SERPRO_CATEGORIES: Record<string, string> = {
   parcelamentos: "Parcelamentos",
   procuracoes: "Procurações e Redesim",
   processos: "e-Processo",
+  nfe: "NF-e — Busca Multi-fonte",
   pagamentos: "PagtoWeb — Pagamentos",
   darf: "Sicalc — DARF",
   eventos: "Eventos PJ/PF",

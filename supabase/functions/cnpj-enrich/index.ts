@@ -43,12 +43,17 @@ async function callMcp(toolName: string, args: Record<string, string>): Promise<
 }
 
 function parseRegime(raw: string): string | null {
-  const u = (raw ?? "").toUpperCase();
+  const u = (raw ?? "").toUpperCase().trim();
+  if (!u) return null;
   if (u.includes("MEI"))                                           return "MEI";
   if (u.includes("SIMPLES"))                                       return "Simples";
   if (u.includes("PRESUMIDO"))                                     return "Lucro Presumido";
   if (u.includes("REAL"))                                          return "Lucro Real";
-  if (u.includes("COMPETÊNCIA") || u.includes("COMPETENCIA"))     return "Simples";
+  // "COMPETÊNCIA" no SERPRO = empresa fora do Simples Nacional (Lucro Presumido por competência)
+  // NÃO é Simples Nacional — é o regime padrão para quem não optou pelo Simples
+  if (u === "COMPETÊNCIA" || u === "COMPETENCIA")                  return "Lucro Presumido";
+  // "CAIXA" = contabilidade por caixa (MEI ou pequenos negócios não optantes)
+  if (u === "CAIXA")                                               return "Simples";
   return null;
 }
 

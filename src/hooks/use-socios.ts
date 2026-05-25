@@ -219,32 +219,49 @@ export function useSocios(clienteId: string | null) {
   }, [load]);
 
   // Importar sócios em lote (pós-consulta CNPJ)
+  // Estratégia: DELETE sócios antigos (origem=cnpj) + INSERT novos.
+  // Evita problemas com upsert e índice parcial.
   const importarDosCNPJ = useCallback(async (
     clienteIdTarget: string,
     sociosCNPJ: DadosCNPJ["socios"]
   ) => {
     if (!sociosCNPJ.length) return;
-    const rows = sociosCNPJ.map(s => ({
-      cliente_id:                 clienteIdTarget,
-      nome:                       s.nome,
-      cnpj_cpf_socio:             s.cnpjCpf,
-      tipo_socio:                 s.cnpjCpf?.replace(/\D/g, "").length === 14 ? "pj" : "pf",
-      qualificacao:               s.qualificacao,
-      codigo_qualificacao:        s.codigoQualificacao,
-      data_entrada:               s.dataEntrada,
-      nome_representante:         s.nomeRepresentante,
-      cpf_representante:          s.cpfRepresentante,
-      qualificacao_representante: s.qualificacaoRepresentante,
-      is_administrador:           s.qualificacao?.toLowerCase().includes("administrador") ?? false,
-      is_ativo:                   true,
-    }));
+
+    // Remover sócios importados anteriormente para este cliente
+    await (supabase as any)
+      .from("cliente_socio")
+      .delete()
+      .eq("cliente_id", clienteIdTarget);
+
+    const rows = sociosCNPJ.map(s => {
+      const cpfDigits = (s.cnpjCpf ?? "").replace(/\D/g, "");
+      const tipo_socio = cpfDigits.length === 14 ? "pj" : "pf";
+      return {
+        cliente_id:                 clienteIdTarget,
+        nome:                       s.nome,
+        cnpj_cpf_socio:             s.cnpjCpf || null,
+        tipo_socio,
+        qualificacao:               s.qualificacao || null,
+        codigo_qualificacao:        s.codigoQualificacao || null,
+        data_entrada:               s.dataEntrada || null,
+        nome_representante:         s.nomeRepresentante || null,
+        cpf_representante:          s.cpfRepresentante || null,
+        qualificacao_representante: s.qualificacaoRepresentante || null,
+        is_administrador:           !!(s.qualificacao?.toLowerCase().includes("administrador")),
+        is_ativo:                   true,
+      };
+    });
 
     const { error } = await (supabase as any)
       .from("cliente_socio")
-      .upsert(rows, { onConflict: "cliente_id,cnpj_cpf_socio" });
+      .insert(rows);
 
-    if (error) console.error("importarDosCNPJ:", error);
-    else await load();
+    if (error) {
+      console.error("importarDosCNPJ error:", error);
+      toast.error("Erro ao importar sócios: " + error.message);
+    } else {
+      await load();
+    }
   }, [load]);
 
   return { socios, loading, load, upsert, remove, importarDosCNPJ };

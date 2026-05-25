@@ -333,11 +333,11 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
   const { cancelar } = useNfse();
   const [query, setQuery] = useState("");
   const now = new Date();
-  const [mes, setMes] = useState<number | null>(null); // null = todos os meses
+  const [mes, setMes] = useState<number | null>(null);
   const [ano, setAno] = useState(now.getFullYear());
 
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
-  const { notas, loading: fetching, error, refetch: load } = useNfseEmitidas(cliente.id, competencia);
+  const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseEmitidas(cliente.id, competencia);
 
   const filtradas = notas.filter(n => {
     const q = query.trim().toLowerCase();
@@ -351,9 +351,15 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
     emitida: "Emitida", processando: "Processando", rascunho: "Rascunho", cancelada: "Cancelada", erro: "Erro"
   };
 
+  const CAMADA_CLS: Record<number, string> = {
+    1: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    2: "bg-blue-50 text-blue-700 border-blue-200",
+    3: "bg-amber-50 text-amber-700 border-amber-200",
+    4: "bg-orange-50 text-orange-700 border-orange-200",
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
         <select className="h-8 rounded border border-input bg-background px-2 text-sm"
           value={mes ?? ""} onChange={e => setMes(e.target.value ? Number(e.target.value) : null)}>
@@ -370,12 +376,29 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input className="pl-8 h-8 text-sm" placeholder="Buscar por tomador…" value={query} onChange={e => setQuery(e.target.value)} />
         </div>
-        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={load} disabled={fetching}>
+        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={load} disabled={fetching || syncing}>
           <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} />
         </Button>
+        {cliente.cnpj && (
+          <Button size="sm" variant="default"
+            className="h-8 gap-1.5 bg-[oklch(0.66_0.195_44)] hover:opacity-90 text-white"
+            onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing || fetching}>
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            {syncing ? "Sincronizando…" : "Sincronizar MCP"}
+          </Button>
+        )}
       </div>
 
-      {/* Erro */}
+      {cascata.camada_usada && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${CAMADA_CLS[cascata.camada_usada] ?? ""}`}>
+          <Wifi className="h-3.5 w-3.5" />
+          <span>Fonte: {cascata.fonte_label ?? "Camada " + cascata.camada_usada} · {cascata.total ?? notas.length} nota{(cascata.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(cascata.total ?? notas.length) !== 1 ? "s" : ""}</span>
+          {(cascata.camada_usada ?? 0) >= 3 && (
+            <span className="opacity-60">(custo: {cascata.camada_usada === 3 ? "R$ 0,24" : "pago"})</span>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -383,16 +406,22 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
         </div>
       )}
 
-      {/* Tabela */}
       {fetching ? (
         <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando notas…</span>
         </div>
       ) : filtradas.length === 0 ? (
-        <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+        <div className="surface-card flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
           <ReceiptText className="h-8 w-8 opacity-30" />
           <p className="text-sm font-medium">Nenhuma NFS-e emitida{mes ? " neste período" : ""}</p>
-          <p className="text-xs opacity-60">As notas emitidas via sistema aparecerão aqui</p>
+          <p className="text-xs opacity-60">Clique em "Sincronizar MCP" para buscar as notas do cliente</p>
+          {cliente.cnpj && (
+            <Button size="sm" variant="outline" className="mt-1 gap-1.5"
+              onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing}>
+              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              Sincronizar agora
+            </Button>
+          )}
         </div>
       ) : (
         <div className="surface-card overflow-hidden">
@@ -452,12 +481,20 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
 // ────────────────────────────────────────────────────────────────────────────
 // NF RECEBIDAS
 // ────────────────────────────────────────────────────────────────────────────
+
 function NfRecebidas({ cliente }: { cliente: Cliente }) {
-  const [mes, setMes] = useState<number | null>(null); // null = todos os meses
+  const [mes, setMes] = useState<number | null>(null);
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
-  const { notas, loading: fetching, error, refetch: load } = useNfseRecebidas(cliente.id, competencia);
+  const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseRecebidas(cliente.id, competencia);
+
+  const CAMADA_CLS: Record<number, string> = {
+    1: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    2: "bg-blue-50 text-blue-700 border-blue-200",
+    3: "bg-amber-50 text-amber-700 border-amber-200",
+    4: "bg-orange-50 text-orange-700 border-orange-200",
+  };
 
   return (
     <div className="space-y-4">
@@ -473,26 +510,52 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
           value={ano} onChange={e => setAno(Number(e.target.value))}>
           {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={load} disabled={fetching}>
-          <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} /> Atualizar
+        <Button size="sm" variant="outline" className="h-8 gap-1.5 ml-auto" onClick={load} disabled={fetching || syncing}>
+          <RefreshCw className={`h-3.5 w-3.5 ${fetching ? "animate-spin" : ""}`} />
         </Button>
+        {cliente.cnpj && (
+          <Button size="sm" variant="default"
+            className="h-8 gap-1.5 bg-[oklch(0.66_0.195_44)] hover:opacity-90 text-white"
+            onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing || fetching}>
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            {syncing ? "Sincronizando…" : "Sincronizar MCP"}
+          </Button>
+        )}
       </div>
+
+      {cascata.camada_usada && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${CAMADA_CLS[cascata.camada_usada] ?? ""}`}>
+          <Wifi className="h-3.5 w-3.5" />
+          <span>Fonte: {cascata.fonte_label ?? "Camada " + cascata.camada_usada} · {cascata.total ?? notas.length} nota{(cascata.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(cascata.total ?? notas.length) !== 1 ? "s" : ""}</span>
+          {(cascata.camada_usada ?? 0) >= 3 && (
+            <span className="opacity-60">(custo: {cascata.camada_usada === 3 ? "R$ 0,24" : "pago"})</span>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
-          <AlertTriangle className="h-4 w-4 shrink-0" /><span>{error}</span>
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
       {fetching ? (
         <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando…</span>
+          <Loader2 className="h-5 w-5 animate-spin" /> <span className="text-sm">Carregando notas…</span>
         </div>
       ) : notas.length === 0 ? (
-        <div className="surface-card flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-          <Receipt className="h-8 w-8 opacity-30" />
+        <div className="surface-card flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
+          <FileText className="h-8 w-8 opacity-30" />
           <p className="text-sm font-medium">Nenhuma NFS-e recebida{mes ? " neste período" : ""}</p>
-          <p className="text-xs opacity-60">Notas recebidas de prestadores de serviço aparecerão aqui</p>
+          <p className="text-xs opacity-60">Clique em "Sincronizar MCP" para buscar as notas recebidas</p>
+          {cliente.cnpj && (
+            <Button size="sm" variant="outline" className="mt-1 gap-1.5"
+              onClick={() => sincronizar(cliente.cnpj!)} disabled={syncing}>
+              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              Sincronizar agora
+            </Button>
+          )}
         </div>
       ) : (
         <div className="surface-card overflow-hidden">
@@ -505,6 +568,7 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
                 <th className="w-24">Emissão</th>
                 <th className="w-28 text-right">Valor</th>
                 <th className="w-24">Fonte</th>
+                <th className="w-16"></th>
               </tr>
             </thead>
             <tbody>
@@ -518,9 +582,13 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
                   <td className="text-sm">{n.competencia ?? "—"}</td>
                   <td className="text-sm">{fmtDate(n.data_emissao)}</td>
                   <td className="text-right font-medium text-sm">{fmtBRL(n.valor_servico)}</td>
+                  <td><Pill cor="gray">{n.fonte ?? "—"}</Pill></td>
                   <td>
-                    {n.fonte && (
-                      <Pill cor="blue">{n.fonte}</Pill>
+                    {n.pdf_url && (
+                      <a href={n.pdf_url} target="_blank" rel="noopener noreferrer"
+                        className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="PDF">
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
                     )}
                   </td>
                 </tr>
@@ -535,6 +603,7 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
     </div>
   );
 }
+
 
 // ── EMITIR NFS-e (formulário inline)
 // ────────────────────────────────────────────────────────────────────────────
