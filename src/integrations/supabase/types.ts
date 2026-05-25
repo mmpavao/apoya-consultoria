@@ -2621,6 +2621,114 @@ export type Database = {
         Relationships: []
       }
     }
+      tarefas: {
+        Row: {
+          id: string
+          titulo: string
+          descricao: string | null
+          tipo: string
+          status: string
+          prioridade: string
+          cliente_id: string | null
+          cliente_nome: string | null
+          responsavel: string
+          responsavel_tipo: string
+          criado_por: string
+          criado_por_tipo: string
+          requer_aprovacao: boolean
+          aprovador: string | null
+          aprovador_tipo: string | null
+          aprovado_em: string | null
+          aprovado_por: string | null
+          motivo_rejeicao: string | null
+          data_prazo: string | null
+          sla_horas: number | null
+          sla_status: string | null
+          tarefa_pai_id: string | null
+          subtarefas: Json
+          subtarefas_total: number
+          subtarefas_concluidas: number
+          tags: Json
+          anexos: Json
+          comentarios: Json
+          historico: Json
+          origem: string | null
+          concluida_em: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          titulo: string
+          descricao?: string | null
+          tipo?: string
+          status?: string
+          prioridade?: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          responsavel: string
+          responsavel_tipo?: string
+          criado_por: string
+          criado_por_tipo?: string
+          requer_aprovacao?: boolean
+          aprovador?: string | null
+          aprovador_tipo?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          motivo_rejeicao?: string | null
+          data_prazo?: string | null
+          sla_horas?: number | null
+          sla_status?: string | null
+          tarefa_pai_id?: string | null
+          subtarefas?: Json
+          subtarefas_total?: number
+          subtarefas_concluidas?: number
+          tags?: Json
+          anexos?: Json
+          comentarios?: Json
+          historico?: Json
+          origem?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          titulo?: string
+          descricao?: string | null
+          tipo?: string
+          status?: string
+          prioridade?: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          responsavel?: string
+          responsavel_tipo?: string
+          criado_por?: string
+          criado_por_tipo?: string
+          requer_aprovacao?: boolean
+          aprovador?: string | null
+          aprovador_tipo?: string | null
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          motivo_rejeicao?: string | null
+          data_prazo?: string | null
+          sla_horas?: number | null
+          sla_status?: string | null
+          tarefa_pai_id?: string | null
+          subtarefas?: Json
+          subtarefas_total?: number
+          subtarefas_concluidas?: number
+          tags?: Json
+          anexos?: Json
+          comentarios?: Json
+          historico?: Json
+          origem?: string | null
+          concluida_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     Views: {
       [_ in never]: never
     }

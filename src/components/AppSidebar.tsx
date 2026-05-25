@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Workflow,
   LayoutDashboard,
   Building2,
   Calendar,
@@ -25,6 +26,7 @@ const items: NavItem[] = [
   { to: "/",             label: "Dashboard",   icon: LayoutDashboard, exact: true },
   { to: "/clientes",     label: "Clientes",    icon: Building2 },
   { to: "/obrigacoes",   label: "Obrigações",  icon: Calendar },
+  { to: "/workflows",    label: "Workflows",   icon: Workflow },
   { to: "/fiscal/das",   label: "Fiscal",      icon: Receipt },
   { to: "/financeiro",   label: "Financeiro",  icon: DollarSign },
   { to: "/whatsapp",     label: "WhatsApp",    icon: MessageSquare },
