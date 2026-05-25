@@ -72,38 +72,38 @@ export default function WorkflowsPage() {
             onChange={e => setFiltroBusca(e.target.value)}
             className="w-48 h-8 text-sm"
           />
-          <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
+          <Select value={filtroResponsavel || "all"} onValueChange={v => setFiltroResponsavel(v === "all" ? "" : v)}>
             <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Responsável" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {TODOS_RESPONSAVEIS.map(r => <SelectItem key={r.nome} value={r.nome}>{r.tipo === "agente" ? "🤖" : "👤"} {r.nome}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+          <Select value={filtroTipo || "all"} onValueChange={v => setFiltroTipo(v === "all" ? "" : v)}>
             <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {(Object.keys(TIPO_LABEL) as TarefaTipo[]).map(t => <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <Select value={filtroStatus || "all"} onValueChange={v => setFiltroStatus(v === "all" ? "" : v)}>
             <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {(Object.keys(STATUS_LABEL) as TarefaStatus[]).map(s => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
+          <Select value={filtroPrioridade || "all"} onValueChange={v => setFiltroPrioridade(v === "all" ? "" : v)}>
             <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Prioridade" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               {(["critica","alta","media","baixa"] as TarefaPrioridade[]).map(p => <SelectItem key={p} value={p}>{PRIORIDADE_EMOJI[p]} {PRIORIDADE_LABEL[p]}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filtroSla} onValueChange={setFiltroSla}>
+          <Select value={filtroSla || "all"} onValueChange={v => setFiltroSla(v === "all" ? "" : v)}>
             <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="SLA" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="no_prazo">🟢 No prazo</SelectItem>
               <SelectItem value="atencao">🟡 Atenção</SelectItem>
               <SelectItem value="atrasada">🔴 Atrasada</SelectItem>

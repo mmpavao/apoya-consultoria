@@ -181,12 +181,12 @@ export function NovaTarefaForm({ open, onClose, currentUser = "Daniel Araújo" }
           {/* Cliente */}
           <div>
             <Label className="text-sm font-medium">Cliente</Label>
-            <Select value={clienteId} onValueChange={setClienteId}>
+            <Select value={clienteId || "none"} onValueChange={v => setClienteId(v === "none" ? "" : v)}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Nenhum (tarefa interna)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">— Nenhum —</SelectItem>
+                <SelectItem value="none">— Nenhum —</SelectItem>
                 {(clientes ?? []).map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>
                 ))}
