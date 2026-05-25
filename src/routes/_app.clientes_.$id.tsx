@@ -28,17 +28,15 @@ import {
 import { useClienteById } from "@/hooks/use-cliente-by-id";
 import { useCobrancas } from "@/hooks/use-cobrancas";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
-import { TabServicos } from "@/components/cliente/TabServicos";
-import { TabContratos } from "@/components/cliente/TabContratos";
 import { TabDocumentos } from "@/components/cliente/TabDocumentos";
 import { TabFiscal } from "@/components/cliente/TabFiscal";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
-import { TabFinanceiro } from "@/components/cliente/TabFinanceiro";
 import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
 import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
 import { TabSocios } from "@/components/cliente/TabSocios";
 import { TabCertificados } from "@/components/cliente/TabCertificados";
+import { TabComercial } from "@/components/cliente/TabComercial";
 import { Shield, FileKey2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
@@ -130,20 +128,17 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "financeiro" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "servicos" | "contratos" | "documentos" | "contato" | "historico";
+type Tab = "geral" | "fiscal" | "comercial" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "documentos" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: "geral",          label: "Visão Geral",   icon: Building2   },
-  { id: "fiscal",         label: "Fiscal",         icon: FileText    },
-  { id: "financeiro",     label: "Financeiro",     icon: DollarSign  },
-  { id: "motor_docs",     label: "Doc. Fiscais",   icon: TrendingUp  },
-  { id: "motor_apuracao", label: "Apuração",       icon: BarChart3   },
-  { id: "socios",         label: "Sócios",         icon: Users       },
-  { id: "certificados",   label: "Certificados",   icon: Shield      },
-  { id: "servicos",       label: "Serviços",       icon: Briefcase   },
-  { id: "contratos",      label: "Contratos",      icon: ReceiptText  },
-  { id: "documentos",     label: "Documentos",     icon: FileText    },
-  { id: "contato",        label: "Contato",        icon: User        },
-  { id: "historico",      label: "Histórico",      icon: Clock       },
+  { id: "geral",          label: "Visão Geral",  icon: Building2  },
+  { id: "fiscal",         label: "Fiscal",        icon: FileText   },
+  { id: "comercial",      label: "Comercial",     icon: Briefcase  },
+  { id: "motor_docs",     label: "Doc. Fiscais",  icon: TrendingUp },
+  { id: "motor_apuracao", label: "Apuração",      icon: BarChart3  },
+  { id: "socios",         label: "Sócios",        icon: Users      },
+  { id: "certificados",   label: "Certificados",  icon: Shield     },
+  { id: "documentos",     label: "Documentos",    icon: FileText   },
+  { id: "historico",      label: "Histórico",     icon: Clock      },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -477,6 +472,26 @@ function ClienteDetailPage() {
             <InfoRow icon={MapPin}       label="Município/UF" value={[cliente.endereco?.municipio ?? cliente.municipio, cliente.endereco?.uf ?? cliente.uf].filter(Boolean).join(" / ")} />
           </SectionCard>
 
+          {/* Contato */}
+          <SectionCard title="Contato" icon={User}>
+            <InfoRow icon={Mail}   label="E-mail"    value={cliente.email}    href={cliente.email    ? `mailto:${cliente.email}` : undefined} />
+            <InfoRow icon={Phone}  label="Telefone"  value={cliente.telefone} href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
+            <div className="flex items-start gap-3 py-2.5 border-b border-border/50">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">WhatsApp</p>
+                {cliente.whatsapp ? (
+                  <button
+                    className="text-sm text-primary hover:underline font-medium"
+                    onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}
+                  >
+                    {cliente.whatsapp}
+                  </button>
+                ) : <p className="text-sm text-muted-foreground">—</p>}
+              </div>
+            </div>
+          </SectionCard>
+
           {/* Observações */}
           {cliente.observacoes && (
             <SectionCard title="Observações" icon={Info}>
@@ -498,9 +513,7 @@ function ClienteDetailPage() {
       )}
 
 
-      {tab === "financeiro" && (
-        <TabFinanceiro cliente={cliente} />
-      )}
+      
 
       {tab === "motor_docs" && (
         <DocumentosFiscaisTab
@@ -516,55 +529,16 @@ function ClienteDetailPage() {
         />
       )}
 
-            {/* ═════════════════════ ABA: CONTATO ═════════════════════ */}
-      {tab === "contato" && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SectionCard title="Dados de Contato" icon={User}>
-            <InfoRow icon={Mail}        label="E-mail"       value={cliente.email} href={cliente.email ? `mailto:${cliente.email}` : undefined} />
-            <InfoRow icon={Phone}       label="Telefone"     value={cliente.telefone} href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
-            <div className="flex items-start gap-3 py-2.5 border-b border-border/50">
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">WhatsApp</p>
-                  {cliente.whatsapp ? (
-                    <button
-                      className="text-sm text-primary hover:underline font-medium"
-                      onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}
-                    >
-                      {cliente.whatsapp}
-                    </button>
-                  ) : <p className="text-sm text-muted-foreground">—</p>}
-                </div>
-              </div>
-            <InfoRow icon={User}        label="Responsável APOYA" value={cliente.responsavel} />
-          </SectionCard>
 
-          <SectionCard title="Endereço Completo" icon={MapPin}>
-            <InfoRow icon={Home}        label="Logradouro / Número" value={[cliente.endereco?.logradouro, cliente.endereco?.numero].filter(Boolean).join(", ")} />
-            <InfoRow icon={MapPin}      label="Bairro"              value={cliente.endereco?.bairro} />
-            <InfoRow icon={Hash}        label="CEP"                 value={cliente.endereco?.cep} />
-            <InfoRow icon={Building2}   label="Município"           value={cliente.endereco?.municipio ?? cliente.municipio} />
-            <InfoRow icon={MapPin}      label="Estado (UF)"         value={cliente.endereco?.uf ?? cliente.uf} />
-          </SectionCard>
-        </div>
-      )}
 
-      {/* ═════════════════════ ABA: SERVIÇOS ═════════════════════ */}
       {tab === "socios" && <TabSocios clienteId={id} />}
 
       {tab === "certificados" && (
         <TabCertificados clienteId={id} cnpj={cliente?.cnpj} razaoSocial={cliente?.razaoSocial} onCertificateUpdated={handleCertUpdate} />
       )}
 
-      {tab === "servicos" && <TabServicos clienteId={id} />}
-
-      {/* ═════════════════════ ABA: CONTRATOS ════════════════════ */}
-      {tab === "contratos" && <TabContratos
-          clienteId={id}
-          clienteEmail={cliente.email}
-          clienteWhatsapp={cliente.whatsapp}
-          clienteNome={cliente.razaoSocial}
-        />}
+      {/* ═════════════════════ ABA: COMERCIAL (Serviços + Contratos + Financeiro) ═════════════════════ */}
+      {tab === "comercial" && <TabComercial cliente={cliente} />}
 
       {/* ═════════════════════ ABA: DOCUMENTOS ═══════════════════ */}
       {tab === "documentos" && <TabDocumentos clienteId={id} />}
