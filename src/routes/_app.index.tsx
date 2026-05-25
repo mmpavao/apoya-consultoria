@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
 } from "recharts";
 import { useAuth } from "@/hooks/use-auth";
 import { useDashboard, type AlertaDash } from "@/hooks/use-dashboard";
@@ -250,6 +251,122 @@ function Dashboard() {
         />
       </div>
 
+
+      {/* ── Status de Clientes (Donut) + Gráfico Honorários ─── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        {/* Donut — distribuição de status */}
+        <section className="surface-card">
+          <div className="flex items-center gap-2 px-6 py-5 border-b border-border/50">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-primary">
+              <Users className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-base font-semibold">Status dos Clientes</h2>
+          </div>
+          <div className="flex flex-col items-center px-6 py-5 gap-4">
+            <ResponsiveContainer width="100%" height={170}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Ativos",       value: kpis.clientesAtivos,                                        fill: "#22c55e" },
+                    { name: "Inadimplentes",value: kpis.inadimplentes,                                         fill: "oklch(0.66 0.195 44)" },
+                    { name: "Suspensos",    value: kpis.suspensos,                                             fill: "#ef4444" },
+                    { name: "Outros",       value: Math.max(0, kpis.clientesTotal - kpis.clientesAtivos - kpis.inadimplentes - kpis.suspensos), fill: "#cbd5e1" },
+                  ].filter(d => d.value > 0)}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={52}
+                  outerRadius={78}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {[
+                    "#22c55e",
+                    "oklch(0.66 0.195 44)",
+                    "#ef4444",
+                    "#cbd5e1",
+                  ].map((color, i) => (
+                    <Cell key={i} fill={color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number, name: string) => [v, name]}
+                  contentStyle={{ borderRadius: "12px", fontSize: "12px", border: "1px solid #e2e8f0" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Legenda */}
+            <div className="w-full space-y-1.5">
+              {[
+                { label: "Ativos",        value: kpis.clientesAtivos,   color: "bg-emerald-400" },
+                { label: "Inadimplentes", value: kpis.inadimplentes,    color: "bg-primary" },
+                { label: "Suspensos",     value: kpis.suspensos,        color: "bg-red-400" },
+              ].map(item => (
+                <div key={item.label} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                    {item.label}
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {item.value}
+                    <span className="ml-1 text-muted-foreground font-normal">
+                      ({kpis.clientesTotal > 0 ? Math.round(item.value / kpis.clientesTotal * 100) : 0}%)
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Gráfico de Honorários — 6 meses */}
+        <section className="surface-card lg:col-span-2">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-border/50">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-primary">
+                <TrendingUp className="h-3.5 w-3.5" />
+              </span>
+              Honorários — últimos 6 meses
+            </h2>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-primary/30" />Previsto</span>
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-primary" />Recebido</span>
+            </div>
+          </div>
+          <div className="px-6 py-5">
+            <p className="text-xs text-muted-foreground mb-1">Acumulado no período</p>
+            <p className="font-display text-2xl font-bold text-foreground mb-4">{fmtBRL(acumulado)}</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={honorariosData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradPrev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="oklch(0.66 0.195 44)" stopOpacity={0.12} />
+                    <stop offset="95%" stopColor="oklch(0.66 0.195 44)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradRec" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="oklch(0.66 0.195 44)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="oklch(0.66 0.195 44)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                <Tooltip
+                  formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR")}`, ""]}
+                  contentStyle={{ borderRadius: "12px", fontSize: "12px", border: "1px solid #e2e8f0" }}
+                />
+                <Area type="monotone" dataKey="previsto" stroke="oklch(0.66 0.195 44)"
+                  strokeWidth={2} strokeDasharray="4 2" fill="url(#gradPrev)" dot={false} />
+                <Area type="monotone" dataKey="recebido" stroke="oklch(0.66 0.195 44)"
+                  strokeWidth={2.5} fill="url(#gradRec)" dot={{ r: 4, fill: "oklch(0.66 0.195 44)" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+      </div>
+
       {/* ── Alertas + Calendário fiscal ─────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
@@ -313,49 +430,7 @@ function Dashboard() {
         </section>
       </div>
 
-      {/* ── Honorários — gráfico ────────────────────────────── */}
-      <section className="surface-card">
-        <div className="flex items-center justify-between px-6 pt-6 pb-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-50 text-emerald-700">
-                <TrendingUp className="h-3.5 w-3.5" />
-              </span>
-              Honorários — últimos 6 meses
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">Recebido vs. previsto</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Acumulado</p>
-            <p className="font-display text-xl font-bold tracking-tight">{fmtBRL(acumulado)}</p>
-          </div>
-        </div>
-        <div className="px-3 pb-4">
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={honorariosData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradRecebido" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="oklch(0.66 0.195 44)" stopOpacity={0.30} />
-                  <stop offset="95%" stopColor="oklch(0.66 0.195 44)" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="gradPrevisto" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="oklch(0.66 0.155 152)" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="oklch(0.66 0.155 152)" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="2 4" stroke="oklch(0.92 0.005 60)" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "oklch(0.52 0.016 260)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "oklch(0.52 0.016 260)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-              <Tooltip
-                formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR")}`, ""]}
-                contentStyle={{ borderRadius: 12, border: "1px solid oklch(0.92 0.005 60)", fontSize: 12, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.08)" }}
-              />
-              <Area type="monotone" dataKey="previsto" stroke="oklch(0.66 0.155 152)" strokeWidth={2} strokeDasharray="4 4" fill="url(#gradPrevisto)" dot={false} />
-              <Area type="monotone" dataKey="recebido" stroke="oklch(0.66 0.195 44)" strokeWidth={2.5} fill="url(#gradRecebido)" dot={{ r: 3, fill: "oklch(0.66 0.195 44)" }} activeDot={{ r: 5 }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+
 
       {/* ── Clientes recentes ───────────────────────────────── */}
       <section className="surface-card">

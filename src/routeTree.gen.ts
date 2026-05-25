@@ -18,6 +18,7 @@ import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
+import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
 import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
@@ -72,6 +73,11 @@ const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
 const AppClientesRoute = AppClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAutomacoesRoute = AppAutomacoesRouteImport.update({
+  id: '/automacoes',
+  path: '/automacoes',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiNfseIndexRoute = ApiNfseIndexRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/financeiro': typeof AppFinanceiroRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/financeiro': typeof AppFinanceiroRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/_app/automacoes': typeof AppAutomacoesRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/login-dev'
+    | '/automacoes'
     | '/clientes'
     | '/configuracoes'
     | '/financeiro'
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/login-dev'
+    | '/automacoes'
     | '/clientes'
     | '/configuracoes'
     | '/financeiro'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/login-dev'
+    | '/_app/automacoes'
     | '/_app/clientes'
     | '/_app/configuracoes'
     | '/_app/financeiro'
@@ -340,6 +352,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/automacoes': {
+      id: '/_app/automacoes'
+      path: '/automacoes'
+      fullPath: '/automacoes'
+      preLoaderRoute: typeof AppAutomacoesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/nfse/': {
       id: '/api/nfse/'
       path: '/api/nfse'
@@ -421,6 +440,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAutomacoesRoute: typeof AppAutomacoesRoute
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
@@ -436,6 +456,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAutomacoesRoute: AppAutomacoesRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,

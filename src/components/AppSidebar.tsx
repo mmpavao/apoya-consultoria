@@ -10,6 +10,7 @@ import {
   LogOut,
   ChevronsLeft,
   ChevronsRight,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ const items: NavItem[] = [
   { to: "/fiscal/das",   label: "Fiscal",      icon: Receipt },
   { to: "/financeiro",   label: "Financeiro",  icon: DollarSign },
   { to: "/whatsapp",     label: "WhatsApp",    icon: MessageSquare },
+  { to: "/automacoes",  label: "Automações",  icon: Bot            },
 ];
 
 const bottom: NavItem[] = [
