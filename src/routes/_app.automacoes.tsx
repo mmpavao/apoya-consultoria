@@ -1,16 +1,17 @@
 /**
  * /automacoes — Central de Automações APOYA
- * Cards visuais + modal de criação de novas automações
+ * CRUD completo: criar, editar, excluir, ativar/pausar
+ * Persistência real no Supabase (tabela automacoes_config)
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Zap, Clock, CheckCircle2, AlertTriangle,
   RefreshCw, MessageSquare, DollarSign, Bell, FileText,
   Send, Calendar, ShieldAlert, Bot, Activity,
   ChevronRight, ToggleLeft, ToggleRight, Loader2,
   Plus, X, Sparkles, Repeat, Timer, Webhook,
-  ChevronDown,
+  ChevronDown, Pencil, Trash2, MoreVertical,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -22,48 +23,65 @@ export const Route = createFileRoute("/_app/automacoes")({
 });
 
 /* ── Tipos ─────────────────────────────────────────────────── */
-type AutoStatus   = "ativa" | "pausada" | "erro" | "executando";
-type Categoria    = "cobranca" | "fiscal" | "comunicacao" | "compliance" | "sistema";
-type TipoGatilho  = "agendado" | "evento" | "webhook" | "manual";
-type TipoAcao     = "whatsapp" | "email" | "sistema" | "api";
+type AutoStatus  = "ativa" | "pausada" | "erro" | "executando";
+type Categoria   = "cobranca" | "fiscal" | "comunicacao" | "compliance" | "sistema";
+type TipoGatilho = "agendado" | "evento" | "webhook" | "manual";
+type TipoAcao    = "whatsapp" | "email" | "sistema" | "api";
 
 interface Automacao {
   id: string;
   nome: string;
-  descricao: string;
+  descricao: string | null;
   categoria: Categoria;
+  tipo_gatilho: TipoGatilho;
+  horario: string | null;
+  dias_semana: number[] | null;
+  evento_gatilho: string | null;
+  tipo_acao: TipoAcao;
+  mensagem: string | null;
+  destinatario: string | null;
+  url_webhook: string | null;
   status: AutoStatus;
-  icone: React.ElementType;
-  ultimaExecucao?: string;
-  proximaExecucao?: string;
-  execucoesHoje: number;
-  totalExecucoes: number;
-  cor: string;
-  detalhe?: string;
-  customizada?: boolean;
+  ultima_execucao: string | null;
+  proxima_execucao: string | null;
+  execucoes_hoje: number;
+  total_execucoes: number;
+  customizada: boolean;
+  detalhe: string | null;
+  created_at: string;
 }
 
-interface NovaAutomacaoForm {
+type AutomacaoForm = {
   nome: string;
   descricao: string;
   categoria: Categoria;
-  tipoGatilho: TipoGatilho;
+  tipo_gatilho: TipoGatilho;
   horario: string;
-  diasSemana: number[];
-  evento: string;
-  tipoAcao: TipoAcao;
+  dias_semana: number[];
+  evento_gatilho: string;
+  tipo_acao: TipoAcao;
   mensagem: string;
   destinatario: string;
-  ativa: boolean;
-}
+  url_webhook: string;
+  status: AutoStatus;
+};
+
+const FORM_VAZIO: AutomacaoForm = {
+  nome: "", descricao: "", categoria: "comunicacao",
+  tipo_gatilho: "agendado", horario: "08:00",
+  dias_semana: [1, 2, 3, 4, 5],
+  evento_gatilho: "Cliente cadastrado",
+  tipo_acao: "whatsapp", mensagem: "",
+  destinatario: "todos", url_webhook: "", status: "ativa",
+};
 
 /* ── Paletas ─────────────────────────────────────────────── */
-const CAT_COR: Record<string, { bg: string; icon: string; label: string }> = {
-  cobranca:    { bg: "bg-violet-50 border-violet-100",  icon: "bg-violet-100 text-violet-600",  label: "Cobrança"    },
-  fiscal:      { bg: "bg-blue-50 border-blue-100",      icon: "bg-blue-100 text-blue-600",      label: "Fiscal"      },
-  comunicacao: { bg: "bg-emerald-50 border-emerald-100",icon: "bg-emerald-100 text-emerald-600",label: "Comunicação" },
-  compliance:  { bg: "bg-amber-50 border-amber-100",    icon: "bg-amber-100 text-amber-600",    label: "Compliance"  },
-  sistema:     { bg: "bg-slate-50 border-slate-100",    icon: "bg-slate-100 text-slate-500",    label: "Sistema"     },
+const CAT_COR: Record<string, { icon: string; label: string }> = {
+  cobranca:    { icon: "bg-violet-100 text-violet-600",  label: "Cobrança"    },
+  fiscal:      { icon: "bg-blue-100 text-blue-600",      label: "Fiscal"      },
+  comunicacao: { icon: "bg-emerald-100 text-emerald-600",label: "Comunicação" },
+  compliance:  { icon: "bg-amber-100 text-amber-600",    label: "Compliance"  },
+  sistema:     { icon: "bg-slate-100 text-slate-500",    label: "Sistema"     },
 };
 
 const STATUS_CFG: Record<AutoStatus, { label: string; cls: string; dot: string }> = {
@@ -74,121 +92,65 @@ const STATUS_CFG: Record<AutoStatus, { label: string; cls: string; dot: string }
 };
 
 const GATILHO_CFG: Record<TipoGatilho, { label: string; icon: React.ElementType; desc: string }> = {
-  agendado: { label: "Agendado",    icon: Clock,    desc: "Executa em horário fixo (diário, semanal…)" },
-  evento:   { label: "Por evento",  icon: Zap,      desc: "Dispara quando algo acontece no sistema"    },
-  webhook:  { label: "Webhook",     icon: Webhook,  desc: "Ativado por chamada HTTP externa"           },
-  manual:   { label: "Manual",      icon: Timer,    desc: "Executada manualmente quando necessário"    },
+  agendado: { label: "Agendado",   icon: Clock,   desc: "Executa em horário fixo (diário, semanal…)" },
+  evento:   { label: "Por evento", icon: Zap,     desc: "Dispara quando algo acontece no sistema"    },
+  webhook:  { label: "Webhook",    icon: Webhook, desc: "Ativado por chamada HTTP externa"           },
+  manual:   { label: "Manual",     icon: Timer,   desc: "Executada manualmente quando necessário"    },
 };
 
 const ACAO_CFG: Record<TipoAcao, { label: string; icon: React.ElementType }> = {
-  whatsapp: { label: "WhatsApp",         icon: MessageSquare },
-  email:    { label: "E-mail",           icon: Send          },
-  sistema:  { label: "Ação no sistema",  icon: Activity      },
-  api:      { label: "Chamada API",      icon: Webhook       },
+  whatsapp: { label: "WhatsApp",        icon: MessageSquare },
+  email:    { label: "E-mail",          icon: Send          },
+  sistema:  { label: "Ação no sistema", icon: Activity      },
+  api:      { label: "Chamada API",     icon: Webhook       },
+};
+
+const ICONES_CAT: Record<string, React.ElementType> = {
+  cobranca:    DollarSign,
+  fiscal:      FileText,
+  comunicacao: MessageSquare,
+  compliance:  Bell,
+  sistema:     Activity,
+};
+
+const ACAO_ICONE: Record<TipoAcao, React.ElementType> = {
+  whatsapp: MessageSquare,
+  email:    Send,
+  sistema:  Activity,
+  api:      Webhook,
 };
 
 const EVENTOS_OPCOES = [
-  "Cliente cadastrado",
-  "Cliente inadimplente",
-  "Certificado próximo ao vencimento (60d)",
-  "Certificado próximo ao vencimento (30d)",
-  "DAS emitida",
-  "DAS paga",
-  "Cobrança gerada",
-  "Cobrança vencida",
-  "NFS-e emitida",
-  "Procuração eCAC vencida",
-  "Obrigação atrasada",
+  "Cliente cadastrado", "Cliente inadimplente",
+  "Certificado próximo ao vencimento (60d)", "Certificado próximo ao vencimento (30d)",
+  "DAS emitida", "DAS paga", "Cobrança gerada", "Cobrança vencida",
+  "NFS-e emitida", "Procuração eCAC vencida", "Obrigação atrasada",
 ];
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-/* ── Base de automações pré-configuradas ─────────────────── */
-const AUTOMACOES_BASE: Omit<Automacao, "execucoesHoje" | "totalExecucoes">[] = [
-  {
-    id: "regua_cobranca", nome: "Régua de Cobrança",
-    descricao: "Envia lembrete automático por WhatsApp D-3, D0 e D+5 do vencimento do honorário",
-    categoria: "cobranca", status: "ativa", icone: DollarSign,
-    ultimaExecucao: "Hoje, 08:00", proximaExecucao: "Amanhã, 08:00",
-    cor: "violet", detalhe: "3 lembretes configurados",
-  },
-  {
-    id: "suspensao_auto", nome: "Suspensão Automática",
-    descricao: "Suspende acesso do cliente após 45 dias de inadimplência e reativa após confirmação de pagamento",
-    categoria: "cobranca", status: "ativa", icone: ShieldAlert,
-    ultimaExecucao: "Ontem, 20:00", proximaExecucao: "Hoje, 20:00",
-    cor: "violet", detalhe: "Integrado com Asaas",
-  },
-  {
-    id: "das_vencimento", nome: "Alerta de DAS",
-    descricao: "Notifica por WhatsApp e e-mail quando DAS vence em 5 dias. Gera boleto automaticamente",
-    categoria: "fiscal", status: "ativa", icone: FileText,
-    ultimaExecucao: "Hoje, 09:30", proximaExecucao: "Amanhã, 09:00",
-    cor: "blue", detalhe: "Vence dia 20 de cada mês",
-  },
-  {
-    id: "obrigacoes_check", nome: "Monitor de Obrigações",
-    descricao: "Verifica diariamente obrigações acessórias pendentes e notifica o contador responsável",
-    categoria: "fiscal", status: "ativa", icone: Calendar,
-    ultimaExecucao: "Hoje, 07:00", proximaExecucao: "Amanhã, 07:00",
-    cor: "blue", detalhe: "DCTFWeb, eSocial, SPED, PGDAS",
-  },
-  {
-    id: "nfse_validacao", nome: "Validação NFS-e",
-    descricao: "Confere notas emitidas no mês, detecta rejeitadas e alerta para reemissão",
-    categoria: "fiscal", status: "ativa", icone: CheckCircle2,
-    ultimaExecucao: "Ontem, 23:00", proximaExecucao: "Hoje, 23:00",
-    cor: "blue", detalhe: "Integrado com NFE.io",
-  },
-  {
-    id: "whatsapp_boas_vindas", nome: "Boas-vindas WhatsApp",
-    descricao: "Envia mensagem automática de boas-vindas quando novo cliente é cadastrado no sistema",
-    categoria: "comunicacao", status: "ativa", icone: MessageSquare,
-    ultimaExecucao: "3 dias atrás", proximaExecucao: "Ao cadastrar cliente",
-    cor: "emerald", detalhe: "Trigger: novo cliente",
-  },
-  {
-    id: "relatorio_mensal", nome: "Relatório Mensal",
-    descricao: "Envia relatório gerencial completo para cada cliente no primeiro dia útil do mês",
-    categoria: "comunicacao", status: "pausada", icone: Send,
-    ultimaExecucao: "01/05/2026", proximaExecucao: "01/06/2026",
-    cor: "emerald", detalhe: "Por e-mail + PDF",
-  },
-  {
-    id: "certificado_vencimento", nome: "Alerta de Certificado Digital",
-    descricao: "Avisa o cliente e o contador 60, 30 e 15 dias antes do vencimento do certificado A1/A3",
-    categoria: "compliance", status: "ativa", icone: Bell,
-    ultimaExecucao: "Hoje, 06:00", proximaExecucao: "Amanhã, 06:00",
-    cor: "amber", detalhe: "3 alertas: 60/30/15 dias",
-  },
-  {
-    id: "procuracao_ecac", nome: "Monitor Procuração eCAC",
-    descricao: "Verifica validade das procurações no eCAC via SERPRO e alerta vencimentos",
-    categoria: "compliance", status: "ativa", icone: ShieldAlert,
-    ultimaExecucao: "Hoje, 06:30", proximaExecucao: "Amanhã, 06:30",
-    cor: "amber", detalhe: "API SERPRO integrada",
-  },
-  {
-    id: "backup_dados", nome: "Backup de Dados",
-    descricao: "Exporta snapshot completo do banco para storage seguro toda madrugada",
-    categoria: "sistema", status: "ativa", icone: Activity,
-    ultimaExecucao: "Hoje, 03:00", proximaExecucao: "Amanhã, 03:00",
-    cor: "slate", detalhe: "Supabase Storage",
-  },
-  {
-    id: "serpro_sync", nome: "Sincronização SERPRO",
-    descricao: "Atualiza situação fiscal e dados cadastrais de todos os clientes semanalmente",
-    categoria: "sistema", status: "ativa", icone: RefreshCw,
-    ultimaExecucao: "Dom, 02:00", proximaExecucao: "Dom, 02:00",
-    cor: "slate", detalhe: "Gateway mcp.zapro.tech",
-  },
-];
-
 /* ── helpers ─────────────────────────────────────────────── */
-function fmtDias(dias: number[]) {
+function fmtDias(dias: number[] | null) {
+  if (!dias || dias.length === 0) return "Nenhum dia";
   if (dias.length === 7) return "Todos os dias";
-  if (dias.length === 0) return "Nenhum dia";
   return dias.map(d => DIAS_SEMANA[d]).join(", ");
+}
+
+function autoToForm(a: Automacao): AutomacaoForm {
+  return {
+    nome:            a.nome,
+    descricao:       a.descricao ?? "",
+    categoria:       a.categoria,
+    tipo_gatilho:    a.tipo_gatilho,
+    horario:         a.horario ?? "08:00",
+    dias_semana:     a.dias_semana ?? [1,2,3,4,5],
+    evento_gatilho:  a.evento_gatilho ?? EVENTOS_OPCOES[0],
+    tipo_acao:       a.tipo_acao,
+    mensagem:        a.mensagem ?? "",
+    destinatario:    a.destinatario ?? "todos",
+    url_webhook:     a.url_webhook ?? "",
+    status:          a.status,
+  };
 }
 
 /* ── KpiBar ──────────────────────────────────────────────── */
@@ -211,28 +173,35 @@ function KpiBar({ label, value, sub, icon: Icon, cls }: {
 }
 
 /* ── AutomacaoCard ───────────────────────────────────────── */
-function AutomacaoCard({ auto, onToggle }: {
+function AutomacaoCard({
+  auto, onToggle, onEdit, onDelete,
+}: {
   auto: Automacao;
-  onToggle: (id: string, novoStatus: AutoStatus) => void;
+  onToggle: (id: string, s: AutoStatus) => void;
+  onEdit:   (a: Automacao) => void;
+  onDelete: (a: Automacao) => void;
 }) {
-  const cat = CAT_COR[auto.categoria];
-  const st  = STATUS_CFG[auto.status];
-  const Icon = auto.icone;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const cat    = CAT_COR[auto.categoria];
+  const st     = STATUS_CFG[auto.status];
+  const Icon   = ACAO_ICONE[auto.tipo_acao] ?? ICONES_CAT[auto.categoria];
   const isActive = auto.status === "ativa";
 
   return (
-    <div className={`surface-card border transition-shadow hover:shadow-elevated ${isActive ? "" : "opacity-70"}`}>
+    <div className={`surface-card border transition-shadow hover:shadow-elevated ${isActive ? "" : "opacity-75"}`}>
       <div className="p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-3">
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-3 min-w-0">
             <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${cat.icon}`}>
               <Icon className="h-5 w-5" />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-foreground leading-tight">{auto.nome}</h3>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-foreground leading-tight truncate">{auto.nome}</h3>
                 {auto.customizada && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                     <Sparkles className="h-2.5 w-2.5" /> Nova
                   </span>
                 )}
@@ -240,8 +209,10 @@ function AutomacaoCard({ auto, onToggle }: {
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{cat.label}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${st.cls}`}>
+
+          {/* Status + menu */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${st.cls}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
               {st.label}
             </span>
@@ -254,27 +225,66 @@ function AutomacaoCard({ auto, onToggle }: {
                 ? <ToggleRight className="h-5 w-5 text-primary" />
                 : <ToggleLeft className="h-5 w-5" />}
             </button>
+            {/* Dropdown menu */}
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(p => !p)}
+                className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-7 z-20 w-36 rounded-xl border border-border bg-background shadow-elevated overflow-hidden">
+                    <button
+                      onClick={() => { setMenuOpen(false); onEdit(auto); }}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> Editar
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); onDelete(auto); }}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{auto.descricao}</p>
+
+        {/* Descrição */}
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-2">
+          {auto.descricao || "Sem descrição"}
+        </p>
+
+        {/* Detalhe */}
         {auto.detalhe && (
           <span className="inline-block rounded-md bg-muted/60 px-2 py-0.5 text-[11px] font-mono text-muted-foreground mb-3">
             {auto.detalhe}
           </span>
         )}
+
+        {/* Footer */}
         <div className="flex items-center justify-between border-t border-border/50 pt-3 mt-1">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {auto.ultimaExecucao && (
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{auto.ultimaExecucao}</span>
+            {auto.ultima_execucao && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(auto.ultima_execucao).toLocaleDateString("pt-BR")}
+              </span>
             )}
-            {auto.proximaExecucao && (
+            {auto.proxima_execucao && (
               <span className="flex items-center gap-1 text-primary/70">
-                <ChevronRight className="h-3 w-3" />{auto.proximaExecucao}
+                <ChevronRight className="h-3 w-3" />{auto.proxima_execucao}
               </span>
             )}
           </div>
           <span className="text-[11px] text-muted-foreground">
-            {auto.execucoesHoje}× hoje · {auto.totalExecucoes} total
+            {auto.execucoes_hoje}× hoje · {auto.total_execucoes} total
           </span>
         </div>
       </div>
@@ -282,54 +292,92 @@ function AutomacaoCard({ auto, onToggle }: {
   );
 }
 
-/* ── Modal de Nova Automação ─────────────────────────────── */
-function NovaAutomacaoModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (form: NovaAutomacaoForm) => void;
+/* ── Diálogo de confirmação de exclusão ──────────────────── */
+function ConfirmDeleteDialog({ auto, onConfirm, onCancel }: {
+  auto: Automacao;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [form, setForm] = useState<NovaAutomacaoForm>({
-    nome: "", descricao: "", categoria: "comunicacao",
-    tipoGatilho: "agendado", horario: "08:00", diasSemana: [1, 2, 3, 4, 5],
-    evento: EVENTOS_OPCOES[0], tipoAcao: "whatsapp",
-    mensagem: "", destinatario: "todos", ativa: true,
-  });
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="w-full max-w-sm bg-background rounded-2xl shadow-elevated border border-border p-6 animate-fade-up">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-destructive/10 text-destructive">
+            <Trash2 className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold">Excluir automação</h2>
+            <p className="text-xs text-muted-foreground">Esta ação não pode ser desfeita</p>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-6">
+          Tem certeza que deseja excluir <strong className="text-foreground">"{auto.nome}"</strong>?
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-destructive text-white px-4 py-2 text-sm font-semibold hover:bg-destructive/90 transition-colors"
+          >
+            Sim, excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const up = (k: keyof NovaAutomacaoForm, v: unknown) =>
+/* ── Modal de Criar/Editar ───────────────────────────────── */
+function AutomacaoModal({
+  inicial, onClose, onSave,
+}: {
+  inicial?: Automacao;
+  onClose: () => void;
+  onSave: (form: AutomacaoForm) => Promise<void>;
+}) {
+  const isEdit = !!inicial;
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [form, setForm] = useState<AutomacaoForm>(
+    inicial ? autoToForm(inicial) : FORM_VAZIO
+  );
+  const [saving, setSaving] = useState(false);
+
+  const up = (k: keyof AutomacaoForm, v: unknown) =>
     setForm(p => ({ ...p, [k]: v }));
 
   const toggleDia = (d: number) =>
     setForm(p => ({
       ...p,
-      diasSemana: p.diasSemana.includes(d)
-        ? p.diasSemana.filter(x => x !== d)
-        : [...p.diasSemana, d].sort(),
+      dias_semana: p.dias_semana.includes(d)
+        ? p.dias_semana.filter(x => x !== d)
+        : [...p.dias_semana, d].sort(),
     }));
 
   const canNext = () => {
     if (step === 1) return form.nome.trim().length >= 3;
-    if (step === 2) return (
-      form.tipoGatilho === "evento"
-        ? !!form.evento
-        : form.tipoGatilho === "agendado"
-          ? form.diasSemana.length > 0 && !!form.horario
-          : true
-    );
+    if (step === 2) return form.tipo_gatilho === "agendado"
+      ? form.dias_semana.length > 0 && !!form.horario
+      : true;
     return true;
   };
 
-  const handleSave = () => {
-    if (!form.nome.trim()) return;
-    onSave(form);
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSave(form); }
+    finally { setSaving(false); }
   };
 
   const STEPS = ["Identidade", "Gatilho", "Ação"];
 
   return (
-    /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
@@ -340,9 +388,11 @@ function NovaAutomacaoModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-primary-soft text-primary">
-              <Sparkles className="h-4 w-4" />
+              {isEdit ? <Pencil className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             </span>
-            <h2 className="text-base font-semibold">Nova Automação</h2>
+            <h2 className="text-base font-semibold">
+              {isEdit ? `Editar: ${inicial!.nome}` : "Nova Automação"}
+            </h2>
           </div>
           <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
@@ -350,13 +400,13 @@ function NovaAutomacaoModal({
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center gap-0 px-6 pt-4 pb-2">
+        <div className="flex items-center px-6 pt-4 pb-2">
           {STEPS.map((s, i) => {
-            const idx = i + 1;
+            const idx = (i + 1) as 1 | 2 | 3;
             const done = step > idx;
             const active = step === idx;
             return (
-              <div key={s} className="flex items-center gap-0 flex-1 last:flex-none">
+              <div key={s} className="flex items-center flex-1 last:flex-none">
                 <div className="flex flex-col items-center">
                   <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold transition-colors ${
                     done   ? "bg-primary text-primary-foreground" :
@@ -365,9 +415,7 @@ function NovaAutomacaoModal({
                   }`}>
                     {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : idx}
                   </span>
-                  <span className={`mt-1 text-[10px] font-medium whitespace-nowrap ${active ? "text-primary" : "text-muted-foreground"}`}>
-                    {s}
-                  </span>
+                  <span className={`mt-1 text-[10px] font-medium whitespace-nowrap ${active ? "text-primary" : "text-muted-foreground"}`}>{s}</span>
                 </div>
                 {i < STEPS.length - 1 && (
                   <div className={`flex-1 h-0.5 mx-2 mb-4 transition-colors ${done ? "bg-primary" : "bg-border"}`} />
@@ -378,15 +426,14 @@ function NovaAutomacaoModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 space-y-4 min-h-[280px]">
+        <div className="px-6 py-4 space-y-4 min-h-[280px] max-h-[55vh] overflow-y-auto">
 
-          {/* ── STEP 1: Identidade ── */}
+          {/* STEP 1 */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">Nome da automação *</label>
-                <input
-                  autoFocus
+                <label className="block text-xs font-semibold mb-1.5">Nome *</label>
+                <input autoFocus
                   className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                   placeholder="Ex: Aviso de vencimento de contrato"
                   value={form.nome}
@@ -394,9 +441,8 @@ function NovaAutomacaoModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">Descrição (opcional)</label>
-                <textarea
-                  rows={2}
+                <label className="block text-xs font-semibold mb-1.5">Descrição</label>
+                <textarea rows={2}
                   className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
                   placeholder="O que essa automação faz?"
                   value={form.descricao}
@@ -404,18 +450,15 @@ function NovaAutomacaoModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">Categoria</label>
+                <label className="block text-xs font-semibold mb-1.5">Categoria</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(Object.entries(CAT_COR) as [Categoria, typeof CAT_COR[string]][]).map(([key, cfg]) => (
-                    <button
-                      key={key}
-                      onClick={() => up("categoria", key)}
+                    <button key={key} onClick={() => up("categoria", key)}
                       className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all text-left ${
                         form.categoria === key
                           ? "border-primary bg-primary/5 text-primary shadow-sm"
                           : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                      }`}
-                    >
+                      }`}>
                       {cfg.label}
                     </button>
                   ))}
@@ -424,27 +467,24 @@ function NovaAutomacaoModal({
             </div>
           )}
 
-          {/* ── STEP 2: Gatilho ── */}
+          {/* STEP 2 */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">Tipo de gatilho</label>
+                <label className="block text-xs font-semibold mb-1.5">Tipo de gatilho</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.entries(GATILHO_CFG) as [TipoGatilho, typeof GATILHO_CFG[string]][]).map(([key, cfg]) => {
                     const Icon = cfg.icon;
                     return (
-                      <button
-                        key={key}
-                        onClick={() => up("tipoGatilho", key)}
+                      <button key={key} onClick={() => up("tipo_gatilho", key)}
                         className={`flex items-start gap-2 rounded-xl border p-3 text-left transition-all ${
-                          form.tipoGatilho === key
+                          form.tipo_gatilho === key
                             ? "border-primary bg-primary/5 shadow-sm"
                             : "border-border hover:border-primary/30"
-                        }`}
-                      >
-                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${form.tipoGatilho === key ? "text-primary" : "text-muted-foreground"}`} />
+                        }`}>
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${form.tipo_gatilho === key ? "text-primary" : "text-muted-foreground"}`} />
                         <div>
-                          <p className={`text-xs font-semibold ${form.tipoGatilho === key ? "text-primary" : "text-foreground"}`}>{cfg.label}</p>
+                          <p className={`text-xs font-semibold ${form.tipo_gatilho === key ? "text-primary" : "text-foreground"}`}>{cfg.label}</p>
                           <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{cfg.desc}</p>
                         </div>
                       </button>
@@ -453,34 +493,29 @@ function NovaAutomacaoModal({
                 </div>
               </div>
 
-              {/* Agendado: dias + horário */}
-              {form.tipoGatilho === "agendado" && (
+              {form.tipo_gatilho === "agendado" && (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    <label className="block text-xs font-semibold mb-1.5">
                       Dias da semana
-                      <span className="ml-2 font-normal text-muted-foreground">({fmtDias(form.diasSemana)})</span>
+                      <span className="ml-2 font-normal text-muted-foreground">({fmtDias(form.dias_semana)})</span>
                     </label>
                     <div className="flex gap-1.5">
                       {DIAS_SEMANA.map((d, i) => (
-                        <button
-                          key={d}
-                          onClick={() => toggleDia(i)}
+                        <button key={d} onClick={() => toggleDia(i)}
                           className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-all ${
-                            form.diasSemana.includes(i)
+                            form.dias_semana.includes(i)
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground hover:bg-muted/70"
-                          }`}
-                        >
+                          }`}>
                           {d}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">Horário de execução</label>
-                    <input
-                      type="time"
+                    <label className="block text-xs font-semibold mb-1.5">Horário</label>
+                    <input type="time"
                       className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                       value={form.horario}
                       onChange={e => up("horario", e.target.value)}
@@ -489,94 +524,82 @@ function NovaAutomacaoModal({
                 </>
               )}
 
-              {/* Evento: select */}
-              {form.tipoGatilho === "evento" && (
+              {form.tipo_gatilho === "evento" && (
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">Evento disparador</label>
+                  <label className="block text-xs font-semibold mb-1.5">Evento disparador</label>
                   <div className="relative">
                     <select
-                      className="w-full appearance-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all pr-10"
-                      value={form.evento}
-                      onChange={e => up("evento", e.target.value)}
-                    >
-                      {EVENTOS_OPCOES.map(ev => (
-                        <option key={ev} value={ev}>{ev}</option>
-                      ))}
+                      className="w-full appearance-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 pr-10"
+                      value={form.evento_gatilho}
+                      onChange={e => up("evento_gatilho", e.target.value)}>
+                      {EVENTOS_OPCOES.map(ev => <option key={ev} value={ev}>{ev}</option>)}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
               )}
 
-              {/* Webhook: info */}
-              {form.tipoGatilho === "webhook" && (
+              {form.tipo_gatilho === "webhook" && (
                 <div className="rounded-xl bg-muted/40 border border-border px-4 py-3">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Após criar, você receberá uma URL de webhook única para configurar em sistemas externos (Asaas, NFE.io, etc.).
+                    Após salvar, uma URL de webhook única será gerada para configurar em sistemas externos.
                   </p>
                 </div>
               )}
 
-              {/* Manual: info */}
-              {form.tipoGatilho === "manual" && (
+              {form.tipo_gatilho === "manual" && (
                 <div className="rounded-xl bg-muted/40 border border-border px-4 py-3">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    A automação ficará disponível como botão de ação na lista. Execute quando necessário.
+                    Ficará disponível como botão de ação na lista de automações. Execute quando necessário.
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── STEP 3: Ação ── */}
+          {/* STEP 3 */}
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">Tipo de ação</label>
+                <label className="block text-xs font-semibold mb-1.5">Tipo de ação</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.entries(ACAO_CFG) as [TipoAcao, typeof ACAO_CFG[string]][]).map(([key, cfg]) => {
                     const Icon = cfg.icon;
                     return (
-                      <button
-                        key={key}
-                        onClick={() => up("tipoAcao", key)}
+                      <button key={key} onClick={() => up("tipo_acao", key)}
                         className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
-                          form.tipoAcao === key
+                          form.tipo_acao === key
                             ? "border-primary bg-primary/5 text-primary shadow-sm"
                             : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        {cfg.label}
+                        }`}>
+                        <Icon className="h-4 w-4 shrink-0" />{cfg.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {(form.tipoAcao === "whatsapp" || form.tipoAcao === "email") && (
+              {(form.tipo_acao === "whatsapp" || form.tipo_acao === "email") && (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    <label className="block text-xs font-semibold mb-1.5">
                       Mensagem
                       <span className="ml-1 font-normal text-muted-foreground">— use {"{nome}"} para personalizar</span>
                     </label>
-                    <textarea
-                      rows={3}
+                    <textarea rows={3}
                       className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
-                      placeholder={`Olá {nome}, aqui é a APOYA Contabilidade…`}
+                      placeholder="Olá {nome}, aqui é a APOYA Contabilidade…"
                       value={form.mensagem}
                       onChange={e => up("mensagem", e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1.5">Destinatário</label>
+                    <label className="block text-xs font-semibold mb-1.5">Destinatário</label>
                     <div className="relative">
                       <select
-                        className="w-full appearance-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all pr-10"
+                        className="w-full appearance-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 pr-10"
                         value={form.destinatario}
-                        onChange={e => up("destinatario", e.target.value)}
-                      >
+                        onChange={e => up("destinatario", e.target.value)}>
                         <option value="todos">Todos os clientes ativos</option>
                         <option value="inadimplentes">Apenas inadimplentes</option>
                         <option value="simples">Simples Nacional</option>
@@ -590,44 +613,38 @@ function NovaAutomacaoModal({
                 </>
               )}
 
-              {form.tipoAcao === "sistema" && (
-                <div className="rounded-xl bg-muted/40 border border-border px-4 py-3">
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Ação executada diretamente no sistema APOYA. Configure os parâmetros após criar a automação.
-                  </p>
-                </div>
-              )}
-
-              {form.tipoAcao === "api" && (
+              {form.tipo_acao === "api" && (
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">URL da API (POST)</label>
+                  <label className="block text-xs font-semibold mb-1.5">URL da API (POST)</label>
                   <input
                     className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-mono outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                     placeholder="https://hooks.example.com/webhook/..."
-                    value={form.mensagem}
-                    onChange={e => up("mensagem", e.target.value)}
+                    value={form.url_webhook}
+                    onChange={e => up("url_webhook", e.target.value)}
                   />
                 </div>
               )}
 
-              {/* Ativar imediatamente */}
+              {form.tipo_acao === "sistema" && (
+                <div className="rounded-xl bg-muted/40 border border-border px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Ação executada diretamente no sistema APOYA.</p>
+                </div>
+              )}
+
+              {/* Toggle ativa */}
               <div className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3 border border-border/50">
                 <div>
                   <p className="text-sm font-medium">Ativar imediatamente</p>
-                  <p className="text-xs text-muted-foreground">Inicia no próximo ciclo de execução</p>
+                  <p className="text-xs text-muted-foreground">Inicia no próximo ciclo</p>
                 </div>
-                <button
-                  onClick={() => up("ativa", !form.ativa)}
-                  className="shrink-0"
-                >
-                  {form.ativa
+                <button onClick={() => up("status", form.status === "ativa" ? "pausada" : "ativa")}>
+                  {form.status === "ativa"
                     ? <ToggleRight className="h-7 w-7 text-primary" />
                     : <ToggleLeft className="h-7 w-7 text-muted-foreground" />}
                 </button>
               </div>
             </div>
           )}
-
         </div>
 
         {/* Footer */}
@@ -641,21 +658,13 @@ function NovaAutomacaoModal({
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{step}/3</span>
             {step < 3 ? (
-              <Button
-                onClick={() => setStep((step + 1) as 2 | 3)}
-                disabled={!canNext()}
-                className="rounded-xl px-6"
-              >
+              <Button onClick={() => setStep((step + 1) as 2 | 3)} disabled={!canNext()} className="rounded-xl px-6">
                 Continuar →
               </Button>
             ) : (
-              <Button
-                onClick={handleSave}
-                disabled={!form.nome.trim()}
-                className="rounded-xl px-6 gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Criar automação
+              <Button onClick={handleSave} disabled={!form.nome.trim() || saving} className="rounded-xl px-6 gap-2">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : isEdit ? <Pencil className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Criar automação"}
               </Button>
             )}
           </div>
@@ -667,87 +676,130 @@ function NovaAutomacaoModal({
 
 /* ── Página principal ────────────────────────────────────── */
 function AutomacoesPage() {
-  const [automacoes, setAutomacoes]   = useState<Automacao[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [filtro, setFiltro]           = useState<string>("todas");
-  const [modalAberto, setModalAberto] = useState(false);
+  const [automacoes, setAutomacoes]     = useState<Automacao[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [filtro, setFiltro]             = useState("todas");
+  const [modalAberto, setModalAberto]   = useState(false);
+  const [editando, setEditando]         = useState<Automacao | null>(null);
+  const [excluindo, setExcluindo]       = useState<Automacao | null>(null);
 
-  useEffect(() => {
-    const carregar = async () => {
-      setLoading(true);
-      try {
-        const { data: obg } = await supabase.from("obrigacoes").select("status").limit(200);
-        const totalObg = obg?.length ?? 0;
-        const items: Automacao[] = AUTOMACOES_BASE.map((a, i) => ({
-          ...a,
-          execucoesHoje:  Math.floor(Math.random() * 8) + 1,
-          totalExecucoes: 30 + i * 12 + Math.floor(totalObg / 2),
-        }));
-        setAutomacoes(items);
-      } catch {
-        setAutomacoes(AUTOMACOES_BASE.map((a, i) => ({
-          ...a, execucoesHoje: 0, totalExecucoes: i * 10,
-        })));
-      } finally {
-        setLoading(false);
-      }
-    };
-    carregar();
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("automacoes_config")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error) {
+      toast.error("Erro ao carregar automações");
+    } else {
+      setAutomacoes((data ?? []) as Automacao[]);
+    }
+    setLoading(false);
   }, []);
 
-  const handleToggle = (id: string, novoStatus: AutoStatus) => {
+  useEffect(() => { carregar(); }, [carregar]);
+
+  /* Toggle ativa/pausada */
+  const handleToggle = async (id: string, novoStatus: AutoStatus) => {
+    const { error } = await supabase
+      .from("automacoes_config")
+      .update({ status: novoStatus })
+      .eq("id", id);
+    if (error) { toast.error("Erro ao atualizar status"); return; }
     setAutomacoes(prev => prev.map(a => a.id === id ? { ...a, status: novoStatus } : a));
     const auto = automacoes.find(a => a.id === id);
-    if (auto) {
-      toast.success(
-        novoStatus === "ativa" ? `✅ "${auto.nome}" ativada` : `⏸ "${auto.nome}" pausada`,
-        { description: novoStatus === "ativa" ? "Será executada no próximo ciclo" : "Nenhuma execução até reativar" }
-      );
-    }
+    toast.success(novoStatus === "ativa" ? `✅ "${auto?.nome}" ativada` : `⏸ "${auto?.nome}" pausada`);
   };
 
-  const handleSave = (form: NovaAutomacaoForm) => {
-    const gatilhoCfg = GATILHO_CFG[form.tipoGatilho];
-    const acaoCfg    = ACAO_CFG[form.tipoAcao];
-
-    let proximaExec = "Manual";
-    if (form.tipoGatilho === "agendado")
-      proximaExec = `${fmtDias(form.diasSemana)} às ${form.horario}`;
-    if (form.tipoGatilho === "evento")
-      proximaExec = `Ao: ${form.evento}`;
-
-    const nova: Automacao = {
-      id:             `custom_${Date.now()}`,
+  /* Criar */
+  const handleCriar = async (form: AutomacaoForm) => {
+    const payload = {
       nome:           form.nome,
-      descricao:      form.descricao || `Automação de ${CAT_COR[form.categoria].label.toLowerCase()} via ${acaoCfg.label}`,
+      descricao:      form.descricao || null,
       categoria:      form.categoria,
-      status:         form.ativa ? "ativa" : "pausada",
-      icone:          acaoCfg.icon,
-      ultimaExecucao: "Nunca",
-      proximaExecucao: proximaExec,
-      execucoesHoje:  0,
-      totalExecucoes: 0,
-      cor:            form.categoria,
-      detalhe:        `${gatilhoCfg.label} · ${acaoCfg.label}`,
+      tipo_gatilho:   form.tipo_gatilho,
+      horario:        form.tipo_gatilho === "agendado" ? form.horario : null,
+      dias_semana:    form.tipo_gatilho === "agendado" ? form.dias_semana : null,
+      evento_gatilho: form.tipo_gatilho === "evento"   ? form.evento_gatilho : null,
+      tipo_acao:      form.tipo_acao,
+      mensagem:       form.mensagem || null,
+      destinatario:   form.destinatario,
+      url_webhook:    form.tipo_acao === "api" ? form.url_webhook : null,
+      status:         form.status,
       customizada:    true,
+      detalhe:        `${GATILHO_CFG[form.tipo_gatilho].label} · ${ACAO_CFG[form.tipo_acao].label}`,
+      proxima_execucao: form.tipo_gatilho === "agendado"
+        ? `${fmtDias(form.dias_semana)} às ${form.horario}`
+        : form.tipo_gatilho === "evento" ? `Ao: ${form.evento_gatilho}` : "Manual",
+      execucoes_hoje:  0,
+      total_execucoes: 0,
     };
-
-    setAutomacoes(prev => [nova, ...prev]);
+    const { data, error } = await supabase
+      .from("automacoes_config")
+      .insert(payload)
+      .select()
+      .single();
+    if (error) { toast.error("Erro ao criar automação: " + error.message); return; }
+    setAutomacoes(prev => [data as Automacao, ...prev]);
     setModalAberto(false);
     toast.success(`🚀 "${form.nome}" criada com sucesso!`, {
-      description: form.ativa
-        ? "Automação ativa — será executada no próximo ciclo"
-        : "Automação salva em modo pausado",
+      description: form.status === "ativa" ? "Ativa — será executada no próximo ciclo" : "Salva em modo pausado",
     });
+  };
+
+  /* Editar */
+  const handleEditar = async (form: AutomacaoForm) => {
+    if (!editando) return;
+    const payload = {
+      nome:           form.nome,
+      descricao:      form.descricao || null,
+      categoria:      form.categoria,
+      tipo_gatilho:   form.tipo_gatilho,
+      horario:        form.tipo_gatilho === "agendado" ? form.horario : null,
+      dias_semana:    form.tipo_gatilho === "agendado" ? form.dias_semana : null,
+      evento_gatilho: form.tipo_gatilho === "evento"   ? form.evento_gatilho : null,
+      tipo_acao:      form.tipo_acao,
+      mensagem:       form.mensagem || null,
+      destinatario:   form.destinatario,
+      url_webhook:    form.tipo_acao === "api" ? form.url_webhook : null,
+      status:         form.status,
+      detalhe:        `${GATILHO_CFG[form.tipo_gatilho].label} · ${ACAO_CFG[form.tipo_acao].label}`,
+      proxima_execucao: form.tipo_gatilho === "agendado"
+        ? `${fmtDias(form.dias_semana)} às ${form.horario}`
+        : form.tipo_gatilho === "evento" ? `Ao: ${form.evento_gatilho}` : "Manual",
+    };
+    const { data, error } = await supabase
+      .from("automacoes_config")
+      .update(payload)
+      .eq("id", editando.id)
+      .select()
+      .single();
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    setAutomacoes(prev => prev.map(a => a.id === editando.id ? data as Automacao : a));
+    setEditando(null);
+    toast.success(`✅ "${form.nome}" atualizada`);
+  };
+
+  /* Excluir */
+  const handleExcluir = async () => {
+    if (!excluindo) return;
+    const { error } = await supabase
+      .from("automacoes_config")
+      .delete()
+      .eq("id", excluindo.id);
+    if (error) { toast.error("Erro ao excluir: " + error.message); return; }
+    setAutomacoes(prev => prev.filter(a => a.id !== excluindo.id));
+    toast.success(`🗑 "${excluindo.nome}" excluída`);
+    setExcluindo(null);
   };
 
   const categorias = ["todas", "cobranca", "fiscal", "comunicacao", "compliance", "sistema"];
   const filtradas  = filtro === "todas" ? automacoes : automacoes.filter(a => a.categoria === filtro);
 
-  const ativas     = automacoes.filter(a => a.status === "ativa").length;
-  const pausadas   = automacoes.filter(a => a.status === "pausada").length;
-  const erros      = automacoes.filter(a => a.status === "erro").length;
-  const totalExec  = automacoes.reduce((s, a) => s + a.execucoesHoje, 0);
+  const ativas    = automacoes.filter(a => a.status === "ativa").length;
+  const pausadas  = automacoes.filter(a => a.status === "pausada").length;
+  const erros     = automacoes.filter(a => a.status === "erro").length;
+  const totalExec = automacoes.reduce((s, a) => s + (a.execucoes_hoje ?? 0), 0);
 
   if (loading) {
     return (
@@ -778,7 +830,7 @@ function AutomacoesPage() {
               {ativas} ativa{ativas !== 1 ? "s" : ""}
             </span>
             <Button
-              onClick={() => setModalAberto(true)}
+              onClick={() => { setEditando(null); setModalAberto(true); }}
               className="rounded-full px-5 gap-2 shadow-soft"
             >
               <Plus className="h-4 w-4" />
@@ -797,33 +849,38 @@ function AutomacoesPage() {
 
         {/* Filtros */}
         <div className="flex items-center gap-2 flex-wrap">
-          {categorias.map(cat => {
-            const info = cat === "todas" ? null : CAT_COR[cat];
-            return (
-              <button
-                key={cat}
-                onClick={() => setFiltro(cat)}
-                className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all capitalize ${
-                  filtro === cat
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
-                }`}
-              >
-                {cat === "todas" ? `Todas (${automacoes.length})` : `${info?.label} (${automacoes.filter(a => a.categoria === cat).length})`}
-              </button>
-            );
-          })}
+          {categorias.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFiltro(cat)}
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                filtro === cat
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {cat === "todas"
+                ? `Todas (${automacoes.length})`
+                : `${CAT_COR[cat]?.label} (${automacoes.filter(a => a.categoria === cat).length})`}
+            </button>
+          ))}
         </div>
 
         {/* Grid */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtradas.map(auto => (
-            <AutomacaoCard key={auto.id} auto={auto} onToggle={handleToggle} />
+            <AutomacaoCard
+              key={auto.id}
+              auto={auto}
+              onToggle={handleToggle}
+              onEdit={a => { setEditando(a); }}
+              onDelete={a => setExcluindo(a)}
+            />
           ))}
-          {/* Card "Criar nova" sempre visível no final */}
+          {/* Card "+ criar" */}
           <button
-            onClick={() => setModalAberto(true)}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border/60 p-8 text-muted-foreground transition-all hover:border-primary/40 hover:text-primary hover:bg-primary/5 group"
+            onClick={() => { setEditando(null); setModalAberto(true); }}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border/60 p-8 text-muted-foreground transition-all hover:border-primary/40 hover:text-primary hover:bg-primary/5 group min-h-[160px]"
           >
             <span className="grid h-12 w-12 place-items-center rounded-full bg-muted/60 group-hover:bg-primary/10 transition-colors">
               <Plus className="h-6 w-6" />
@@ -839,19 +896,35 @@ function AutomacoesPage() {
         <div className="surface-card flex items-center gap-3 px-5 py-4 bg-muted/30">
           <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
           <p className="text-xs text-muted-foreground leading-relaxed">
-            As automações são executadas pelo agente APOYA em segundo plano.
-            Alterações entram em vigor no próximo ciclo de execução.
-            Para configurar parâmetros avançados, acesse <strong>Configurações → Automações</strong>.
+            As automações são executadas pelo agente APOYA em segundo plano. Alterações entram em vigor no próximo ciclo.
+            Para parâmetros avançados, acesse <strong>Configurações → Automações</strong>.
           </p>
         </div>
-
       </div>
 
-      {/* Modal */}
-      {modalAberto && (
-        <NovaAutomacaoModal
+      {/* Modal criar */}
+      {modalAberto && !editando && (
+        <AutomacaoModal
           onClose={() => setModalAberto(false)}
-          onSave={handleSave}
+          onSave={handleCriar}
+        />
+      )}
+
+      {/* Modal editar */}
+      {editando && (
+        <AutomacaoModal
+          inicial={editando}
+          onClose={() => setEditando(null)}
+          onSave={handleEditar}
+        />
+      )}
+
+      {/* Dialog excluir */}
+      {excluindo && (
+        <ConfirmDeleteDialog
+          auto={excluindo}
+          onConfirm={handleExcluir}
+          onCancel={() => setExcluindo(null)}
         />
       )}
     </>
