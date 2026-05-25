@@ -2728,7 +2728,109 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+        leads_crm: {
+        Row: {
+          id: string
+          nome: string
+          telefone: string
+          email: string | null
+          cnpj: string | null
+          razao_social: string | null
+          nome_fantasia: string | null
+          regime_tributario: string | null
+          situacao_cadastral: string | null
+          porte: string | null
+          municipio: string | null
+          uf: string | null
+          socios: Json | null
+          etapa: string
+          temperatura: string
+          origem: string
+          canal: string
+          responsavel: string
+          honorario_proposto: number | null
+          cliente_id: string | null
+          contato_id: string | null
+          conversa_id: string | null
+          ultimo_contato: string | null
+          proximo_passo: string | null
+          motivo_perda: string | null
+          observacoes: string | null
+          tags: string[] | null
+          metadados: Json | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          telefone: string
+          email?: string | null
+          cnpj?: string | null
+          razao_social?: string | null
+          nome_fantasia?: string | null
+          regime_tributario?: string | null
+          situacao_cadastral?: string | null
+          porte?: string | null
+          municipio?: string | null
+          uf?: string | null
+          socios?: Json | null
+          etapa: string
+          temperatura: string
+          origem: string
+          canal: string
+          responsavel: string
+          honorario_proposto?: number | null
+          cliente_id?: string | null
+          contato_id?: string | null
+          conversa_id?: string | null
+          ultimo_contato?: string | null
+          proximo_passo?: string | null
+          motivo_perda?: string | null
+          observacoes?: string | null
+          tags?: string[] | null
+          metadados?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          telefone?: string
+          email?: string | null
+          cnpj?: string | null
+          razao_social?: string | null
+          nome_fantasia?: string | null
+          regime_tributario?: string | null
+          situacao_cadastral?: string | null
+          porte?: string | null
+          municipio?: string | null
+          uf?: string | null
+          socios?: Json | null
+          etapa?: string
+          temperatura?: string
+          origem?: string
+          canal?: string
+          responsavel?: string
+          honorario_proposto?: number | null
+          cliente_id?: string | null
+          contato_id?: string | null
+          conversa_id?: string | null
+          ultimo_contato?: string | null
+          proximo_passo?: string | null
+          motivo_perda?: string | null
+          observacoes?: string | null
+          tags?: string[] | null
+          metadados?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
+    }
     Views: {
       [_ in never]: never
     }

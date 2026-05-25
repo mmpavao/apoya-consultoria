@@ -92,7 +92,7 @@ export function useUsuarios() {
       );
 
       // Ordenar: admins primeiro, agentes por último
-      list.sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99));
+      list.sort((a: { role: UsuarioRole }, b: { role: UsuarioRole }) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99));
 
       setUsuarios(list);
       setError(null);

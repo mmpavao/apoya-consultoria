@@ -19,10 +19,10 @@ import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppDocumentosRouteImport } from './routes/_app.documentos'
+import { Route as AppCrmRouteImport } from './routes/_app.crm'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
-import { Route as AppCrmRouteImport } from './routes/_app.crm'
 import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
@@ -92,6 +92,11 @@ const AppDocumentosRoute = AppDocumentosRouteImport.update({
   path: '/documentos',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCrmRoute = AppCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConfiguracoesRoute = AppConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
@@ -105,11 +110,6 @@ const AppClientesRoute = AppClientesRouteImport.update({
 const AppAutomacoesRoute = AppAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCrmRoute = AppCrmRouteImport.update({
-  id: '/crm',
-  path: '/crm',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiNfseIndexRoute = ApiNfseIndexRouteImport.update({
@@ -217,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/crm': typeof AppCrmRoute
   '/documentos': typeof AppDocumentosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
@@ -249,6 +250,7 @@ export interface FileRoutesByTo {
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
+  '/crm': typeof AppCrmRoute
   '/documentos': typeof AppDocumentosRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
@@ -282,9 +284,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
   '/_app/automacoes': typeof AppAutomacoesRoute
-  '/_app/crm': typeof AppCrmRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
+  '/_app/crm': typeof AppCrmRoute
   '/_app/documentos': typeof AppDocumentosRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
@@ -321,6 +323,7 @@ export interface FileRouteTypes {
     | '/automacoes'
     | '/clientes'
     | '/configuracoes'
+    | '/crm'
     | '/documentos'
     | '/financeiro'
     | '/obrigacoes'
@@ -353,6 +356,7 @@ export interface FileRouteTypes {
     | '/automacoes'
     | '/clientes'
     | '/configuracoes'
+    | '/crm'
     | '/documentos'
     | '/financeiro'
     | '/obrigacoes'
@@ -387,6 +391,7 @@ export interface FileRouteTypes {
     | '/_app/automacoes'
     | '/_app/clientes'
     | '/_app/configuracoes'
+    | '/_app/crm'
     | '/_app/documentos'
     | '/_app/financeiro'
     | '/_app/obrigacoes'
@@ -505,6 +510,13 @@ declare module '@tanstack/react-router' {
       path: '/documentos'
       fullPath: '/documentos'
       preLoaderRoute: typeof AppDocumentosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/crm': {
+      id: '/_app/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof AppCrmRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/configuracoes': {
@@ -668,6 +680,7 @@ interface AppRouteChildren {
   AppAutomacoesRoute: typeof AppAutomacoesRoute
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
+  AppCrmRoute: typeof AppCrmRoute
   AppDocumentosRoute: typeof AppDocumentosRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
@@ -684,9 +697,9 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAutomacoesRoute: AppAutomacoesRoute,
-      AppCrmRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
+  AppCrmRoute: AppCrmRoute,
   AppDocumentosRoute: AppDocumentosRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,

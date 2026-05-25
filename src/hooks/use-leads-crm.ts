@@ -103,7 +103,7 @@ export const FUNIL_COLS: { etapa: LeadEtapa; accent: string; bg: string }[] = [
   { etapa: "fechado_perdido",accent: "border-t-red-400",     bg: "bg-red-50/60"     },
 ];
 
-// Helper seguro Supabase
+// Helper Supabase — leads_crm está no banco mas gerado fora do CLI
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tb = () => (supabase as any).from("leads_crm");
 

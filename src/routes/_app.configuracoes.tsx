@@ -230,7 +230,7 @@ function UsuariosSection() {
   const humanos = usuarios.filter(u => !u.isAgent);
   const agentes = usuarios.filter(u => u.isAgent);
 
-  function UserRow({ u }: { u: ReturnType<typeof usuarios[0]> }) {
+  function UserRow({ u }: { u: typeof usuarios[0] }) {
     return (
       <div key={u.id} className="flex items-center justify-between px-5 py-3.5 gap-4">
         <div className="min-w-0 flex items-center gap-3">
@@ -395,7 +395,7 @@ function IntegracoesSection() {
       {/* WhatsApp inline */}
       <div className="surface-card p-0 overflow-hidden divide-y divide-border">
         {integracoes.map(integ => {
-          const meta = INTEG_META[integ.tipo] ?? { icon: "🔌", label: integ.tipo, descricao: "" };
+          const meta = INTEG_META[integ.id] ?? { icon: "🔌", label: integ.id, descricao: "" };
           return (
             <div key={integ.id} className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-3">
