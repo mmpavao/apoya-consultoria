@@ -76,23 +76,93 @@ function FinanceiroPage(){
 
   async function gerarAsaas(){
     const ids=filtered.filter(c=>sel.has(c.id)&&!c.asaasId).map(c=>c.id);
-    if(!ids.length){ toast.error("Selecione cobranças sem link Asaas"); return; }
+    if(!ids.length){ toast.error("Selecione cobranças sem link de pagamento"); return; }
     setBusy(true);
-    toast.loading(`Gerando ${ids.length} cobrança(s)…`,{id:"fin-asaas"});
-    await new Promise(r=>setTimeout(r,900));
-    toast.info(`Cobrança Asaas disponível via integração. (${ids.length} selecionados)`); await refresh();
-    toast.success(`${ids.length} cobrança(s) gerada(s)`,{id:"fin-asaas"});
-    setBusy(false); setSel(new Set());
+    toast.loading(`Emitindo ${ids.length} cobrança(s) no Asaas…`,{id:"fin-asaas"});
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", {id:"fin-asaas"}); return; }
+      let emitidas = 0; let erros = 0;
+      for (const cobId of ids) {
+        const res = await fetch("/api/cobranca/emitir", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+          body: JSON.stringify({ mode: "individual", cobranca_id: cobId }),
+        });
+        const data = await res.json() as any;
+        if (data.ok && data.emitidas > 0) emitidas++;
+        else erros++;
+      }
+      await refresh();
+      if (erros === 0) toast.success(`${emitidas} cobrança(s) emitida(s) no Asaas! 🎉`,{id:"fin-asaas"});
+      else toast.warning(`${emitidas} emitida(s) · ${erros} com erro`,{id:"fin-asaas"});
+      setSel(new Set());
+    } catch(e:any) {
+      toast.error("Erro Asaas: " + (e?.message ?? "Tente novamente"), {id:"fin-asaas"});
+    } finally {
+      setBusy(false);
+    }
   }
   async function enviarWpp(){
-    const ids=filtered.filter(c=>sel.has(c.id)).map(c=>c.id);
-    if(!ids.length){ toast.error("Selecione ao menos uma cobrança"); return; }
+    const cobs=filtered.filter(c=>sel.has(c.id)&&c.linkPagamento);
+    if(!cobs.length){ toast.error("Selecione cobranças com link de pagamento gerado"); return; }
     setBusy(true);
-    toast.loading(`Enviando ${ids.length} msg…`,{id:"fin-wpp"});
-    await new Promise(r=>setTimeout(r,700));
-    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${ids.length} envios)`); await refresh();
-    toast.success(`${ids.length} mensagem(ns) enviada(s)`,{id:"fin-wpp"});
-    setBusy(false); setSel(new Set());
+    toast.loading(`Enviando ${cobs.length} mensagem(ns) WhatsApp…`,{id:"fin-wpp"});
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", {id:"fin-wpp"}); return; }
+      let enviadas = 0; let erros = 0;
+      for (const cob of cobs) {
+        const fmtBRLv = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+        const fmtDt   = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
+        const nome    = cob.clienteNome.split(" ")[0];
+        const msg     = cob.diasAtraso > 0
+          ? `❗ ${nome}, sua mensalidade APOYA de ${fmtBRLv(cob.valor)} está *vencida há ${cob.diasAtraso} dia(s)*.
+🔗 Regularize: ${cob.linkPagamento}`
+          : `💰 Olá ${nome}! Sua mensalidade APOYA de ${fmtBRLv(cob.valor)} vence em *${fmtDt(cob.vencimento)}*.
+🔗 Pague: ${cob.linkPagamento}`;
+        const res = await fetch("/api/wa/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+          body: JSON.stringify({ telefone: cob.clienteId, mensagem: msg, cliente_id: cob.clienteId }),
+        });
+        const data = await res.json() as any;
+        if (data.ok) enviadas++; else erros++;
+      }
+      await refresh();
+      if (erros === 0) toast.success(`${enviadas} mensagem(ns) enviada(s)! 📱`,{id:"fin-wpp"});
+      else toast.warning(`${enviadas} enviada(s) · ${erros} com erro`,{id:"fin-wpp"});
+      setSel(new Set());
+    } catch(e:any) {
+      toast.error("Erro WhatsApp: " + (e?.message ?? "Tente novamente"), {id:"fin-wpp"});
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function gerarMensal(){
+    setBusy(true);
+    toast.loading("Gerando cobranças mensais e emitindo no Asaas…",{id:"fin-mensal"});
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", {id:"fin-mensal"}); return; }
+      const res = await fetch("/api/cobranca/emitir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: "gerar_mensal", competencia: comp }),
+      });
+      const data = await res.json() as any;
+      await refresh();
+      if (data.ok) {
+        toast.success(`${data.geradas ?? 0} cobranças geradas · ${data.emitidas ?? 0} emitidas no Asaas 🎉`,{id:"fin-mensal"});
+      } else {
+        toast.error(data.error ?? "Erro ao gerar cobranças",{id:"fin-mensal"});
+      }
+    } catch(e:any) {
+      toast.error("Erro: " + (e?.message ?? "Tente novamente"), {id:"fin-mensal"});
+    } finally {
+      setBusy(false);
+    }
   }
 
   const cols: ColDef<Cobranca>[] = [
