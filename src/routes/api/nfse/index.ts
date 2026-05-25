@@ -109,7 +109,6 @@ async function getEmitenteId(token: string): Promise<string> {
     const rows = await supaRest(token, "escritorio_config", "GET", undefined, "select=nfseio_emitente_id&limit=1");
     const id = Array.isArray(rows) ? rows[0]?.nfseio_emitente_id : null;
     if (id) {
-      console.log(`[nfse-api] emitente encontrado: ${id}`);
       return id;
     }
   } catch (e) {

@@ -55,7 +55,6 @@ export const Route = createFileRoute("/api/public/evolution-webhook/$instance")(
               break;
             default:
               // log para debug
-              console.log(`[evolution-webhook] evento ignorado: ${event}`);
           }
         } catch (e) {
           console.error(`[evolution-webhook] erro processando ${event}`, e);

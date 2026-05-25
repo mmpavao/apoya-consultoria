@@ -53,7 +53,7 @@ export function initRealtime() {
     })
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        console.log("[Realtime] Master channel connected ✓");
+        // canal conectado
       }
       if (status === "CHANNEL_ERROR") {
         console.error("[Realtime] Master channel error — retrying...");

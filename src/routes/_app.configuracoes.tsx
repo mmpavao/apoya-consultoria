@@ -31,7 +31,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/PagePlaceholder";
 import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 // config-store: migrado para hooks Supabase (use-usuarios, use-escritorio, use-integracoes)

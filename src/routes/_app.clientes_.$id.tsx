@@ -358,7 +358,7 @@ function ClienteDetailPage() {
                 label: "Contrato",
                 ok: temContrato,
                 icon: "📄",
-                tab: "contratos" as Tab,
+                tab: "comercial",
                 tip: "Contrato de prestação de serviços assinado",
               },
               {
@@ -398,7 +398,7 @@ function ClienteDetailPage() {
                 label: "Serviço Ativo",
                 ok: temServico,
                 icon: "✅",
-                tab: "servicos" as Tab,
+                tab: "comercial",
                 tip: "Contrato de serviço contábil vigente",
               },
             ].map(item => (
