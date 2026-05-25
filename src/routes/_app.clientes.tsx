@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Clock,
   ExternalLink, Loader2, MessageCircle, MoreHorizontal,
@@ -101,6 +101,8 @@ function ClientesPage(){
   const [modalNfse, setModalNfse] = useState(false);
   const [clienteNfse, setClienteNfse] = useState<Cliente | undefined>();
   const [page, setPage]         = useState(1);
+  const [showSync, setShowSync] = useState(false);
+  const { state: syncState, sync: runSync, abort: abortSync, reset: resetSync } = useSyncAllClientes();
 
   const responsaveis = useMemo(()=>Array.from(new Set(clientes.map(c=>c.responsavel))),[clientes]);
 
