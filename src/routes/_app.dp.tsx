@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
 import { DataTable, InlineBadge, type ColDef } from "@/components/DataTable";
 
-export const Route = createFileRoute("/_app/dp" as never)({
+export const Route = createFileRoute("/_app/dp")({
   component: DpPage,
   head: () => ({ meta: [{ title: "Dep. Pessoal · APOYA Gestão" }] }),
 });
