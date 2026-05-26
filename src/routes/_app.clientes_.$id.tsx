@@ -8,7 +8,7 @@ import {
   ArrowLeft, Building2, Calendar, CheckCircle2, Clock, DollarSign,
   Edit, FileText, Mail, MapPin, MessageSquare, Phone, Save, Trash2,
   User, X, AlertTriangle, Briefcase, CreditCard, Hash, Home,
-  Info, ReceiptText, ShieldCheck, Users, Zap, ChevronRight,
+  Info, ReceiptText, ShieldCheck, Users, Users2, BookOpen, Zap, ChevronRight,
   ExternalLink, Loader2, RefreshCw, TrendingUp, BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +37,8 @@ import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
 import { TabSocios } from "@/components/cliente/TabSocios";
 import { TabCertificados } from "@/components/cliente/TabCertificados";
 import { TabComercial } from "@/components/cliente/TabComercial";
+import { TabDP } from "@/components/cliente/TabDP";
+import { TabContabil } from "@/components/cliente/TabContabil";
 import { Shield, FileKey2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/clientes_/$id")({
@@ -128,7 +130,7 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "comercial" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "documentos" | "historico";
+type Tab = "geral" | "fiscal" | "comercial" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "documentos" | "historico" | "dp" | "contabil";
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "geral",          label: "Visão Geral",  icon: Building2  },
   { id: "fiscal",         label: "Fiscal",        icon: FileText   },
@@ -139,6 +141,8 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "certificados",   label: "Certificados",  icon: Shield     },
   { id: "documentos",     label: "Documentos",    icon: FileText   },
   { id: "historico",      label: "Histórico",     icon: Clock      },
+  { id: "dp",             label: "Dep. Pessoal",  icon: Users2     },
+  { id: "contabil",       label: "Contábil",      icon: BookOpen   },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -769,6 +773,17 @@ function ClienteDetailPage() {
         </div>
       )}
     </div>
+      {/* ═════════════════════ ABA: DEP. PESSOAL ═══════════════════ */}
+      {tab === "dp" && cliente?.temEmpregados && <TabDP clienteId={id} />}
+      {tab === "dp" && !cliente?.temEmpregados && (
+        <div className="text-center text-muted-foreground py-12">
+          Este cliente não tem empregados cadastrados. Ative "Tem empregados CLT" no cadastro.
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: CONTÁBIL ═════════════════════ */}
+      {tab === "contabil" && <TabContabil clienteId={id} />}
+
   <EmitirNfseModal
       open={modalNfse}
       onClose={() => setModalNfse(false)}

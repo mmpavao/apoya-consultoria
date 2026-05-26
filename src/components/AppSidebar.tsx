@@ -1,6 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Workflow,
+  Users2,
+  BookOpen,
   FolderOpen,
   LayoutDashboard,
   Building2,
@@ -32,6 +34,8 @@ const items: NavItem[] = [
   { to: "/crm",          label: "CRM",         icon: UserRoundSearch },
   { to: "/documentos",   label: "Documentos",  icon: FolderOpen },
   { to: "/fiscal/das",   label: "Fiscal",      icon: Receipt },
+  { to: "/dp",           label: "Dep. Pessoal", icon: Users2 },
+  { to: "/contabil",     label: "Contábil",     icon: BookOpen },
   { to: "/financeiro",   label: "Financeiro",  icon: DollarSign },
   { to: "/whatsapp",     label: "WhatsApp",    icon: MessageSquare },
   { to: "/automacoes",  label: "Automações",  icon: Bot            },
