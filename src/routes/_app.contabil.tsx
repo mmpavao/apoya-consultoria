@@ -163,14 +163,17 @@ function ContabilPage() {
         <KpiCard icon={AlertTriangle} label="Com Divergência"        value={comDivergencia}   tone={comDivergencia > 0 ? "danger" : "neutral"} />
       </KpiGrid>
 
-      <DataTable
-        cols={cols}
-        rows={clientes}
-        loading={loading}
-        emptyText="Nenhum cliente encontrado."
-        getKey={(r) => r.id}
-        onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
-      />
+      {loading ? (
+        <div className="text-center py-12 text-muted-foreground">Carregando clientes...</div>
+      ) : (
+        <DataTable
+          cols={cols}
+          rows={clientes}
+          emptyText="Nenhum cliente encontrado."
+          getKey={(r) => r.id}
+          onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
+        />
+      )}
     </div>
   );
 }

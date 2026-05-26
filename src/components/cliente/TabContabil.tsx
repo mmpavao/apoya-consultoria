@@ -1,602 +1,381 @@
 /**
  * TabContabil — Contabilidade
  * Sub-abas: Período | Lançamentos | Balancete | Conciliação Bancária
- * Escopo: Simples Nacional apenas — banco já existe, apenas interface
  */
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import { CheckCircle2, AlertTriangle, Plus, Lock, Printer } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertTriangle, Plus, CheckSquare, Printer, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useLancamentos,
-  usePlanoContas,
-  usePeriodosContabeis,
-  useAbrirPeriodo,
-  useFecharPeriodo,
-  useExtratosBancarios,
+  useLancamentos, usePeriodosContabeis, usePlanoContas,
+  useAbrirPeriodo, useFecharPeriodo, useExtratosBancarios,
+  type Lancamento,
 } from "@/hooks/use-contabil";
-import { supabase } from "@/integrations/supabase/client";
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
+const FMT_BRL  = (v: number) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
+const FMT_DATE = (d: string) => new Date(d+"T00:00:00").toLocaleDateString("pt-BR");
+const MES_ATUAL = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; };
+const COMP_LABEL = (c: string) => { const [a,m]=c.split("-"); return `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][+m-1]}/${a}`; };
+const MESES_LIST = () => Array.from({length:12},(_,i)=>{const d=new Date();d.setMonth(d.getMonth()-i);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;});
 
-function mesAtual() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function competenciaLabel(c: string) {
-  const [ano, mes] = c.split("-");
-  const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  return `${meses[parseInt(mes, 10) - 1]}/${ano}`;
-}
-
-function formatMoeda(v: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-}
-
-function gerarCompetencias(n = 12): string[] {
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
-}
-
-// ─── Sub-aba: Período ─────────────────────────────────────────────────────────
-
-function SubAbaPeriodo({ clienteId }: { clienteId: string }) {
-  const competencia = mesAtual();
+// ─── Sub-aba Período ──────────────────────────────────────────────────────────
+function SubAbaPeriodo({ clienteId, temEmpregados }: { clienteId: string; temEmpregados?: boolean }) {
   const { periodos, loading, refresh } = usePeriodosContabeis(clienteId);
   const { abrirPeriodo, loading: abrindo } = useAbrirPeriodo();
   const { fecharPeriodo, loading: fechando } = useFecharPeriodo();
-  const [confirmFechar, setConfirmFechar] = useState(false);
-  const { lancamentos } = useLancamentos(clienteId, competencia);
-  const { extratos } = useExtratosBancarios(clienteId, competencia);
+  const [confirm, setConfirm] = useState<string|null>(null);
+  const [novoComp, setNovoComp] = useState(MES_ATUAL());
+  const atual = periodos.find(p=>p.competencia===MES_ATUAL());
 
-  const periodoAtual = periodos.find(p => p.mes_referencia === competencia);
-
-  // Checklist de fechamento
-  const nfEntrada   = lancamentos.filter(l => l.tipo === "nf_entrada").length > 0;
-  const nfSaida     = lancamentos.filter(l => l.tipo === "nf_saida").length > 0;
-  const conciliacao = extratos.length > 0 && extratos.every(e => e.conciliado);
-  const balancete   = lancamentos.length > 0;
-
-  const checklist = [
-    { label: "NF-e de entrada escrituradas",  ok: nfEntrada },
-    { label: "NF-e de saída escrituradas",    ok: nfSaida },
-    { label: "Conciliação bancária 100%",     ok: conciliacao },
-    { label: "Lançamentos no balancete",      ok: balancete },
-    { label: "Balancete equilibrado",         ok: balancete },
+  const CHECKLIST = [
+    { id:"nf_entrada",    label:"NF-e de entrada escrituradas" },
+    { id:"nf_saida",      label:"NF-e de saída escrituradas" },
+    ...(temEmpregados ? [{ id:"folha", label:"Folha lançada" }] : []),
+    { id:"conciliacao",   label:"Conciliação bancária 100%" },
+    { id:"depreciacao",   label:"Depreciação lançada" },
+    { id:"balancete",     label:"Balancete equilibrado" },
   ];
-  const checklistOk = checklist.every(c => c.ok);
-
-  const handleAbrirPeriodo = async () => {
-    const ok = await abrirPeriodo(clienteId, competencia);
-    if (ok) refresh();
-  };
-
-  const handleFecharPeriodo = async () => {
-    if (!periodoAtual) return;
-    const ok = await fecharPeriodo(periodoAtual.id);
-    if (ok) { refresh(); setConfirmFechar(false); }
-  };
+  const [checks, setChecks] = useState<Record<string,boolean>>({});
+  const todosMarcados = CHECKLIST.every(c=>checks[c.id]);
 
   if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
     <div className="space-y-6">
       {/* Período atual */}
-      <div className="surface-card rounded-lg p-5 space-y-4">
+      <div className="surface-card p-4 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-base">Período: {competenciaLabel(competencia)}</h3>
-          {periodoAtual ? (
-            <Badge variant={periodoAtual.status === "fechado" ? "default" : "secondary"}>
-              {periodoAtual.status === "fechado" ? "Fechado" : "Aberto"}
-            </Badge>
-          ) : (
-            <Badge variant="outline">Não iniciado</Badge>
-          )}
+          <h3 className="font-semibold">Período Atual — {COMP_LABEL(MES_ATUAL())}</h3>
+          {atual
+            ?<span className={`text-xs font-medium px-2 py-1 rounded-full ${atual.status==="aberto"?"bg-yellow-100 text-yellow-800":"bg-green-100 text-green-800"}`}>
+              {atual.status==="aberto"?"Aberto":"Fechado"}
+            </span>
+            :<span className="text-xs text-muted-foreground">Sem período aberto</span>}
         </div>
 
-        {/* Checklist */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Checklist de Fechamento</p>
-          {checklist.map(item => (
-            <div key={item.label} className="flex items-center gap-2 text-sm">
-              {item.ok
-                ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                : <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
-              <span className={item.ok ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Ações */}
-        <div className="flex gap-2 pt-1">
-          {!periodoAtual && (
-            <Button size="sm" onClick={handleAbrirPeriodo} disabled={abrindo}>
-              <Plus className="h-4 w-4 mr-1" /> {abrindo ? "Abrindo..." : "Abrir Período"}
+        {!atual&&(
+          <div className="flex items-center gap-3">
+            <Select value={novoComp} onValueChange={setNovoComp}>
+              <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+              <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button size="sm" onClick={async()=>{const ok=await abrirPeriodo(clienteId,novoComp);if(ok)refresh();}} disabled={abrindo}>
+              <Plus className="h-4 w-4 mr-1"/>{abrindo?"Abrindo...":"Abrir Período"}
             </Button>
-          )}
-          {periodoAtual?.status === "aberto" && (
-            <>
-              {!confirmFechar ? (
-                <Button size="sm" variant="outline" disabled={!checklistOk} onClick={() => setConfirmFechar(true)}>
-                  <Lock className="h-4 w-4 mr-1" /> Fechar Período
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                  <span>Confirmar fechamento?</span>
-                  <Button size="sm" variant="destructive" onClick={handleFecharPeriodo} disabled={fechando}>
-                    {fechando ? "Fechando..." : "Confirmar"}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmFechar(false)}>Cancelar</Button>
-                </div>
-              )}
-              {!checklistOk && (
-                <p className="text-xs text-muted-foreground self-center">
-                  Complete o checklist para fechar o período
-                </p>
-              )}
-            </>
-          )}
-        </div>
+          </div>
+        )}
+
+        {atual?.status==="aberto"&&(
+          <>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Checklist de Fechamento</p>
+              {CHECKLIST.map(c=>(
+                <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={!!checks[c.id]}
+                    onChange={e=>setChecks(p=>({...p,[c.id]:e.target.checked}))}
+                    className="rounded"/>
+                  <span className={checks[c.id]?"line-through text-muted-foreground":""}>{c.label}</span>
+                </label>
+              ))}
+            </div>
+            {!confirm
+              ?<Button size="sm" disabled={!todosMarcados} onClick={()=>setConfirm(atual.id)}>
+                <CheckSquare className="h-4 w-4 mr-1"/>Fechar Período
+              </Button>
+              :<div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm flex-1">Confirmar fechamento de {COMP_LABEL(atual.competencia)}?</p>
+                <Button size="sm" variant="destructive" onClick={async()=>{const ok=await fecharPeriodo(atual.id);if(ok){refresh();setConfirm(null);}}} disabled={fechando}>{fechando?"Fechando...":"Confirmar"}</Button>
+                <Button size="sm" variant="ghost" onClick={()=>setConfirm(null)}>Cancelar</Button>
+              </div>
+            }
+          </>
+        )}
       </div>
 
-      {/* Histórico de períodos */}
-      {periodos.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Histórico</p>
-          <div className="rounded-md border overflow-hidden">
-            <table className="ft-table w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Mês</th>
-                  <th>Status</th>
-                  <th>Fechado em</th>
+      {/* Histórico */}
+      <div>
+        <p className="text-sm font-medium mb-3">Histórico de Períodos</p>
+        <div className="rounded-md border overflow-hidden">
+          <table className="ft-table w-full text-sm">
+            <thead><tr><th>Competência</th><th>Status</th><th>Fechado em</th></tr></thead>
+            <tbody>
+              {periodos.length===0&&<tr><td colSpan={3} className="text-center text-muted-foreground py-6">Nenhum período registrado</td></tr>}
+              {periodos.map(p=>(
+                <tr key={p.id}>
+                  <td>{COMP_LABEL(p.competencia)}</td>
+                  <td><Badge variant={p.status==="aberto"?"secondary":"outline"}>{p.status==="aberto"?"Aberto":"Fechado"}</Badge></td>
+                  <td>{p.fechado_em?FMT_DATE(p.fechado_em.split("T")[0]):"—"}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {periodos.map(p => (
-                  <tr key={p.id}>
-                    <td>{competenciaLabel(p.mes_referencia)}</td>
-                    <td>
-                      <Badge variant={p.status === "fechado" ? "default" : "secondary"} className="text-xs">
-                        {p.status === "fechado" ? "Fechado" : "Aberto"}
-                      </Badge>
-                    </td>
-                    <td className="text-muted-foreground">
-                      {p.fechado_em
-                        ? new Date(p.fechado_em).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ─── Sub-aba: Lançamentos ─────────────────────────────────────────────────────
-
-interface NovoLancamentoDialogProps {
-  open: boolean;
-  onClose: () => void;
-  clienteId: string;
-  mesReferencia: string;
-  onSuccess: () => void;
-}
-
-function NovoLancamentoDialog({ open, onClose, clienteId, mesReferencia, onSuccess }: NovoLancamentoDialogProps) {
-  const { contas } = usePlanoContas(clienteId);
+// ─── Dialog Novo Lançamento ───────────────────────────────────────────────────
+function NovoLancDialog({ open, onClose, clienteId, competencia, contas, onOk }:
+  { open:boolean; onClose:()=>void; clienteId:string; competencia:string; contas:{id:string;codigo:string;nome:string}[]; onOk:()=>void }) {
+  const [form, setForm] = useState({ data:"", historico:"", conta_debito:"", conta_credito:"", valor:"" });
+  const s = (k:string,v:string)=>setForm(p=>({...p,[k]:v}));
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    data_lancamento: new Date().toISOString().split("T")[0],
-    historico: "",
-    conta_debito: "",
-    conta_credito: "",
-    valor: "",
-  });
-
-  const f = (k: string, v: string) => setForm(prev => ({ ...prev, [k]: v }));
-
-  const handleSave = async () => {
-    if (!form.historico || !form.conta_debito || !form.conta_credito || !form.valor) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-    if (form.conta_debito === form.conta_credito) {
-      toast.error("Conta débito e crédito não podem ser iguais");
-      return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { supabase: _sb } = { supabase: null }; // unused
+  const submit = async () => {
+    if (!form.data||!form.historico||!form.conta_debito||!form.conta_credito||!form.valor) {
+      toast.error("Preencha todos os campos"); return;
     }
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { supabase } = await import("@/integrations/supabase/client");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from("lancamentos_contabeis")
-        .insert({
-          empresa_id: clienteId,
-          mes_referencia: mesReferencia,
-          data_lancamento: form.data_lancamento,
-          historico: form.historico,
-          conta_debito: form.conta_debito,
-          conta_credito: form.conta_credito,
-          valor: parseFloat(form.valor),
-          origem: "manual",
-          criado_por: user?.id,
-        });
+      const { data:{user} } = await supabase.auth.getUser();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("lancamentos_contabeis").insert({
+        empresa_id: clienteId, data_lancamento: form.data, historico: form.historico,
+        conta_debito: form.conta_debito, conta_credito: form.conta_credito,
+        valor: parseFloat(form.valor), competencia, tipo: "manual",
+        criado_por: user?.email, criado_por_tipo: "humano",
+      });
       if (error) throw error;
-      toast.success("Lançamento criado com sucesso");
-      onSuccess();
-      onClose();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar lançamento");
-    } finally {
-      setSaving(false);
-    }
+      toast.success("Lançamento criado"); onOk(); onClose();
+    } catch(e) { toast.error(e instanceof Error?e.message:"Erro ao salvar"); }
+    finally { setSaving(false); }
   };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Novo Lançamento — {competenciaLabel(mesReferencia)}</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Novo Lançamento Contábil</DialogTitle></DialogHeader>
         <div className="space-y-3 py-2">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Data *</Label>
-              <Input type="date" value={form.data_lancamento} onChange={e => f("data_lancamento", e.target.value)} />
-            </div>
-            <div>
-              <Label>Valor *</Label>
-              <Input type="number" step="0.01" min="0" placeholder="0,00" value={form.valor} onChange={e => f("valor", e.target.value)} />
-            </div>
+            <div><Label>Data *</Label><Input type="date" value={form.data} onChange={e=>s("data",e.target.value)}/></div>
+            <div><Label>Valor *</Label><Input type="number" min="0" step="0.01" value={form.valor} onChange={e=>s("valor",e.target.value)} placeholder="0,00"/></div>
           </div>
-          <div>
-            <Label>Histórico *</Label>
-            <Input placeholder="Descrição do lançamento" value={form.historico} onChange={e => f("historico", e.target.value)} />
-          </div>
-          <div>
-            <Label>Conta Débito *</Label>
-            <Select value={form.conta_debito} onValueChange={v => f("conta_debito", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-              <SelectContent>
-                {contas.map(c => (
-                  <SelectItem key={c.id} value={c.codigo}>{c.codigo} — {c.nome}</SelectItem>
-                ))}
-              </SelectContent>
+          <div><Label>Histórico *</Label><Input value={form.historico} onChange={e=>s("historico",e.target.value)} placeholder="Descrição do lançamento"/></div>
+          <div><Label>Conta Débito *</Label>
+            <Select value={form.conta_debito} onValueChange={v=>s("conta_debito",v)}>
+              <SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger>
+              <SelectContent>{contas.map(c=><SelectItem key={c.id} value={c.codigo}>{c.codigo} — {c.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Conta Crédito *</Label>
-            <Select value={form.conta_credito} onValueChange={v => f("conta_credito", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-              <SelectContent>
-                {contas.map(c => (
-                  <SelectItem key={c.id} value={c.codigo}>{c.codigo} — {c.nome}</SelectItem>
-                ))}
-              </SelectContent>
+          <div><Label>Conta Crédito *</Label>
+            <Select value={form.conta_credito} onValueChange={v=>s("conta_credito",v)}>
+              <SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger>
+              <SelectContent>{contas.map(c=><SelectItem key={c.id} value={c.codigo}>{c.codigo} — {c.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <p className="text-xs text-muted-foreground">Débito deve ser igual ao Crédito (partidas dobradas).</p>
+          {form.conta_debito===form.conta_credito&&form.conta_debito&&(
+            <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3"/>Conta débito e crédito iguais</p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : "Salvar Lançamento"}</Button>
+          <Button onClick={submit} disabled={saving||form.conta_debito===form.conta_credito}>{saving?"Salvando...":"Criar Lançamento"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
+// ─── Sub-aba Lançamentos ──────────────────────────────────────────────────────
 function SubAbaLancamentos({ clienteId }: { clienteId: string }) {
-  const competencias = gerarCompetencias();
-  const [mes, setMes] = useState(mesAtual());
-  const { lancamentos, loading, totais, refresh } = useLancamentos(clienteId, mes);
-  const [showNovo, setShowNovo] = useState(false);
-  const [filtroContaP, setFiltroContaP] = useState("");
+  const [comp, setComp] = useState(MES_ATUAL());
+  const { lancamentos, loading, totais, refresh } = useLancamentos(clienteId, comp);
+  const { contas } = usePlanoContas(clienteId);
+  const [filtroContas, setFiltroContas] = useState("todas");
+  const [novoOpen, setNovoOpen] = useState(false);
+  const desequilibrado = totais.totalDebito!==totais.totalCredito&&(totais.totalDebito>0||totais.totalCredito>0);
 
-  const filtered = filtroContaP
-    ? lancamentos.filter(l => l.conta_debito.includes(filtroContaP) || l.conta_credito.includes(filtroContaP))
-    : lancamentos;
+  const lista = filtroContas==="todas" ? lancamentos
+    : lancamentos.filter((l:Lancamento)=>l.conta_debito===filtroContas||l.conta_credito===filtroContas);
+
+  if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Label>Competência:</Label>
-          <Select value={mes} onValueChange={setMes}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={comp} onValueChange={setComp}>
+          <SelectTrigger className="w-36"><SelectValue/></SelectTrigger>
+          <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
+        </Select>
+        {contas.length>0&&(
+          <Select value={filtroContas} onValueChange={setFiltroContas}>
+            <SelectTrigger className="w-60"><SelectValue placeholder="Filtrar por conta"/></SelectTrigger>
             <SelectContent>
-              {competencias.map(c => <SelectItem key={c} value={c}>{competenciaLabel(c)}</SelectItem>)}
+              <SelectItem value="todas">Todas as contas</SelectItem>
+              {contas.map(c=><SelectItem key={c.id} value={c.codigo}>{c.codigo} — {c.nome}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Input
-            placeholder="Filtrar por conta..."
-            value={filtroContaP}
-            onChange={e => setFiltroContaP(e.target.value)}
-            className="w-40"
-          />
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" onClick={()=>setNovoOpen(true)}><Plus className="h-4 w-4 mr-1"/>Novo Lançamento</Button>
         </div>
-        <Button size="sm" onClick={() => setShowNovo(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Novo Lançamento
-        </Button>
       </div>
 
-      {/* Totalizador */}
-      <div className="flex gap-4 p-3 bg-muted/40 rounded-lg text-sm">
-        <span>Débitos: <strong>{formatMoeda(totais.totalDebito)}</strong></span>
-        <span>Créditos: <strong>{formatMoeda(totais.totalCredito)}</strong></span>
-        <span className={totais.equilibrado ? "text-emerald-600" : "text-red-600"}>
-          {totais.equilibrado ? "✅ Equilibrado" : "⚠️ Divergente"}
-        </span>
-        <span className="text-muted-foreground">{lancamentos.length} lançamentos</span>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      ) : (
-        <div className="rounded-md border overflow-hidden">
-          <table className="ft-table w-full text-sm">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Histórico</th>
-                <th>Conta Débito</th>
-                <th>Conta Crédito</th>
-                <th className="text-right">Valor</th>
-                <th>Origem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center text-muted-foreground py-8">Nenhum lançamento neste período</td></tr>
-              )}
-              {filtered.map(l => (
-                <tr key={l.id}>
-                  <td className="text-xs">{new Date(l.data_lancamento + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                  <td className="max-w-xs truncate">{l.historico}</td>
-                  <td className="font-mono text-xs">{l.conta_debito}</td>
-                  <td className="font-mono text-xs">{l.conta_credito}</td>
-                  <td className="text-right tabular-nums">{formatMoeda(l.valor)}</td>
-                  <td>
-                    <Badge variant={l.origem === "manual" ? "outline" : "secondary"} className="text-xs">
-                      {l.origem === "manual" ? "Manual" : "Agente"}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {desequilibrado&&(
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0"/>
+          <span>Débitos ({FMT_BRL(totais.totalDebito)}) ≠ Créditos ({FMT_BRL(totais.totalCredito)}). Verifique os lançamentos.</span>
         </div>
       )}
 
-      <NovoLancamentoDialog
-        open={showNovo}
-        onClose={() => setShowNovo(false)}
-        clienteId={clienteId}
-        mesReferencia={mes}
-        onSuccess={refresh}
-      />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="surface-card p-3 rounded-lg"><p className="text-xs text-muted-foreground">Total Débitos</p><p className="font-bold">{FMT_BRL(totais.totalDebito)}</p></div>
+        <div className="surface-card p-3 rounded-lg"><p className="text-xs text-muted-foreground">Total Créditos</p><p className="font-bold">{FMT_BRL(totais.totalCredito)}</p></div>
+      </div>
+
+      <div className="rounded-md border overflow-hidden">
+        <table className="ft-table w-full text-sm">
+          <thead><tr><th>Data</th><th>Histórico</th><th>Débito</th><th>Crédito</th><th className="text-right">Valor</th><th>Origem</th></tr></thead>
+          <tbody>
+            {lista.length===0&&<tr><td colSpan={6} className="text-center text-muted-foreground py-8">Nenhum lançamento para {COMP_LABEL(comp)}</td></tr>}
+            {lista.map((l:Lancamento)=>(
+              <tr key={l.id}>
+                <td className="text-xs">{FMT_DATE(l.data_lancamento)}</td>
+                <td>{l.historico}</td>
+                <td className="font-mono text-xs">{l.conta_debito}</td>
+                <td className="font-mono text-xs">{l.conta_credito}</td>
+                <td className="text-right font-medium">{FMT_BRL(l.valor)}</td>
+                <td><Badge variant={l.criado_por_tipo==="agente"?"secondary":"outline"} className="text-xs">
+                  {l.criado_por_tipo==="agente"?"Agente":"Manual"}
+                </Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <NovoLancDialog open={novoOpen} onClose={()=>setNovoOpen(false)}
+        clienteId={clienteId} competencia={comp} contas={contas} onOk={refresh}/>
     </div>
   );
 }
 
-// ─── Sub-aba: Balancete ───────────────────────────────────────────────────────
-
+// ─── Sub-aba Balancete ────────────────────────────────────────────────────────
 function SubAbaBalancete({ clienteId }: { clienteId: string }) {
-  const competencias = gerarCompetencias();
-  const [mes, setMes] = useState(mesAtual());
-  const { lancamentos, loading } = useLancamentos(clienteId, mes);
+  const [comp, setComp] = useState(MES_ATUAL());
+  const { lancamentos, loading } = useLancamentos(clienteId, comp);
   const { contas } = usePlanoContas(clienteId);
 
   // Agrupar por tipo de conta
-  const grupos = ["ativo", "passivo", "pl", "receita", "despesa"];
-  const grupoLabel: Record<string, string> = {
-    ativo: "Ativo", passivo: "Passivo", pl: "Patrimônio Líquido", receita: "Receitas", despesa: "Despesas",
-  };
-
-  // Calcular saldo por conta
-  const saldos: Record<string, number> = {};
+  const grupos: Record<string, { nome:string; debitos:number; creditos:number }> = {};
   for (const l of lancamentos) {
-    saldos[l.conta_debito]  = (saldos[l.conta_debito]  ?? 0) + l.valor;
-    saldos[l.conta_credito] = (saldos[l.conta_credito] ?? 0) - l.valor;
+    const cd = contas.find(c=>c.codigo===l.conta_debito);
+    const cc = contas.find(c=>c.codigo===l.conta_credito);
+    if (cd) { if (!grupos[cd.tipo]) grupos[cd.tipo]={nome:cd.tipo,debitos:0,creditos:0}; grupos[cd.tipo].debitos+=l.valor; }
+    if (cc) { if (!grupos[cc.tipo]) grupos[cc.tipo]={nome:cc.tipo,debitos:0,creditos:0}; grupos[cc.tipo].creditos+=l.valor; }
   }
 
-  const totalGeral = Object.values(saldos).reduce((s, v) => s + Math.abs(v), 0);
+  if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Label>Competência:</Label>
-          <Select value={mes} onValueChange={setMes}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {competencias.map(c => <SelectItem key={c} value={c}>{competenciaLabel(c)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button size="sm" variant="outline" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-1" /> Exportar PDF
+      <div className="flex items-center gap-3">
+        <Select value={comp} onValueChange={setComp}>
+          <SelectTrigger className="w-36"><SelectValue/></SelectTrigger>
+          <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
+        </Select>
+        <Button size="sm" variant="outline" onClick={()=>window.print()}>
+          <Printer className="h-4 w-4 mr-1"/>Exportar PDF
         </Button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      ) : (
-        <div className="space-y-4">
-          {grupos.map(grupo => {
-            const contasGrupo = contas.filter(c => c.tipo === grupo);
-            if (contasGrupo.length === 0) return null;
-
-            const totalGrupo = contasGrupo.reduce((s, c) => s + (saldos[c.codigo] ?? 0), 0);
-
-            return (
-              <div key={grupo} className="rounded-md border overflow-hidden">
-                <div className="bg-muted/50 px-4 py-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold">{grupoLabel[grupo]}</span>
-                  <span className="text-sm font-semibold tabular-nums">{formatMoeda(totalGrupo)}</span>
-                </div>
-                <table className="ft-table w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Código</th>
-                      <th>Conta</th>
-                      <th className="text-right">Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contasGrupo.map(c => (
-                      <tr key={c.id}>
-                        <td className="font-mono text-xs">{c.codigo}</td>
-                        <td>{c.nome}</td>
-                        <td className={`text-right tabular-nums ${(saldos[c.codigo] ?? 0) < 0 ? "text-red-600" : ""}`}>
-                          {formatMoeda(saldos[c.codigo] ?? 0)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
-
-          <div className="flex justify-between p-3 bg-muted rounded-lg font-semibold text-sm">
-            <span>Total Geral</span>
-            <span className="tabular-nums">{formatMoeda(totalGeral)}</span>
-          </div>
-        </div>
-      )}
+      <div className="rounded-md border overflow-hidden">
+        <table className="ft-table w-full text-sm">
+          <thead><tr><th>Grupo / Conta</th><th className="text-right">Débitos</th><th className="text-right">Créditos</th><th className="text-right">Saldo</th></tr></thead>
+          <tbody>
+            {Object.keys(grupos).length===0&&<tr><td colSpan={4} className="text-center text-muted-foreground py-8">Nenhum lançamento em {COMP_LABEL(comp)}</td></tr>}
+            {Object.entries(grupos).map(([tipo,g])=>(
+              <tr key={tipo}>
+                <td className="font-medium capitalize">{tipo.replace("_"," ")}</td>
+                <td className="text-right">{FMT_BRL(g.debitos)}</td>
+                <td className="text-right">{FMT_BRL(g.creditos)}</td>
+                <td className="text-right font-semibold">{FMT_BRL(g.debitos-g.creditos)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-bold border-t-2">
+              <td>Total</td>
+              <td className="text-right">{FMT_BRL(Object.values(grupos).reduce((s,g)=>s+g.debitos,0))}</td>
+              <td className="text-right">{FMT_BRL(Object.values(grupos).reduce((s,g)=>s+g.creditos,0))}</td>
+              <td className="text-right">{FMT_BRL(Object.values(grupos).reduce((s,g)=>s+g.debitos-g.creditos,0))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }
 
-// ─── Sub-aba: Conciliação Bancária ────────────────────────────────────────────
-
+// ─── Sub-aba Conciliação ──────────────────────────────────────────────────────
 function SubAbaConciliacao({ clienteId }: { clienteId: string }) {
-  const competencias = gerarCompetencias();
-  const [mes, setMes] = useState(mesAtual());
-  const { extratos, loading, conciliados, pendentes, refresh } = useExtratosBancarios(clienteId, mes);
-  const { lancamentos } = useLancamentos(clienteId, mes);
+  const [comp, setComp] = useState(MES_ATUAL());
+  const { extratos, loading, conciliados, pendentes, refresh } = useExtratosBancarios(clienteId, comp);
 
-  const totalBanco     = extratos.reduce((s, e) => s + (e.tipo === "credito" ? e.valor : -e.valor), 0);
-  const totalContabil  = lancamentos.reduce((s, l) => s + l.valor, 0);
-
-  const handleConciliar = async (extratoId: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from("extrato_bancario")
-        .update({ conciliado: true })
-        .eq("id", extratoId);
-      if (error) throw error;
-      toast.success("Item conciliado");
-      refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao conciliar");
-    }
+  const conciliar = async (extratoId: string) => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("extrato_bancario").update({ conciliado:true }).eq("id",extratoId);
+    if (!error) { toast.success("Conciliado"); refresh(); }
+    else toast.error("Erro ao conciliar");
   };
+
+  if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Label>Competência:</Label>
-        <Select value={mes} onValueChange={setMes}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {competencias.map(c => <SelectItem key={c} value={c}>{competenciaLabel(c)}</SelectItem>)}
-          </SelectContent>
+      <div className="flex items-center gap-3">
+        <Select value={comp} onValueChange={setComp}>
+          <SelectTrigger className="w-36"><SelectValue/></SelectTrigger>
+          <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
         </Select>
-      </div>
-
-      {/* Resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Saldo Banco",    value: formatMoeda(totalBanco),    color: "" },
-          { label: "Saldo Contábil", value: formatMoeda(totalContabil), color: "" },
-          { label: "Conciliados",    value: conciliados,                color: "text-emerald-600" },
-          { label: "Pendentes",      value: pendentes,                  color: pendentes > 0 ? "text-orange-600" : "" },
-        ].map(item => (
-          <div key={item.label} className="surface-card p-4 rounded-lg">
-            <p className="text-xs text-muted-foreground">{item.label}</p>
-            <p className={`text-lg font-semibold mt-1 ${item.color}`}>{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      ) : (
-        <div className="rounded-md border overflow-hidden">
-          <table className="ft-table w-full text-sm">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Tipo</th>
-                <th className="text-right">Valor</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {extratos.length === 0 && (
-                <tr><td colSpan={6} className="text-center text-muted-foreground py-8">Nenhum extrato importado neste período</td></tr>
-              )}
-              {extratos.map(e => (
-                <tr key={e.id}>
-                  <td className="text-xs">{new Date(e.data_transacao + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                  <td className="max-w-xs truncate">{e.descricao}</td>
-                  <td>
-                    <Badge variant={e.tipo === "credito" ? "default" : "outline"} className="text-xs">
-                      {e.tipo === "credito" ? "Crédito" : "Débito"}
-                    </Badge>
-                  </td>
-                  <td className="text-right tabular-nums">{formatMoeda(e.valor)}</td>
-                  <td>
-                    {e.conciliado
-                      ? <span className="text-emerald-600 text-xs font-medium flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Conciliado</span>
-                      : <span className="text-orange-600 text-xs font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Pendente</span>}
-                  </td>
-                  <td>
-                    {!e.conciliado && (
-                      <Button size="sm" variant="ghost" onClick={() => handleConciliar(e.id)}>
-                        Conciliar
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-3 ml-auto">
+          <span className="flex items-center gap-1 text-sm text-green-600"><CheckCircle2 className="h-4 w-4"/>{conciliados} conciliados</span>
+          <span className="flex items-center gap-1 text-sm text-yellow-600"><Clock className="h-4 w-4"/>{pendentes} pendentes</span>
         </div>
-      )}
+      </div>
+
+      <div className="rounded-md border overflow-hidden">
+        <table className="ft-table w-full text-sm">
+          <thead><tr><th>Data</th><th>Descrição</th><th className="text-right">Valor</th><th>Tipo</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {extratos.length===0&&<tr><td colSpan={6} className="text-center text-muted-foreground py-8">Nenhum extrato para {COMP_LABEL(comp)}</td></tr>}
+            {extratos.map(e=>(
+              <tr key={e.id} className={!e.conciliado?"bg-yellow-50/30":""}>
+                <td className="text-xs">{FMT_DATE(e.data_movimento)}</td>
+                <td>{e.descricao}</td>
+                <td className="text-right font-medium">{FMT_BRL(e.valor)}</td>
+                <td><Badge variant={e.tipo==="credito"?"default":"secondary"}>{e.tipo==="credito"?"Crédito":"Débito"}</Badge></td>
+                <td>
+                  {e.conciliado
+                    ?<span className="flex items-center gap-1 text-green-600 text-xs"><CheckCircle2 className="h-3 w-3"/>Conciliado</span>
+                    :<span className="flex items-center gap-1 text-yellow-600 text-xs"><Clock className="h-3 w-3"/>Pendente</span>}
+                </td>
+                <td>
+                  {!e.conciliado&&<Button size="sm" variant="ghost" onClick={()=>conciliar(e.id)}>
+                    <CheckCircle2 className="h-4 w-4"/>
+                  </Button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
-
-interface TabContabilProps {
-  clienteId: string;
-}
-
-export function TabContabil({ clienteId }: TabContabilProps) {
+export function TabContabil({ clienteId, temEmpregados }: { clienteId: string; temEmpregados?: boolean }) {
   return (
     <div className="animate-fade-up space-y-4">
       <Tabs defaultValue="periodo">
@@ -606,14 +385,12 @@ export function TabContabil({ clienteId }: TabContabilProps) {
           <TabsTrigger value="balancete">Balancete</TabsTrigger>
           <TabsTrigger value="conciliacao">Conciliação</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="periodo"     className="mt-4"><SubAbaPeriodo     clienteId={clienteId} /></TabsContent>
-        <TabsContent value="lancamentos" className="mt-4"><SubAbaLancamentos clienteId={clienteId} /></TabsContent>
-        <TabsContent value="balancete"   className="mt-4"><SubAbaBalancete   clienteId={clienteId} /></TabsContent>
-        <TabsContent value="conciliacao" className="mt-4"><SubAbaConciliacao clienteId={clienteId} /></TabsContent>
+        <TabsContent value="periodo" className="mt-4"><SubAbaPeriodo clienteId={clienteId} temEmpregados={temEmpregados}/></TabsContent>
+        <TabsContent value="lancamentos" className="mt-4"><SubAbaLancamentos clienteId={clienteId}/></TabsContent>
+        <TabsContent value="balancete" className="mt-4"><SubAbaBalancete clienteId={clienteId}/></TabsContent>
+        <TabsContent value="conciliacao" className="mt-4"><SubAbaConciliacao clienteId={clienteId}/></TabsContent>
       </Tabs>
     </div>
   );
 }
-
 export default TabContabil;
