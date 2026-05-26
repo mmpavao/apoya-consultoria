@@ -16,6 +16,7 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as CheckoutIdRouteImport } from './routes/checkout.$id'
 import { Route as AppWorkflowsRouteImport } from './routes/_app.workflows'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
+import { Route as AppSocietarioRouteImport } from './routes/_app.societario'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppDpRouteImport } from './routes/_app.dp'
@@ -77,6 +78,11 @@ const AppWorkflowsRoute = AppWorkflowsRouteImport.update({
 const AppWhatsappRoute = AppWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSocietarioRoute = AppSocietarioRouteImport.update({
+  id: '/societario',
+  path: '/societario',
   getParentRoute: () => AppRoute,
 } as any)
 const AppObrigacoesRoute = AppObrigacoesRouteImport.update({
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/dp': typeof AppDpRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
+  '/societario': typeof AppSocietarioRoute
   '/whatsapp': typeof AppWhatsappRoute
   '/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
@@ -270,6 +277,7 @@ export interface FileRoutesByTo {
   '/dp': typeof AppDpRoute
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
+  '/societario': typeof AppSocietarioRoute
   '/whatsapp': typeof AppWhatsappRoute
   '/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
@@ -308,6 +316,7 @@ export interface FileRoutesById {
   '/_app/dp': typeof AppDpRoute
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
+  '/_app/societario': typeof AppSocietarioRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
   '/_app/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
@@ -347,6 +356,7 @@ export interface FileRouteTypes {
     | '/dp'
     | '/financeiro'
     | '/obrigacoes'
+    | '/societario'
     | '/whatsapp'
     | '/workflows'
     | '/checkout/$id'
@@ -382,6 +392,7 @@ export interface FileRouteTypes {
     | '/dp'
     | '/financeiro'
     | '/obrigacoes'
+    | '/societario'
     | '/whatsapp'
     | '/workflows'
     | '/checkout/$id'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/_app/dp'
     | '/_app/financeiro'
     | '/_app/obrigacoes'
+    | '/_app/societario'
     | '/_app/whatsapp'
     | '/_app/workflows'
     | '/checkout/$id'
@@ -513,6 +525,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp'
       fullPath: '/whatsapp'
       preLoaderRoute: typeof AppWhatsappRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/societario': {
+      id: '/_app/societario'
+      path: '/societario'
+      fullPath: '/societario'
+      preLoaderRoute: typeof AppSocietarioRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/obrigacoes': {
@@ -724,6 +743,7 @@ interface AppRouteChildren {
   AppDpRoute: typeof AppDpRoute
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
+  AppSocietarioRoute: typeof AppSocietarioRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
   AppWorkflowsRoute: typeof AppWorkflowsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -745,6 +765,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDpRoute: AppDpRoute,
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
+  AppSocietarioRoute: AppSocietarioRoute,
   AppWhatsappRoute: AppWhatsappRoute,
   AppWorkflowsRoute: AppWorkflowsRoute,
   AppIndexRoute: AppIndexRoute,
