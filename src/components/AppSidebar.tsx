@@ -21,36 +21,38 @@ import {
 import { cn } from "@/lib/utils";
 
 type NavItem =
-  | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never }
-  | { separator: true; to?: never; label?: never; icon?: never; exact?: never };
+  | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never; group?: never }
+  | { separator: true; to?: never; label?: never; icon?: never; exact?: never; group?: never }
+  | { group: string; to?: never; label?: never; icon?: never; exact?: never; separator?: never };
 
 const items: NavItem[] = [
-  // ── GRUPO 1: Visão geral ──────────────────────────────────────────────────
+  { group: "GESTÃO" },
   { to: "/",           label: "Dashboard",    icon: LayoutDashboard, exact: true },
   { to: "/clientes",   label: "Clientes",     icon: Building2 },
   { to: "/crm",        label: "CRM",          icon: UserRoundSearch },
-  { to: "/societario",  label: "Societário",     icon: Landmark },
-  { separator: true },
-  // ── GRUPO 2: Operacional ─────────────────────────────────────────────────
+
+  { group: "OPERACIONAL" },
   { to: "/obrigacoes", label: "Obrigações",   icon: Calendar },
   { to: "/workflows",  label: "Workflows",    icon: Workflow },
+  { to: "/societario", label: "Societário",   icon: Landmark },
+
+  { group: "DEPARTAMENTOS" },
   { to: "/fiscal/das", label: "Fiscal",       icon: Receipt },
   { to: "/dp",         label: "Dep. Pessoal", icon: Users2 },
   { to: "/contabil",   label: "Contábil",     icon: BookOpen },
   { to: "/financeiro", label: "Financeiro",   icon: DollarSign },
-  { separator: true },
-  // ── GRUPO 3: Infraestrutura ───────────────────────────────────────────────
+
+  { group: "FERRAMENTAS" },
   { to: "/documentos", label: "Documentos",   icon: FolderOpen },
   { to: "/whatsapp",   label: "WhatsApp",     icon: MessageSquare },
   { to: "/automacoes", label: "Automações",   icon: Bot },
 ];
-
 const bottom: NavItem[] = [
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {
-  if (item.separator) return false;
+  if (item.separator || "group" in item) return false;
   if (item.exact) return pathname === item.to;
   if (item.to === "/fiscal/das") return pathname.startsWith("/fiscal");
   return pathname.startsWith(item.to);
@@ -164,7 +166,15 @@ export function AppSidebar({
         )}
       >
         {items.map((it, idx) =>
-          it.separator ? (
+          "group" in it && it.group ? (
+            collapsed ? (
+              <div key={`grp-${it.group}`} className="mx-2 my-1 border-t border-sidebar-border/30 w-8" />
+            ) : (
+              <p key={`grp-${it.group}`} className="px-3 pt-3 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/30 select-none">
+                {it.group}
+              </p>
+            )
+          ) : it.separator ? (
             <div
               key={`sep-${idx}`}
               className={collapsed ? "my-1 border-t border-sidebar-border/30 mx-2 w-8" : "mx-3 my-1 border-t border-sidebar-border/30"}
