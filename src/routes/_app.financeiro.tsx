@@ -224,12 +224,17 @@ function FinanceiroPage(){
         title="Financeiro"
         subtitle={`Régua de cobrança · ${MESES[mes-1]} ${ano}`}
         actions={
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
-              onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
-            <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
-              onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+                onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
+              <span className="min-w-[120px] text-center text-sm font-semibold">{MESES[mes-1]} {ano}</span>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
+                onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
+            </div>
+            <Button size="sm" onClick={() => setDialogCob(true)} className="rounded-xl gap-1.5">
+              <Plus className="h-4 w-4" /> Registrar Pagamento
+            </Button>
           </div>
         }
       />

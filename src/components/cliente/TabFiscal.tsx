@@ -28,6 +28,8 @@ import { useSerpro } from "@/hooks/use-serpro";
 import { useNfse } from "@/hooks/use-nfse";
 import { useNfseEmitidas, useNfseRecebidas } from "@/hooks/use-nfse-local";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
+import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
+import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
 import { REGIME_LABEL, type Cliente } from "@/hooks/use-clientes";
 import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
@@ -47,7 +49,7 @@ function downloadBlob(b64: string, filename: string, mime: string) {
 }
 
 // ── sub-tipos de tab ───────────────────────────────────────────────────────
-type FiscalTab = "resumo" | "emitidas" | "recebidas" | "emitir" | "serpro";
+type FiscalTab = "resumo" | "emitidas" | "recebidas" | "emitir" | "serpro" | "docs" | "apuracao";
 
 const SUB_TABS: { id: FiscalTab; label: string }[] = [
   { id: "resumo",   label: "Resumo Fiscal" },
@@ -55,6 +57,8 @@ const SUB_TABS: { id: FiscalTab; label: string }[] = [
   { id: "recebidas",label: "NF Recebidas"  },
   { id: "emitir",   label: "Emitir NFS-e"  },
   { id: "serpro",   label: "Consultas Fiscais" },
+  { id: "docs",     label: "Doc. Fiscais" },
+  { id: "apuracao", label: "Apuração" },
 ];
 
 // ── badge inline ───────────────────────────────────────────────────────────
@@ -734,7 +738,7 @@ function EmitirNfse({ cliente }: { cliente: Cliente }) {
 // ────────────────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ────────────────────────────────────────────────────────────────────────────
-export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean } }) {
+export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean; cnpj?: string; regime?: string } }) {
   const [sub, setSub] = useState<FiscalTab>("resumo");
   const [modalNfse, setModalNfse] = useState(false);
 
@@ -794,6 +798,20 @@ export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: 
             tem_certificado: (cliente as any).tem_certificado ?? false,
             tem_procuracao:  (cliente as any).tem_procuracao  ?? false,
           }}
+        />
+      )}
+
+      {sub === "docs" && (
+        <DocumentosFiscaisTab
+          clienteId={cliente.id}
+          clienteCnpj={cliente.cnpj ?? ""}
+        />
+      )}
+
+      {sub === "apuracao" && (
+        <ApuracaoMensalCard
+          clienteId={cliente.id}
+          regime={cliente.regime ?? "simples_nacional"}
         />
       )}
     </div>
