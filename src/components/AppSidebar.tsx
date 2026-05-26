@@ -17,8 +17,10 @@ import {
   Bot,
   UserRoundSearch,
   Landmark,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 type NavItem =
   | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never; group?: never }
@@ -47,6 +49,7 @@ const items: NavItem[] = [
   { to: "/whatsapp",   label: "WhatsApp",     icon: MessageSquare },
   { to: "/automacoes", label: "Automações",   icon: Bot },
 ];
+
 const bottom: NavItem[] = [
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -56,6 +59,26 @@ function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.to;
   if (item.to === "/fiscal/das") return pathname.startsWith("/fiscal");
   return pathname.startsWith(item.to);
+}
+
+function getActiveGroup(pathname: string): string | null {
+  const gestao        = ["/", "/clientes", "/crm"];
+  const operacional   = ["/obrigacoes", "/workflows", "/societario"];
+  const departamentos = ["/fiscal", "/dp", "/contabil", "/financeiro"];
+  const ferramentas   = ["/documentos", "/whatsapp", "/automacoes"];
+  if (gestao.some(p => pathname === p || (p !== "/" && pathname.startsWith(p)))) return "GESTÃO";
+  if (operacional.some(p => pathname.startsWith(p)))   return "OPERACIONAL";
+  if (departamentos.some(p => pathname.startsWith(p))) return "DEPARTAMENTOS";
+  if (ferramentas.some(p => pathname.startsWith(p)))   return "FERRAMENTAS";
+  return null;
+}
+
+function defaultOpenGroups(): string[] {
+  try {
+    const saved = localStorage.getItem("sidebar-open-groups");
+    if (saved) return JSON.parse(saved) as string[];
+  } catch {}
+  return ["GESTÃO", "OPERACIONAL", "DEPARTAMENTOS", "FERRAMENTAS"];
 }
 
 function NavLine({
@@ -77,7 +100,7 @@ function NavLine({
       title={collapsed ? item.label : undefined}
       className={cn(
         "group relative flex items-center rounded-xl transition-all duration-200",
-        collapsed ? "h-11 w-11 justify-center" : "h-11 w-full px-3 gap-3",
+        collapsed ? "h-9 w-9 justify-center" : "h-9 w-full px-3 gap-2.5",
         active
           ? "bg-primary text-primary-foreground shadow-glow"
           : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -108,6 +131,87 @@ export function AppSidebar({
   onLogout?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [openGroups, setOpenGroups] = useState<string[]>(defaultOpenGroups);
+
+  useEffect(() => {
+    const activeGroup = getActiveGroup(pathname);
+    if (activeGroup) {
+      setOpenGroups(prev => {
+        if (prev.includes(activeGroup)) return prev;
+        const next = [...prev, activeGroup];
+        localStorage.setItem("sidebar-open-groups", JSON.stringify(next));
+        return next;
+      });
+    }
+  }, [pathname]);
+
+  function toggleGroup(group: string) {
+    setOpenGroups(prev => {
+      const next = prev.includes(group)
+        ? prev.filter(g => g !== group)
+        : [...prev, group];
+      localStorage.setItem("sidebar-open-groups", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function renderAccordion(): React.ReactNode[] {
+    const rendered: React.ReactNode[] = [];
+    let currentGroup: string | null = null;
+    let groupItems: NavItem[] = [];
+
+    const flushGroup = () => {
+      if (!currentGroup) return;
+      const grp = currentGroup;
+      const isOpen = collapsed || openGroups.includes(grp);
+      rendered.push(
+        <div key={`group-${grp}`} className="mb-0.5">
+          {!collapsed && (
+            <button
+              onClick={() => toggleGroup(grp)}
+              className={cn(
+                "w-full flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors",
+                "text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/40"
+              )}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-widest">{grp}</span>
+              <ChevronDown className={cn(
+                "h-3 w-3 transition-transform duration-200",
+                isOpen ? "rotate-0" : "-rotate-90"
+              )} />
+            </button>
+          )}
+          {isOpen && (
+            <div className={cn("flex flex-col gap-0.5", !collapsed && "mt-0.5")}>
+              {groupItems.map((it) =>
+                "to" in it ? (
+                  <NavLine
+                    key={it.to}
+                    item={it as Extract<NavItem, { to: string }>}
+                    active={isActive(pathname, it)}
+                    collapsed={collapsed}
+                    onClick={onNavigate}
+                  />
+                ) : null
+              )}
+            </div>
+          )}
+        </div>
+      );
+      groupItems = [];
+    };
+
+    for (const it of items) {
+      if ("group" in it && it.group) {
+        flushGroup();
+        currentGroup = it.group;
+      } else {
+        groupItems.push(it);
+      }
+    }
+    flushGroup();
+    return rendered;
+  }
 
   return (
     <div
@@ -116,10 +220,10 @@ export function AppSidebar({
         collapsed ? "items-center px-0" : "items-stretch px-3"
       )}
     >
-      {/* Header: logo + (wordmark) + toggle */}
+      {/* Header: logo + wordmark + toggle */}
       <div
         className={cn(
-          "mb-7 flex items-center",
+          "mb-5 flex items-center",
           collapsed ? "flex-col gap-3" : "justify-between"
         )}
       >
@@ -158,43 +262,20 @@ export function AppSidebar({
         )}
       </div>
 
-      {/* Nav principal */}
+      {/* Nav com accordion */}
       <nav
         className={cn(
-          "flex flex-1 flex-col gap-1.5",
+          "sidebar-nav flex flex-1 flex-col gap-0.5 overflow-y-auto",
           collapsed ? "items-center" : "items-stretch"
         )}
       >
-        {items.map((it, idx) =>
-          "group" in it && it.group ? (
-            collapsed ? (
-              <div key={`grp-${it.group}`} className="mx-2 my-1 border-t border-sidebar-border/30 w-8" />
-            ) : (
-              <p key={`grp-${it.group}`} className="px-3 pt-3 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/30 select-none">
-                {it.group}
-              </p>
-            )
-          ) : it.separator ? (
-            <div
-              key={`sep-${idx}`}
-              className={collapsed ? "my-1 border-t border-sidebar-border/30 mx-2 w-8" : "mx-3 my-1 border-t border-sidebar-border/30"}
-            />
-          ) : (
-            <NavLine
-              key={it.to}
-              item={it as Extract<NavItem, { to: string }>}
-              active={isActive(pathname, it)}
-              collapsed={collapsed}
-              onClick={onNavigate}
-            />
-          )
-        )}
+        {renderAccordion()}
       </nav>
 
       {/* Footer */}
       <div
         className={cn(
-          "flex flex-col gap-1.5",
+          "mt-2 flex flex-col gap-1",
           collapsed ? "items-center" : "items-stretch"
         )}
       >
@@ -213,7 +294,7 @@ export function AppSidebar({
             title="Sair"
             className={cn(
               "flex items-center rounded-xl text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-destructive transition-all",
-              collapsed ? "h-11 w-11 justify-center" : "h-11 w-full px-3 gap-3"
+              collapsed ? "h-9 w-9 justify-center" : "h-9 w-full px-3 gap-2.5"
             )}
           >
             <LogOut className="h-[18px] w-[18px] shrink-0" />

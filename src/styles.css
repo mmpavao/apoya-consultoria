@@ -370,3 +370,7 @@
   .ds-list-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-border); }
   .ds-list-item:last-child { border-bottom: none; }
 }
+
+/* Sidebar nav — scrollbar invisível */
+.sidebar-nav::-webkit-scrollbar { display: none; }
+.sidebar-nav { scrollbar-width: none; }
