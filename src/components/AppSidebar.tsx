@@ -16,6 +16,7 @@ import {
   ChevronsRight,
   Bot,
   UserRoundSearch,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const items: NavItem[] = [
   { to: "/",           label: "Dashboard",    icon: LayoutDashboard, exact: true },
   { to: "/clientes",   label: "Clientes",     icon: Building2 },
   { to: "/crm",        label: "CRM",          icon: UserRoundSearch },
+  { to: "/societario",  label: "Societário",     icon: Landmark },
   { separator: true },
   // ── GRUPO 2: Operacional ─────────────────────────────────────────────────
   { to: "/obrigacoes", label: "Obrigações",   icon: Calendar },

@@ -7,7 +7,8 @@
  *   Honorários   → histórico e configuração de honorários
  *   Pagamentos   → histórico de pagamentos realizados
  */
-import { useState, useMemo } from "react";
+import { toast } from "sonner";
+import { useState, useMemo, useCallback } from "react";
 import {
   Calendar, CheckCircle2, Clock, CreditCard, DollarSign,
   Hash, Loader2, Search, TrendingUp, User, XCircle, ReceiptText,
@@ -15,6 +16,10 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCobrancas } from "@/hooks/use-cobrancas";
+import { useEscritorio } from "@/hooks/use-escritorio";
+import { supabase } from "@/integrations/supabase/client";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Cliente } from "@/hooks/use-clientes";
 import type { Cobranca } from "@/hooks/use-cobrancas";
 
@@ -229,6 +234,56 @@ export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
               <DataRow label="Dia de Vencimento" value={cliente.diaVencimento ? `Todo dia ${cliente.diaVencimento}` : undefined} />
               <DataRow label="Forma de Pagamento" value={cliente.formaPagamento} />
               <DataRow label="Responsável"        value={cliente.responsavel} />
+            </FinCard>
+
+            {/* Configuração de Cobrança — SLA por cliente */}
+            <FinCard title="⚙️ Configuração de Cobrança" icon={DollarSign}>
+              <div className="space-y-4">
+                {/* Dia de cobrança */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Dia de cobrança</Label>
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                      <input type="checkbox" className="h-3 w-3 accent-primary" checked={usarGlobalDia}
+                        onChange={e=>setUsarGlobalDia(e.target.checked)}/>
+                      Usar global ({escritorio?.diaCobranca ?? 10})
+                    </label>
+                  </div>
+                  <Input type="number" min={1} max={31} placeholder={String(escritorio?.diaCobranca ?? 10)}
+                    value={slaDia} onChange={e=>setSlaDia(e.target.value)} disabled={usarGlobalDia} className="h-8 text-sm"/>
+                </div>
+                {/* Dias p/ suspensão */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Dias para suspensão</Label>
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                      <input type="checkbox" className="h-3 w-3 accent-primary" checked={usarGlobalSusp}
+                        onChange={e=>setUsarGlobalSusp(e.target.checked)}/>
+                      Usar global ({escritorio?.diasSuspensao ?? 45})
+                    </label>
+                  </div>
+                  <Input type="number" min={1} max={120} placeholder={String(escritorio?.diasSuspensao ?? 45)}
+                    value={slaSupen} onChange={e=>setSlaSusp(e.target.value)} disabled={usarGlobalSusp} className="h-8 text-sm"/>
+                </div>
+                {/* Forma padrão */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Forma de pagamento padrão</Label>
+                  <Select value={slaForma} onValueChange={setSlaForma}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue/></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PIX">PIX</SelectItem>
+                      <SelectItem value="BOLETO">Boleto</SelectItem>
+                      <SelectItem value="DEBITO">Débito em conta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={salvarSla} disabled={salvandoSla}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                    {salvandoSla?"Salvando...":"💾 Salvar"}
+                  </button>
+                </div>
+              </div>
             </FinCard>
 
             {/* Últimas cobranças */}

@@ -3,13 +3,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
-  Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus} from "lucide-react";
+  Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
+  RefreshCw, Zap, ExternalLink, TrendingDown} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { CobrancaFormDialog } from "@/components/CobrancaFormDialog";
+import { PagamentoDialog } from "@/components/PagamentoDialog";
 // import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
 
 export const Route = createFileRoute("/_app/financeiro")({
@@ -33,7 +35,11 @@ function FinanceiroPage(){
   const { cobrancas: items, loading: cobLoading, refetch: refresh } = useCobrancas();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
-  const [dialogCob, setDialogCob] = useState(false);
+  const [dialogCob, setDialogCob]     = useState(false);
+  type FinView = "cobrancas" | "inadimplencia";
+  const [finView, setFinView]          = useState<FinView>("cobrancas");
+  const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
+  const [executandoRegua, setExecRegua] = useState(false);
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
@@ -165,6 +171,47 @@ function FinanceiroPage(){
     }
   }
 
+
+  async function executarRegua() {
+    setExecRegua(true);
+    toast.loading("Executando régua…", { id: "fin-regua" });
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", { id:"fin-regua" }); return; }
+      const res = await fetch("/api/cobranca/regua", {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},
+        body: JSON.stringify({ mode:"manual" }),
+      });
+      const data = await res.json() as Record<string,unknown>;
+      await refresh();
+      if (data.ok) toast.success(`Régua executada: ${data.processadas ?? 0} cobrança(s)`, { id:"fin-regua" });
+      else toast.error(String(data.error??"Erro"), { id:"fin-regua" });
+    } catch(e) {
+      toast.error("Erro: " + (e instanceof Error ? e.message : "Tente novamente"), { id:"fin-regua" });
+    } finally { setExecRegua(false); }
+  }
+
+  // ── Dados de inadimplência ────────────────────────────────────────────────
+  const hoje = new Date().toISOString().split("T")[0];
+  const inadimplentes = items.filter(c => c.status==="vencida" || (c.status==="pendente" && c.vencimento < hoje));
+  const totalInad      = inadimplentes.reduce((s,c) => s+c.valor, 0);
+  const suspensas      = items.filter(c => c.reguaStage==="suspensao").length;
+  const vencidasMais30 = inadimplentes.filter(c => c.diasAtraso > 30).length;
+  const agingFaixas    = [
+    { label:"0–15 dias",  count: inadimplentes.filter(c=>c.diasAtraso<=15&&c.diasAtraso>=0).length,  cor:"text-amber-600" },
+    { label:"16–30 dias", count: inadimplentes.filter(c=>c.diasAtraso>15&&c.diasAtraso<=30).length,  cor:"text-orange-600" },
+    { label:"31–60 dias", count: inadimplentes.filter(c=>c.diasAtraso>30&&c.diasAtraso<=60).length,  cor:"text-red-600" },
+    { label:">60 dias",   count: inadimplentes.filter(c=>c.diasAtraso>60).length,                     cor:"text-rose-800 font-bold" },
+  ];
+  const STAGE_BADGE: Record<ReguaStage,{label:string;cls:string}> = {
+    ok:         {label:"Em dia",      cls:"bg-emerald-100 text-emerald-700"},
+    lembrete:   {label:"Lembrete",    cls:"bg-blue-100 text-blue-700"},
+    cobranca:   {label:"Cobrança",    cls:"bg-amber-100 text-amber-700"},
+    negativacao:{label:"Negativação", cls:"bg-orange-100 text-orange-700"},
+    suspensao:  {label:"Suspensão",   cls:"bg-rose-100 text-rose-700"},
+  };
+
   const cols: ColDef<Cobranca>[] = [
     {
       key:"cliente", header:"Cliente",
@@ -224,7 +271,7 @@ function FinanceiroPage(){
         title="Financeiro"
         subtitle={`Régua de cobrança · ${MESES[mes-1]} ${ano}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
                 onClick={()=>{let m=mes-1,a=ano;if(m<1){m=12;a--;}setMes(m);setAno(a);}}>‹</Button>
@@ -232,8 +279,14 @@ function FinanceiroPage(){
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
                 onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
             </div>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={gerarMensal} disabled={busy}>
+              {busy?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<Zap className="h-3.5 w-3.5"/>}Emitir cobranças
+            </Button>
+            <Button variant="ghost" size="sm" className="rounded-xl gap-1 text-xs" onClick={executarRegua} disabled={executandoRegua}>
+              {executandoRegua?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>}Régua
+            </Button>
             <Button size="sm" onClick={() => setDialogCob(true)} className="rounded-xl gap-1.5">
-              <Plus className="h-4 w-4" /> Registrar Pagamento
+              <Plus className="h-4 w-4" /> Nova Cobrança
             </Button>
           </div>
         }
@@ -247,6 +300,91 @@ function FinanceiroPage(){
       </KpiGrid>
 
 
+
+      {/* ── Tabs de view ── */}
+      <div className="flex items-center gap-1 border-b">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${finView==="cobrancas"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={()=>setFinView("cobrancas")}>
+          Cobranças
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${finView==="inadimplencia"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={()=>setFinView("inadimplencia")}>
+          <TrendingDown className="h-3.5 w-3.5"/>Inadimplência
+          {inadimplentes.length>0&&<span className="bg-rose-100 text-rose-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">{inadimplentes.length}</span>}
+        </button>
+      </div>
+
+      {/* ── VIEW: INADIMPLÊNCIA ── */}
+      {finView==="inadimplencia"&&(
+        <div className="space-y-5">
+          {/* KPIs inadimplência */}
+          <KpiGrid cols={4}>
+            <KpiCard icon={AlertTriangle} tone="danger"   label="Total inadimplentes"  value={inadimplentes.length} hint="clientes"/>
+            <KpiCard icon={DollarSign}   tone="danger"   label="Valor em aberto"       value={totalInad.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} hint="em atraso"/>
+            <KpiCard icon={TrendingDown} tone="warning"  label="Vencidas +30d"         value={vencidasMais30} hint="requer ação"/>
+            <KpiCard icon={ShieldAlert}  tone="warning"  label="Suspensas"             value={suspensas} hint="aguardando pagamento"/>
+          </KpiGrid>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            {/* Aging list */}
+            <div className="lg:col-span-2 surface-card rounded-xl border p-5">
+              <h3 className="font-semibold text-sm mb-4">Aging por faixa</h3>
+              <div className="space-y-3">
+                {agingFaixas.map(f=>(
+                  <div key={f.label} className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{f.label}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 bg-muted rounded-full h-2">
+                        <div className="bg-primary/60 h-2 rounded-full" style={{width:`${Math.min(100,(f.count/(inadimplentes.length||1))*100)}%`}}/>
+                      </div>
+                      <span className={`text-sm font-semibold tabular-nums w-6 text-right ${f.cor}`}>{f.count}</span>
+                    </div>
+                  </div>
+                ))}
+                {inadimplentes.length===0&&<p className="text-sm text-muted-foreground italic">Sem inadimplentes 🎉</p>}
+              </div>
+            </div>
+
+            {/* Tabela inadimplência */}
+            <div className="lg:col-span-3 surface-card rounded-xl border overflow-hidden">
+              <table className="ft-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase">Cliente</th>
+                    <th className="text-right p-3 text-xs font-semibold text-muted-foreground uppercase">Valor</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase hidden md:table-cell">Atraso</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase hidden sm:table-cell">Régua</th>
+                    <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inadimplentes.length===0&&<tr><td colSpan={5} className="text-center p-6 text-muted-foreground">Nenhum inadimplente no período. 🎉</td></tr>}
+                  {inadimplentes.map(c=>(
+                    <tr key={c.id} className="border-t border-border/50 hover:bg-muted/30">
+                      <td className="p-3"><div className="font-medium text-sm leading-tight">{c.clienteNome}</div><div className="text-[11px] text-muted-foreground font-mono">{c.cnpj}</div></td>
+                      <td className="p-3 text-right font-semibold tabular-nums">{c.valor.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</td>
+                      <td className="p-3 hidden md:table-cell"><span className={`font-semibold ${c.diasAtraso>30?"text-rose-600":c.diasAtraso>15?"text-orange-600":"text-amber-600"}`}>{c.diasAtraso}d</span></td>
+                      <td className="p-3 hidden sm:table-cell"><span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STAGE_BADGE[c.reguaStage].cls}`}>{STAGE_BADGE[c.reguaStage].label}</span></td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1">
+                          {c.linkPagamento&&<button title="Copiar link" onClick={()=>{navigator.clipboard.writeText(c.linkPagamento!);toast.success("Link copiado");}} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary"><ExternalLink className="h-3.5 w-3.5"/></button>}
+                          <button title="Registrar pagamento" onClick={()=>setPagDialog(c)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5"/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW: COBRANÇAS (original) ── */}
+      {finView==="cobrancas"&&(
+      <div>
       {/* Barra de ações em lote */}
       {sel.size>0 && (
         <div className="flex items-center gap-3 rounded-xl border bg-primary/5 px-4 py-2.5">
@@ -306,10 +444,19 @@ function FinanceiroPage(){
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
 
+      </div>
+      )} {/* fim finView=cobrancas */}
+
       <CobrancaFormDialog
         open={dialogCob}
         onClose={() => setDialogCob(false)}
         onCreated={() => {}}
+      />
+      <PagamentoDialog
+        cobranca={pagDialog}
+        open={!!pagDialog}
+        onClose={() => setPagDialog(null)}
+        onSaved={() => { void refresh(); }}
       />
     </div>
   );
