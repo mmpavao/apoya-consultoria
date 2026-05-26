@@ -19,33 +19,36 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  exact?: boolean;
-};
+type NavItem =
+  | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never }
+  | { separator: true; to?: never; label?: never; icon?: never; exact?: never };
 
 const items: NavItem[] = [
-  { to: "/",             label: "Dashboard",   icon: LayoutDashboard, exact: true },
-  { to: "/clientes",     label: "Clientes",    icon: Building2 },
-  { to: "/obrigacoes",   label: "Obrigações",  icon: Calendar },
-  { to: "/workflows",    label: "Workflows",   icon: Workflow },
-  { to: "/crm",          label: "CRM",         icon: UserRoundSearch },
-  { to: "/documentos",   label: "Documentos",  icon: FolderOpen },
-  { to: "/fiscal/das",   label: "Fiscal",      icon: Receipt },
-  { to: "/dp",           label: "Dep. Pessoal", icon: Users2 },
-  { to: "/contabil",     label: "Contábil",     icon: BookOpen },
-  { to: "/financeiro",   label: "Financeiro",  icon: DollarSign },
-  { to: "/whatsapp",     label: "WhatsApp",    icon: MessageSquare },
-  { to: "/automacoes",  label: "Automações",  icon: Bot            },
+  // ── GRUPO 1: Visão geral ──────────────────────────────────────────────────
+  { to: "/",           label: "Dashboard",    icon: LayoutDashboard, exact: true },
+  { to: "/clientes",   label: "Clientes",     icon: Building2 },
+  { to: "/crm",        label: "CRM",          icon: UserRoundSearch },
+  { separator: true },
+  // ── GRUPO 2: Operacional ─────────────────────────────────────────────────
+  { to: "/obrigacoes", label: "Obrigações",   icon: Calendar },
+  { to: "/workflows",  label: "Workflows",    icon: Workflow },
+  { to: "/fiscal/das", label: "Fiscal",       icon: Receipt },
+  { to: "/dp",         label: "Dep. Pessoal", icon: Users2 },
+  { to: "/contabil",   label: "Contábil",     icon: BookOpen },
+  { to: "/financeiro", label: "Financeiro",   icon: DollarSign },
+  { separator: true },
+  // ── GRUPO 3: Infraestrutura ───────────────────────────────────────────────
+  { to: "/documentos", label: "Documentos",   icon: FolderOpen },
+  { to: "/whatsapp",   label: "WhatsApp",     icon: MessageSquare },
+  { to: "/automacoes", label: "Automações",   icon: Bot },
 ];
 
 const bottom: NavItem[] = [
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
-function isActive(pathname: string, item: NavItem) {
+function isActive(pathname: string, item: NavItem): boolean {
+  if (item.separator) return false;
   if (item.exact) return pathname === item.to;
   if (item.to === "/fiscal/das") return pathname.startsWith("/fiscal");
   return pathname.startsWith(item.to);
@@ -57,7 +60,7 @@ function NavLine({
   collapsed,
   onClick,
 }: {
-  item: NavItem;
+  item: Extract<NavItem, { to: string }>;
   active: boolean;
   collapsed: boolean;
   onClick?: () => void;
@@ -158,15 +161,22 @@ export function AppSidebar({
           collapsed ? "items-center" : "items-stretch"
         )}
       >
-        {items.map((it) => (
-          <NavLine
-            key={it.to}
-            item={it}
-            active={isActive(pathname, it)}
-            collapsed={collapsed}
-            onClick={onNavigate}
-          />
-        ))}
+        {items.map((it, idx) =>
+          it.separator ? (
+            <div
+              key={`sep-${idx}`}
+              className={collapsed ? "my-1 border-t border-sidebar-border/30 mx-2 w-8" : "mx-3 my-1 border-t border-sidebar-border/30"}
+            />
+          ) : (
+            <NavLine
+              key={it.to}
+              item={it as Extract<NavItem, { to: string }>}
+              active={isActive(pathname, it)}
+              collapsed={collapsed}
+              onClick={onNavigate}
+            />
+          )
+        )}
       </nav>
 
       {/* Footer */}

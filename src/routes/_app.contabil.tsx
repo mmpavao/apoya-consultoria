@@ -5,10 +5,17 @@
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { BookOpen, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { BookOpen, AlertTriangle, CheckCircle2, Clock, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageHeader, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
 import { DataTable, InlineBadge, type ColDef } from "@/components/DataTable";
+import { useAbrirPeriodo } from "@/hooks/use-contabil";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/contabil")({
   component: ContabilPage,
@@ -34,6 +41,12 @@ function ContabilPage() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<ClienteContabil[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAbrirPeriodo, setShowAbrirPeriodo] = useState(false);
+  const { abrirPeriodo, loading: abrindo } = useAbrirPeriodo();
+  const [periodoForm, setPeriodoForm] = useState({
+    empresa_id: "",
+    competencia: new Date().toISOString().slice(0, 7),
+  });
   const competencia = mesAtual();
 
   useEffect(() => {
@@ -154,7 +167,56 @@ function ContabilPage() {
         eyebrow="Gestão"
         title="Contabilidade"
         subtitle="Visão consolidada de períodos contábeis de todos os clientes"
+        actions={
+          <Button size="sm" onClick={() => setShowAbrirPeriodo(true)} className="rounded-xl gap-1.5">
+            <Plus className="h-4 w-4" /> Abrir Período
+          </Button>
+        }
       />
+
+      {/* Dialog — Abrir Período */}
+      <Dialog open={showAbrirPeriodo} onOpenChange={setShowAbrirPeriodo}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Abrir Período Contábil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Empresa</Label>
+              <Select value={periodoForm.empresa_id} onValueChange={v => setPeriodoForm(f => ({ ...f, empresa_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecionar cliente..." /></SelectTrigger>
+                <SelectContent>
+                  {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razao_social}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Mês de referência</Label>
+              <Input
+                type="month"
+                value={periodoForm.competencia}
+                onChange={e => setPeriodoForm(f => ({ ...f, competencia: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAbrirPeriodo(false)}>Cancelar</Button>
+            <Button
+              disabled={abrindo || !periodoForm.empresa_id || !periodoForm.competencia}
+              onClick={async () => {
+                if (!periodoForm.empresa_id) { toast.error("Selecione uma empresa"); return; }
+                const ok = await abrirPeriodo(periodoForm.empresa_id, periodoForm.competencia);
+                if (ok) {
+                  setShowAbrirPeriodo(false);
+                  setPeriodoForm({ empresa_id: "", competencia: new Date().toISOString().slice(0, 7) });
+                }
+              }}
+            >
+              {abrindo ? "Abrindo..." : "Abrir Período"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <KpiGrid cols={4}>
         <KpiCard icon={Clock}         label="Períodos Abertos"       value={periodosAbertos}  tone="warning" />

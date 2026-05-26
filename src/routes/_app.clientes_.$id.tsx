@@ -9,7 +9,7 @@ import {
   Edit, FileText, Mail, MapPin, MessageSquare, Phone, Save, Trash2,
   User, X, AlertTriangle, Briefcase, CreditCard, Hash, Home,
   Info, ReceiptText, ShieldCheck, Users, Users2, BookOpen, Zap, ChevronRight,
-  ExternalLink, Loader2, RefreshCw, TrendingUp, BarChart3,
+  ExternalLink, Loader2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,8 +32,6 @@ import { TabDocumentos } from "@/components/cliente/TabDocumentos";
 import { TabFiscal } from "@/components/cliente/TabFiscal";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
-import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
-import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
 import { TabSocios } from "@/components/cliente/TabSocios";
 import { TabCertificados } from "@/components/cliente/TabCertificados";
 import { TabComercial } from "@/components/cliente/TabComercial";
@@ -130,19 +128,17 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-type Tab = "geral" | "fiscal" | "comercial" | "motor_docs" | "motor_apuracao" | "socios" | "certificados" | "documentos" | "historico" | "dp" | "contabil";
+type Tab = "geral" | "fiscal" | "dp" | "contabil" | "comercial" | "socios" | "certificados" | "documentos" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: "geral",          label: "Visão Geral",  icon: Building2  },
-  { id: "fiscal",         label: "Fiscal",        icon: FileText   },
-  { id: "comercial",      label: "Comercial",     icon: Briefcase  },
-  { id: "motor_docs",     label: "Doc. Fiscais",  icon: TrendingUp },
-  { id: "motor_apuracao", label: "Apuração",      icon: BarChart3  },
-  { id: "socios",         label: "Sócios",        icon: Users      },
-  { id: "certificados",   label: "Certificados",  icon: Shield     },
-  { id: "documentos",     label: "Documentos",    icon: FileText   },
-  { id: "historico",      label: "Histórico",     icon: Clock      },
-  { id: "dp",             label: "Dep. Pessoal",  icon: Users2     },
-  { id: "contabil",       label: "Contábil",      icon: BookOpen   },
+  { id: "geral",        label: "Visão Geral",  icon: Building2  },
+  { id: "fiscal",       label: "Fiscal",        icon: FileText   },
+  { id: "dp",           label: "Dep. Pessoal",  icon: Users2     },
+  { id: "contabil",     label: "Contábil",      icon: BookOpen   },
+  { id: "comercial",    label: "Comercial",     icon: Briefcase  },
+  { id: "socios",       label: "Sócios",        icon: Users      },
+  { id: "certificados", label: "Certificados",  icon: Shield     },
+  { id: "documentos",   label: "Documentos",    icon: FileText   },
+  { id: "historico",    label: "Histórico",     icon: Clock      },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -518,22 +514,6 @@ function ClienteDetailPage() {
 
 
       
-
-      {tab === "motor_docs" && (
-        <DocumentosFiscaisTab
-          clienteId={id}
-          clienteCnpj={cliente.cnpj}
-        />
-      )}
-
-      {tab === "motor_apuracao" && (
-        <ApuracaoMensalCard
-          clienteId={id}
-          regime={REGIME_LABEL[cliente.regime] ?? cliente.regime}
-        />
-      )}
-
-
 
       {tab === "socios" && <TabSocios clienteId={id} />}
 
