@@ -1,0 +1,285 @@
+/**
+ * Hook: use-dp.ts
+ * Departamento Pessoal — Funcionários, Folha Mensal, Férias, Rescisões
+ * Escopo: Simples Nacional apenas
+ */
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type TipoContrato   = "clt" | "pj" | "estagiario" | "autonomo";
+export type StatusFunc     = "ativo" | "afastado" | "demitido";
+export type StatusFolha    = "aberta" | "fechada" | "enviada";
+export type StatusFerias   = "pendente" | "agendada" | "paga" | "vencida";
+export type TipoRescisao   =
+  | "sem_justa_causa" | "com_justa_causa" | "pedido_demissao"
+  | "acordo" | "aposentadoria";
+
+export interface Funcionario {
+  id: string; empresa_id: string; nome: string; cpf: string;
+  pis?: string; cargo?: string; departamento?: string;
+  salario_base: number; data_admissao: string; data_demissao?: string;
+  tipo_contrato: TipoContrato; jornada?: string;
+  banco?: string; agencia?: string; conta?: string; tipo_conta?: string;
+  dependentes: number; status: StatusFunc; observacoes?: string;
+  created_at: string; updated_at: string;
+  dias_sem_ferias?: number;
+}
+
+export interface FolhaMensal {
+  id: string; empresa_id: string; competencia: string;
+  total_funcionarios: number; total_proventos: number;
+  total_descontos: number; total_liquido: number;
+  total_fgts: number; total_inss_empresa: number;
+  status: StatusFolha; fechado_em?: string; fechado_por?: string;
+  observacoes?: string; created_at: string; updated_at: string;
+}
+
+export interface Ferias {
+  id: string; funcionario_id: string; empresa_id: string;
+  periodo_aquisitivo_ini: string; periodo_aquisitivo_fim: string;
+  gozo_inicio?: string; gozo_fim?: string; dias_gozo: number;
+  abono_pecuniario: boolean; dias_abono: number;
+  valor_ferias?: number; valor_abono?: number; valor_total?: number;
+  status: StatusFerias; created_at: string;
+  funcionario?: { nome: string; cargo?: string };
+}
+
+export interface Rescisao {
+  id: string; funcionario_id: string; empresa_id: string;
+  tipo: TipoRescisao; data_aviso?: string; data_demissao: string;
+  saldo_salario: number; ferias_vencidas: number; ferias_proporcionais: number;
+  decimo_proporcional: number; multa_fgts: number;
+  inss_desconto: number; irrf_desconto: number;
+  total_bruto: number; total_liquido: number; fgts_saldo: number;
+  homologada: boolean; homologada_em?: string; pdf_url?: string;
+  observacoes?: string; created_at: string;
+}
+
+// ─── Funcionários ────────────────────────────────────────────────────────────
+
+export function useFuncionarios(empresaId?: string) {
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any).from("funcionarios").select("*").order("nome");
+      if (empresaId) q = q.eq("empresa_id", empresaId);
+      const { data, error } = await q;
+      if (error) throw error;
+      const hoje = Date.now();
+      const enriched = (data ?? []).map((f: Funcionario) => ({
+        ...f,
+        dias_sem_ferias: f.status === "ativo"
+          ? Math.floor((hoje - new Date(f.data_admissao).getTime()) / 86400000)
+          : 0,
+      }));
+      setFuncionarios(enriched);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao carregar funcionários");
+    } finally { setLoading(false); }
+  }, [empresaId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { funcionarios, loading, refresh: fetch };
+}
+
+export function useFuncionarioById(id: string) {
+  const [funcionario, setFuncionario] = useState<Funcionario | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      setLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("funcionarios").select("*").eq("id", id).single();
+      setFuncionario(data ?? null);
+      setLoading(false);
+    })();
+  }, [id]);
+  return { funcionario, loading };
+}
+
+export function useCreateFuncionario() {
+  const [loading, setLoading] = useState(false);
+  const create = useCallback(async (data: Omit<Funcionario, "id" | "created_at" | "updated_at" | "dias_sem_ferias">) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("funcionarios").insert(data);
+      if (error) throw error;
+      toast.success("Funcionário cadastrado");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao cadastrar"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { create, loading };
+}
+
+export function useUpdateFuncionario() {
+  const [loading, setLoading] = useState(false);
+  const update = useCallback(async (id: string, data: Partial<Funcionario>) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("funcionarios")
+        .update({ ...data, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+      toast.success("Funcionário atualizado");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao atualizar"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { update, loading };
+}
+
+export function useDemitirFuncionario() {
+  const [loading, setLoading] = useState(false);
+  const demitir = useCallback(async (funcionarioId: string, dataDemissao: string, tipo: TipoRescisao) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
+      const { error: e1 } = await db.from("funcionarios")
+        .update({ status: "demitido", data_demissao: dataDemissao, updated_at: new Date().toISOString() })
+        .eq("id", funcionarioId);
+      if (e1) throw e1;
+      const { data: func } = await db.from("funcionarios").select("empresa_id").eq("id", funcionarioId).single();
+      const { error: e2 } = await db.from("rescisoes")
+        .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao });
+      if (e2) throw e2;
+      toast.success("Funcionário demitido e rescisão registrada");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao demitir"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { demitir, loading };
+}
+
+// ─── Folha Mensal ────────────────────────────────────────────────────────────
+
+export function useFolhaMensal(empresaId: string, competencia: string) {
+  const [folha, setFolha] = useState<FolhaMensal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const fetch = useCallback(async () => {
+    if (!empresaId || !competencia) return;
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("folha_mensal")
+        .select("*").eq("empresa_id", empresaId).eq("competencia", competencia).maybeSingle();
+      if (error) throw error;
+      setFolha(data ?? null);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar folha"); }
+    finally { setLoading(false); }
+  }, [empresaId, competencia]);
+  useEffect(() => { fetch(); }, [fetch]);
+  return { folha, loading, refresh: fetch };
+}
+
+export function useCreateFolha() {
+  const [loading, setLoading] = useState(false);
+  const createFolha = useCallback(async (empresaId: string, competencia: string) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any;
+      const { count } = await db.from("funcionarios")
+        .select("id", { count: "exact", head: true })
+        .eq("empresa_id", empresaId).eq("status", "ativo");
+      const { error } = await db.from("folha_mensal")
+        .insert({ empresa_id: empresaId, competencia, total_funcionarios: count ?? 0, status: "aberta" });
+      if (error) throw error;
+      toast.success(`Folha ${competencia} aberta`);
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao criar folha"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { createFolha, loading };
+}
+
+export function useFecharFolha() {
+  const [loading, setLoading] = useState(false);
+  const fecharFolha = useCallback(async (folhaId: string) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("folha_mensal")
+        .update({ status: "fechada", fechado_em: new Date().toISOString(), fechado_por: user?.id, updated_at: new Date().toISOString() })
+        .eq("id", folhaId);
+      if (error) throw error;
+      toast.success("Folha fechada");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao fechar folha"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { fecharFolha, loading };
+}
+
+// ─── Férias ──────────────────────────────────────────────────────────────────
+
+export function useFerias(empresaId?: string) {
+  const [ferias, setFerias] = useState<Ferias[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any).from("ferias")
+        .select("*, funcionario:funcionario_id(nome, cargo)")
+        .in("status", ["pendente", "vencida"])
+        .order("periodo_aquisitivo_fim");
+      if (empresaId) q = q.eq("empresa_id", empresaId);
+      const { data, error } = await q;
+      if (error) throw error;
+      setFerias(data ?? []);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar férias"); }
+    finally { setLoading(false); }
+  }, [empresaId]);
+  useEffect(() => { fetch(); }, [fetch]);
+  return { ferias, loading, refresh: fetch };
+}
+
+export function useFeriasFuncionario(funcionarioId: string) {
+  const [ferias, setFerias] = useState<Ferias[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!funcionarioId) return;
+    (async () => {
+      setLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("ferias")
+        .select("*").eq("funcionario_id", funcionarioId).order("created_at", { ascending: false });
+      setFerias(data ?? []);
+      setLoading(false);
+    })();
+  }, [funcionarioId]);
+  return { ferias, loading };
+}
+
+// ─── Rescisões ───────────────────────────────────────────────────────────────
+
+export function useRescisoes(empresaId?: string) {
+  const [rescisoes, setRescisoes] = useState<Rescisao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any).from("rescisoes").select("*").order("data_demissao", { ascending: false });
+      if (empresaId) q = q.eq("empresa_id", empresaId);
+      const { data, error } = await q;
+      if (error) throw error;
+      setRescisoes(data ?? []);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar rescisões"); }
+    finally { setLoading(false); }
+  }, [empresaId]);
+  useEffect(() => { fetch(); }, [fetch]);
+  return { rescisoes, loading, refresh: fetch };
+}
