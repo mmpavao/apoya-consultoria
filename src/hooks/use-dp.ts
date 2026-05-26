@@ -246,6 +246,22 @@ export function useFerias(empresaId?: string) {
   return { ferias, loading, refresh: fetch };
 }
 
+export function useCreateFerias() {
+  const [loading, setLoading] = useState(false);
+  const create = useCallback(async (data: Omit<Ferias, "id" | "created_at">) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("ferias").insert(data);
+      if (error) throw error;
+      toast.success("Férias agendadas");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao agendar férias"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { create, loading };
+}
+
 export function useFeriasFuncionario(funcionarioId: string) {
   const [ferias, setFerias] = useState<Ferias[]>([]);
   const [loading, setLoading] = useState(true);

@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertTriangle, Plus, UserX, Calendar, CheckSquare } from "lucide-react";
+import { AlertTriangle, Plus, UserX, Calendar, CheckSquare, ExternalLink } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   useFuncionarios, useCreateFuncionario, useDemitirFuncionario,
@@ -318,8 +319,19 @@ function SubAbaFerias({ clienteId }: { clienteId: string }) {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export function TabDP({ clienteId }: { clienteId: string }) {
+  const navigate = useNavigate();
   return (
     <div className="animate-fade-up space-y-4">
+      {/* Link para página completa */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => navigate({ to: "/dp/$empresaId", params: { empresaId: clienteId } })}
+          className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Abrir DP Completo
+        </button>
+      </div>
       <Tabs defaultValue="funcionarios">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="funcionarios">Funcionários</TabsTrigger>

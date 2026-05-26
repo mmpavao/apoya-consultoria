@@ -42,6 +42,7 @@ import { Route as ApiCheckoutIdRouteImport } from './routes/api/checkout/$id'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
 import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
+import { Route as AppDpEmpresaIdRouteImport } from './routes/_app.dp_.$empresaId'
 import { Route as AppConfiguracoesServicosRouteImport } from './routes/_app.configuracoes_.servicos'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
 import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
@@ -210,6 +211,11 @@ const AppFiscalDasRoute = AppFiscalDasRouteImport.update({
   path: '/fiscal/das',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDpEmpresaIdRoute = AppDpEmpresaIdRouteImport.update({
+  id: '/dp_/$empresaId',
+  path: '/dp/$empresaId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppConfiguracoesServicosRoute =
   AppConfiguracoesServicosRouteImport.update({
     id: '/configuracoes_/servicos',
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/checkout/$id': typeof CheckoutIdRoute
   '/clientes/$id': typeof AppClientesIdRoute
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
+  '/dp/$empresaId': typeof AppDpEmpresaIdRoute
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/clientes/$id': typeof AppClientesIdRoute
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
+  '/dp/$empresaId': typeof AppDpEmpresaIdRoute
   '/fiscal/das': typeof AppFiscalDasRoute
   '/fiscal/nfse': typeof AppFiscalNfseRoute
   '/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/clientes_/$id': typeof AppClientesIdRoute
   '/_app/configuracoes_/servicos': typeof AppConfiguracoesServicosRoute
+  '/_app/dp_/$empresaId': typeof AppDpEmpresaIdRoute
   '/_app/fiscal/das': typeof AppFiscalDasRoute
   '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/checkout/$id'
     | '/clientes/$id'
     | '/configuracoes/servicos'
+    | '/dp/$empresaId'
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clientes/$id'
     | '/configuracoes/servicos'
+    | '/dp/$empresaId'
     | '/fiscal/das'
     | '/fiscal/nfse'
     | '/fiscal/serpro'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/clientes_/$id'
     | '/_app/configuracoes_/servicos'
+    | '/_app/dp_/$empresaId'
     | '/_app/fiscal/das'
     | '/_app/fiscal/nfse'
     | '/_app/fiscal/serpro'
@@ -709,6 +721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFiscalDasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/dp_/$empresaId': {
+      id: '/_app/dp_/$empresaId'
+      path: '/dp/$empresaId'
+      fullPath: '/dp/$empresaId'
+      preLoaderRoute: typeof AppDpEmpresaIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/configuracoes_/servicos': {
       id: '/_app/configuracoes_/servicos'
       path: '/configuracoes/servicos'
@@ -749,6 +768,7 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppClientesIdRoute: typeof AppClientesIdRoute
   AppConfiguracoesServicosRoute: typeof AppConfiguracoesServicosRoute
+  AppDpEmpresaIdRoute: typeof AppDpEmpresaIdRoute
   AppFiscalDasRoute: typeof AppFiscalDasRoute
   AppFiscalNfseRoute: typeof AppFiscalNfseRoute
   AppFiscalSerproRoute: typeof AppFiscalSerproRoute
@@ -771,6 +791,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppClientesIdRoute: AppClientesIdRoute,
   AppConfiguracoesServicosRoute: AppConfiguracoesServicosRoute,
+  AppDpEmpresaIdRoute: AppDpEmpresaIdRoute,
   AppFiscalDasRoute: AppFiscalDasRoute,
   AppFiscalNfseRoute: AppFiscalNfseRoute,
   AppFiscalSerproRoute: AppFiscalSerproRoute,
