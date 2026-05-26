@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useSerpro } from "@/hooks/use-serpro";
-import { useNfse, type NfseEmitida } from "@/hooks/use-nfse";
+import { useNfse } from "@/hooks/use-nfse";
 import { useNfseEmitidas, useNfseRecebidas } from "@/hooks/use-nfse-local";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { REGIME_LABEL, type Cliente } from "@/hooks/use-clientes";
