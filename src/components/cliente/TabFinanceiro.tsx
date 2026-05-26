@@ -143,7 +143,29 @@ function TabelaCobrancas({ cobrancas }: { cobrancas: Cobranca[] }) {
 // ────────────────────────────────────────────────────────────────────────────
 export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
   const { cobrancas, loading } = useCobrancas();
+  const { escritorio } = useEscritorio();
   const [sub, setSub] = useState<FinTab>("resumo");
+
+  // ── SLA por cliente ──────────────────────────────────────────────────────
+  const [usarGlobalDia,  setUsarGlobalDia]  = useState(!cliente.diaCobrancaProprio);
+  const [usarGlobalSusp, setUsarGlobalSusp] = useState(!cliente.diasSuspensaoProprio);
+  const [slaDia,   setSlaDia]   = useState(String(cliente.diaCobrancaProprio ?? ""));
+  const [slaSupen, setSlaSusp]  = useState(String(cliente.diasSuspensaoProprio ?? ""));
+  const [slaForma, setSlaForma] = useState<string>(cliente.formaPagamentoPadrao ?? "PIX");
+  const [salvandoSla, setSalvandoSla] = useState(false);
+
+  async function salvarSla() {
+    setSalvandoSla(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("clientes").update({
+      dia_cobranca_proprio:   usarGlobalDia  ? null : Number(slaDia)  || null,
+      dias_suspensao_proprio: usarGlobalSusp ? null : Number(slaSupen) || null,
+      forma_pagamento_padrao: slaForma,
+    }).eq("id", cliente.id);
+    setSalvandoSla(false);
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    toast.success("Configuração salva!");
+  }
 
   const cobCliente = useMemo(() =>
     cobrancas.filter(c => c.clienteId === cliente.id),

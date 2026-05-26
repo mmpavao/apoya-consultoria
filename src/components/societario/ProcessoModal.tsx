@@ -99,6 +99,21 @@ export function ProcessoModal({processo,open,onClose,onMoverFase,onComentario,on
               {processo.dataConclusao && <div className="flex justify-between"><span className="text-muted-foreground">Conclusão:</span><span className="text-emerald-600">{fmtData(processo.dataConclusao)}</span></div>}
             </div>
             <div><Label className="text-xs text-muted-foreground uppercase mb-1 block"><Clock className="h-3 w-3 inline mr-1"/>Tempo na fase</Label><p className="text-sm font-medium">{processo.diasNaFase}d</p></div>
+            {/* Documentos pendentes */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Documentos Pendentes</p>
+              {(processo.documentosPendentes ?? []).length === 0
+                ? <p className="text-xs text-muted-foreground italic">Nenhum doc pendente</p>
+                : <ul className="space-y-1">
+                    {processo.documentosPendentes!.map((doc, i) => (
+                      <li key={i} className="text-xs flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0"/>
+                        {doc}
+                      </li>
+                    ))}
+                  </ul>
+              }
+            </div>
             <div className="space-y-2 pt-2 border-t">
               {editando ? (
                 <div className="flex gap-2">

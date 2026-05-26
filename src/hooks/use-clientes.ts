@@ -31,6 +31,10 @@ export interface Cliente {
   diaVencimento?: number;
   valorHonorario?: number;
   formaPagamento?: FormaPagamento;
+  // SLA por cliente (override do escritório)
+  diaCobrancaProprio?: number | null;
+  diasSuspensaoProprio?: number | null;
+  formaPagamentoPadrao?: string | null;
   temEmpregados?: boolean;
   temIncentivoFiscal?: boolean;
   municipio?: string;
@@ -66,6 +70,9 @@ function fromDb(row: Record<string, unknown>): Cliente {
     diaVencimento:     row.dia_vencimento as number | undefined,
     valorHonorario:    row.valor_honorario ? Number(row.valor_honorario) : undefined,
     formaPagamento:    row.forma_pagamento as FormaPagamento | undefined,
+    diaCobrancaProprio:   row.dia_cobranca_proprio  != null ? Number(row.dia_cobranca_proprio)  : null,
+    diasSuspensaoProprio: row.dias_suspensao_proprio != null ? Number(row.dias_suspensao_proprio) : null,
+    formaPagamentoPadrao: row.forma_pagamento_padrao as string | null ?? null,
     temEmpregados:     row.tem_empregados as boolean,
     temIncentivoFiscal:row.tem_incentivo_fiscal as boolean,
     municipio:         row.municipio as string | undefined,
@@ -112,6 +119,9 @@ function toDb(c: Partial<Cliente>): Record<string, unknown> {
   if (c.diaVencimento     !== undefined) out.dia_vencimento      = c.diaVencimento;
   if (c.valorHonorario    !== undefined) out.valor_honorario     = c.valorHonorario;
   if (c.formaPagamento    !== undefined) out.forma_pagamento     = c.formaPagamento;
+  if (c.diaCobrancaProprio   !== undefined) out.dia_cobranca_proprio   = c.diaCobrancaProprio;
+  if (c.diasSuspensaoProprio !== undefined) out.dias_suspensao_proprio = c.diasSuspensaoProprio;
+  if (c.formaPagamentoPadrao !== undefined) out.forma_pagamento_padrao = c.formaPagamentoPadrao;
   if (c.temEmpregados     !== undefined) out.tem_empregados      = c.temEmpregados;
   if (c.temIncentivoFiscal!==undefined)  out.tem_incentivo_fiscal= c.temIncentivoFiscal;
   if (c.atividadePrincipal!==undefined)  out.atividade_principal = c.atividadePrincipal;
