@@ -28,6 +28,8 @@ import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
 import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
+import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
+import { Route as ApiWhatsappModoHumanoRouteImport } from './routes/api/whatsapp/modo-humano'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
 import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
@@ -140,6 +142,16 @@ const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
   id: '/fiscal/',
   path: '/fiscal/',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
+  id: '/api/whatsapp/webhook',
+  path: '/api/whatsapp/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappModoHumanoRoute = ApiWhatsappModoHumanoRouteImport.update({
+  id: '/api/whatsapp/modo-humano',
+  path: '/api/whatsapp/modo-humano',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWaSendRoute = ApiWaSendRouteImport.update({
   id: '/api/wa/send',
@@ -268,6 +280,8 @@ export interface FileRoutesByFullPath {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -306,6 +320,8 @@ export interface FileRoutesByTo {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/fiscal': typeof AppFiscalIndexRoute
   '/api/nfse': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -346,6 +362,8 @@ export interface FileRoutesById {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
+  '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
@@ -386,6 +404,8 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/whatsapp/modo-humano'
+    | '/api/whatsapp/webhook'
     | '/fiscal/'
     | '/api/nfse/'
     | '/api/public/evolution-webhook/$instance'
@@ -424,6 +444,8 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/whatsapp/modo-humano'
+    | '/api/whatsapp/webhook'
     | '/fiscal'
     | '/api/nfse'
     | '/api/public/evolution-webhook/$instance'
@@ -463,6 +485,8 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/whatsapp/modo-humano'
+    | '/api/whatsapp/webhook'
     | '/_app/fiscal/'
     | '/api/nfse/'
     | '/api/public/evolution-webhook/$instance'
@@ -484,6 +508,8 @@ export interface RootRouteChildren {
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
   ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiWaSendRoute: typeof ApiWaSendRoute
+  ApiWhatsappModoHumanoRoute: typeof ApiWhatsappModoHumanoRoute
+  ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   ApiNfseIndexRoute: typeof ApiNfseIndexRoute
   ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
 }
@@ -622,6 +648,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/fiscal/'
       preLoaderRoute: typeof AppFiscalIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/whatsapp/webhook': {
+      id: '/api/whatsapp/webhook'
+      path: '/api/whatsapp/webhook'
+      fullPath: '/api/whatsapp/webhook'
+      preLoaderRoute: typeof ApiWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp/modo-humano': {
+      id: '/api/whatsapp/modo-humano'
+      path: '/api/whatsapp/modo-humano'
+      fullPath: '/api/whatsapp/modo-humano'
+      preLoaderRoute: typeof ApiWhatsappModoHumanoRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/wa/send': {
       id: '/api/wa/send'
@@ -816,6 +856,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
   ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiWaSendRoute: ApiWaSendRoute,
+  ApiWhatsappModoHumanoRoute: ApiWhatsappModoHumanoRoute,
+  ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   ApiNfseIndexRoute: ApiNfseIndexRoute,
   ApiPublicEvolutionWebhookInstanceRoute:
     ApiPublicEvolutionWebhookInstanceRoute,

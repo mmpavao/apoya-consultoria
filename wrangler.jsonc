@@ -11,5 +11,10 @@
     "directory": "dist/client",
     "binding": "ASSETS",
     "not_found_handling": "none"
+  },
+  "vars": {
+    "SUPABASE_URL": "https://ajaqbdsalxfgrwpjbtbn.supabase.co",
+    "EVOLUTION_BASE_URL": "https://evolution-api-production-f159.up.railway.app",
+    "EVOLUTION_INSTANCE": "zapmei"
   }
 }
