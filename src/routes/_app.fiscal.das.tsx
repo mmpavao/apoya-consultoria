@@ -31,9 +31,9 @@ const fmtBRL  = (v: number) => v.toLocaleString("pt-BR",{style:"currency",curren
 const fmtDate = (d: string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
 function DasPage() {
-  const now = new Date();
-  const [ano, setAno]       = useState(now.getFullYear());
-  const [mes, setMes]       = useState(now.getMonth() + 1);
+  
+  const [ano, setAno] = useState<string>(() => String(new Date().getFullYear()));
+  const [mes, setMes] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const { guias: items, loading: dasLoading, refresh } = useDas();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
@@ -41,7 +41,7 @@ function DasPage() {
   const [status, setStatus] = useState<"todos"|DasStatus>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
   const [busy, setBusy]     = useState(false);
-  const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
+  const comp = `${ano}-${mes}`;
 
   useEffect(() => {
     const fn = () => refresh();
@@ -250,11 +250,11 @@ function DasPage() {
         rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
         toolbar={
           <>
-            <Select value={mes.toString()} onValueChange={v=>setMes(+v)}>
+            <Select value={mes} onValueChange={v => setMes(v)}>
               <SelectTrigger className="h-8 w-28 rounded-lg text-xs"><SelectValue/></SelectTrigger>
               <SelectContent>{MESES.map((m,i)=><SelectItem key={m} value={(i+1).toString()}>{m}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={ano.toString()} onValueChange={v=>setAno(+v)}>
+            <Select value={ano} onValueChange={v => setAno(v)}>
               <SelectTrigger className="h-8 w-24 rounded-lg text-xs"><SelectValue/></SelectTrigger>
               <SelectContent>{[now.getFullYear()-1,now.getFullYear(),now.getFullYear()+1].map(y=><SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
             </Select>
