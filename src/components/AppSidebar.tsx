@@ -17,10 +17,8 @@ import {
   Bot,
   UserRoundSearch,
   Landmark,
-  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
 
 type NavItem =
   | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never; group?: never }
@@ -59,26 +57,6 @@ function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.to;
   if (item.to === "/fiscal/das") return pathname.startsWith("/fiscal");
   return pathname.startsWith(item.to);
-}
-
-function getActiveGroup(pathname: string): string | null {
-  const gestao        = ["/", "/clientes", "/crm"];
-  const operacional   = ["/obrigacoes", "/workflows", "/societario"];
-  const departamentos = ["/fiscal", "/dp", "/contabil", "/financeiro"];
-  const ferramentas   = ["/documentos", "/whatsapp", "/automacoes"];
-  if (gestao.some(p => pathname === p || (p !== "/" && pathname.startsWith(p)))) return "GESTÃO";
-  if (operacional.some(p => pathname.startsWith(p)))   return "OPERACIONAL";
-  if (departamentos.some(p => pathname.startsWith(p))) return "DEPARTAMENTOS";
-  if (ferramentas.some(p => pathname.startsWith(p)))   return "FERRAMENTAS";
-  return null;
-}
-
-function defaultOpenGroups(): string[] {
-  try {
-    const saved = localStorage.getItem("sidebar-open-groups");
-    if (saved) return JSON.parse(saved) as string[];
-  } catch {}
-  return ["GESTÃO", "OPERACIONAL", "DEPARTAMENTOS", "FERRAMENTAS"];
 }
 
 function NavLine({
@@ -131,85 +109,46 @@ export function AppSidebar({
   onLogout?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [openGroups, setOpenGroups] = useState<string[]>(defaultOpenGroups);
 
-  useEffect(() => {
-    const activeGroup = getActiveGroup(pathname);
-    if (activeGroup) {
-      setOpenGroups(prev => {
-        if (prev.includes(activeGroup)) return prev;
-        const next = [...prev, activeGroup];
-        localStorage.setItem("sidebar-open-groups", JSON.stringify(next));
-        return next;
-      });
-    }
-  }, [pathname]);
-
-  function toggleGroup(group: string) {
-    setOpenGroups(prev => {
-      const next = prev.includes(group)
-        ? prev.filter(g => g !== group)
-        : [...prev, group];
-      localStorage.setItem("sidebar-open-groups", JSON.stringify(next));
-      return next;
-    });
-  }
-
-  function renderAccordion(): React.ReactNode[] {
+  function renderNav(): React.ReactNode[] {
     const rendered: React.ReactNode[] = [];
-    let currentGroup: string | null = null;
-    let groupItems: NavItem[] = [];
-
-    const flushGroup = () => {
-      if (!currentGroup) return;
-      const grp = currentGroup;
-      const isOpen = collapsed || openGroups.includes(grp);
-      rendered.push(
-        <div key={`group-${grp}`} className="mb-0.5">
-          {!collapsed && (
-            <button
-              onClick={() => toggleGroup(grp)}
-              className={cn(
-                "w-full flex items-center justify-between px-3 py-1.5 rounded-lg transition-colors",
-                "text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/40"
-              )}
-            >
-              <span className="text-[10px] font-bold uppercase tracking-widest">{grp}</span>
-              <ChevronDown className={cn(
-                "h-3 w-3 transition-transform duration-200",
-                isOpen ? "rotate-0" : "-rotate-90"
-              )} />
-            </button>
-          )}
-          {isOpen && (
-            <div className={cn("flex flex-col gap-0.5", !collapsed && "mt-0.5")}>
-              {groupItems.map((it) =>
-                "to" in it ? (
-                  <NavLine
-                    key={it.to}
-                    item={it as Extract<NavItem, { to: string }>}
-                    active={isActive(pathname, it)}
-                    collapsed={collapsed}
-                    onClick={onNavigate}
-                  />
-                ) : null
-              )}
-            </div>
-          )}
-        </div>
-      );
-      groupItems = [];
-    };
+    let firstGroup = true;
 
     for (const it of items) {
       if ("group" in it && it.group) {
-        flushGroup();
-        currentGroup = it.group;
-      } else {
-        groupItems.push(it);
+        if (!collapsed) {
+          rendered.push(
+            <p
+              key={`grp-${it.group}`}
+              className={cn(
+                "px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/35 mb-1",
+                firstGroup ? "mt-0" : "mt-4"
+              )}
+            >
+              {it.group}
+            </p>
+          );
+        } else {
+          if (!firstGroup) {
+            rendered.push(
+              <div key={`grp-sep-${it.group}`} className="my-2 h-px w-6 bg-sidebar-foreground/10 mx-auto" />
+            );
+          }
+        }
+        firstGroup = false;
+      } else if ("to" in it) {
+        rendered.push(
+          <NavLine
+            key={it.to}
+            item={it as Extract<NavItem, { to: string }>}
+            active={isActive(pathname, it)}
+            collapsed={collapsed}
+            onClick={onNavigate}
+          />
+        );
       }
     }
-    flushGroup();
+
     return rendered;
   }
 
@@ -223,7 +162,7 @@ export function AppSidebar({
       {/* Header: logo + wordmark + toggle */}
       <div
         className={cn(
-          "mb-5 flex items-center",
+          "mb-5 flex shrink-0 items-center",
           collapsed ? "flex-col gap-3" : "justify-between"
         )}
       >
@@ -262,20 +201,20 @@ export function AppSidebar({
         )}
       </div>
 
-      {/* Nav com accordion */}
+      {/* Nav scrollável — min-h-0 é crítico para overflow funcionar em flex */}
       <nav
         className={cn(
-          "sidebar-nav flex flex-1 flex-col gap-0.5 overflow-y-auto",
+          "sidebar-nav flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5",
           collapsed ? "items-center" : "items-stretch"
         )}
       >
-        {renderAccordion()}
+        {renderNav()}
       </nav>
 
-      {/* Footer */}
+      {/* Footer fixo — nunca é cortado */}
       <div
         className={cn(
-          "mt-2 flex flex-col gap-1",
+          "mt-3 shrink-0 flex flex-col gap-1 border-t border-sidebar-foreground/10 pt-3",
           collapsed ? "items-center" : "items-stretch"
         )}
       >

@@ -32,9 +32,8 @@ const fmtDate = (d: string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR
 
 function DasPage() {
   const now = new Date();
-  const def = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const [ano, setAno]       = useState(def.getFullYear());
-  const [mes, setMes]       = useState(def.getMonth() + 1);
+  const [ano, setAno]       = useState(now.getFullYear());
+  const [mes, setMes]       = useState(now.getMonth() + 1);
   const { guias: items, loading: dasLoading, refresh } = useDas();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
@@ -247,7 +246,7 @@ function DasPage() {
         onToggleAll={toggleAll}
         onToggleRow={toggleOne}
         emptyIcon={<FileText className="h-8 w-8"/>}
-        emptyText="Nenhum DAS para os filtros selecionados"
+        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — use "Gerar (0)" para criar as guias via SERPRO`}
         rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
         toolbar={
           <>
@@ -295,3 +294,4 @@ function DasPage() {
     </div>
   );
 }
+
