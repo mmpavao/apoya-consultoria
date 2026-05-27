@@ -107,6 +107,31 @@ function DasPage() {
       setBusy(false);
     }
   }
+  async function gerarTodosDoMes() {
+    setBusy(true);
+    toast.loading("Criando guias DAS para todos os clientes elegíveis…", {id:"das-init"});
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", {id:"das-init"}); return; }
+      const res = await fetch("/api/das/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: "lote", competencia: comp }),
+      });
+      const data = await res.json() as any;
+      if (data.ok) {
+        toast.success(`${data.geradas ?? 0} guia(s) DAS criada(s) para ${comp}`, {id:"das-init"});
+        await refresh();
+      } else {
+        toast.error(data.error ?? "Erro ao gerar DAS em lote", {id:"das-init"});
+      }
+    } catch (e: any) {
+      toast.error("Erro: " + (e?.message ?? "Tente novamente"), {id:"das-init"});
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function enviarWhats() {
     const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");
     if(!elig.length){ toast.error("Selecione DAS já geradas"); return; }
@@ -210,6 +235,11 @@ function DasPage() {
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
               onClick={enviarWhats} disabled={sel.size===0}>
               <MessageCircle className="h-4 w-4" /> WhatsApp
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
+              onClick={gerarTodosDoMes} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+              Inicializar Mês
             </Button>
             <Button size="sm" className="rounded-xl gap-1.5 h-9"
               onClick={gerarLote} disabled={busy||sel.size===0}>
