@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertTriangle, Plus, UserX, Calendar, CheckSquare, ExternalLink } from "lucide-react";
+import { AlertTriangle, Plus, UserX, Calendar, CheckSquare, ExternalLink, Users, Pencil } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -144,7 +144,7 @@ function DemitirDialog({ open, onClose, funcId, funcNome, onOk }:
 }
 
 // ─── Sub-aba Funcionários ─────────────────────────────────────────────────────
-function SubAbaFuncionarios({ clienteId }: { clienteId: string }) {
+function SubAbaFuncionarios({ clienteId, onEditarCadastro }: { clienteId: string; onEditarCadastro?: () => void }) {
   const { funcionarios, loading, refresh } = useFuncionarios(clienteId);
   const [novo, setNovo] = useState(false);
   const [demitindo, setDemitindo] = useState<{id:string;nome:string}|null>(null);
@@ -169,7 +169,26 @@ function SubAbaFuncionarios({ clienteId }: { clienteId: string }) {
             <th className="text-right">Salário</th><th>Admissão</th><th>Status</th><th>Férias</th><th></th>
           </tr></thead>
           <tbody>
-            {funcionarios.length===0&&<tr><td colSpan={9} className="text-center text-muted-foreground py-8">Nenhum funcionário cadastrado</td></tr>}
+            {funcionarios.length===0&&(
+              <tr>
+                <td colSpan={9} className="text-center py-10">
+                  <div className="flex flex-col items-center gap-3">
+                    <Users className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">Nenhum funcionário cadastrado neste cliente.</p>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={()=>setNovo(true)}>
+                        <Plus className="h-4 w-4 mr-1"/>Cadastrar Funcionário
+                      </Button>
+                      {onEditarCadastro && (
+                        <Button size="sm" variant="outline" onClick={onEditarCadastro}>
+                          <Pencil className="h-4 w-4 mr-1"/>Editar Cadastro do Cliente
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            )}
             {funcionarios.map(f=>{
               const alerta=f.status==="ativo"&&(f.dias_sem_ferias??0)>330;
               return (
@@ -338,7 +357,7 @@ export function TabDP({ clienteId }: { clienteId: string }) {
           <TabsTrigger value="folha">Folha Mensal</TabsTrigger>
           <TabsTrigger value="ferias">Férias</TabsTrigger>
         </TabsList>
-        <TabsContent value="funcionarios" className="mt-4"><SubAbaFuncionarios clienteId={clienteId}/></TabsContent>
+        <TabsContent value="funcionarios" className="mt-4"><SubAbaFuncionarios clienteId={clienteId} onEditarCadastro={() => navigate({ to: "/clientes/$id", params: { id: clienteId } })}/></TabsContent>
         <TabsContent value="folha" className="mt-4"><SubAbaFolha clienteId={clienteId}/></TabsContent>
         <TabsContent value="ferias" className="mt-4"><SubAbaFerias clienteId={clienteId}/></TabsContent>
       </Tabs>

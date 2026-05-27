@@ -155,7 +155,12 @@ function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: bool
   const [regimeAnos, setRegimeAnos]       = useState<{ ano: number; regime: string }[]>([]);
   const [loadingAuto, setLoadingAuto]     = useState(false);
   const [autoFetched, setAutoFetched]     = useState(false);
+  const [fetchError, setFetchError]       = useState(false);
   const didRun = useRef(false);
+
+  // Helper: wraps a promise with a 10s timeout
+  const withTimeout = <T,>(p: Promise<T>, ms = 10_000): Promise<T> =>
+    Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
 
   const obgCliente = obrigacoes.filter(o => o.clienteId === cliente.id);
   const obgAtrasada = obgCliente.filter(o => o.status === "atrasada").length;
@@ -165,59 +170,69 @@ function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: bool
     if (!cnpj || didRun.current) return;
     didRun.current = true;
     setLoadingAuto(true);
+    setFetchError(false);
 
-    // DTE
-    const dteRes = await call("serpro_dte", { cnpj }, cliente.id);
-    if (dteRes.ok) {
-      try {
-        const content = (dteRes.content ?? [])[0]?.text ?? "{}";
-        const outer = JSON.parse(content);
-        const result = outer?.result ?? outer;
-        const status = result?.statusEnquadramento ?? "";
-        const ind    = result?.indicadorEnquadramento;
-        setDteStatus(ind === 2 || status.toLowerCase().includes("optante"));
-        setDteLbl(status || "Enquadrado");
-      } catch { setDteStatus(true); setDteLbl("Ativo"); }
-    } else {
-      setDteStatus(false); setDteLbl("Não verificado");
-    }
-
-    // Regime anos
-    const raRes = await call("serpro_regime_anos", { cnpj }, cliente.id);
-    if (raRes.ok) {
-      try {
-        const outer = JSON.parse((raRes.content ?? [])[0]?.text ?? "{}");
-        const list = outer?.result ?? [];
-        setRegimeAnos(list.slice(0, 4).map((a: any) => ({
-          ano: a.anoCalendario,
-          regime: a.regimeApurado === "COMPETENCIA" ? "Competência" : a.regimeApurado,
-        })));
-      } catch {}
-    }
-
-    // PGDAS (Simples) ou PGMEI
-    if (isSimples && !isMEI) {
-      const pgRes = await call("serpro_pgdas_ultima", { cnpj }, cliente.id);
-      if (pgRes.ok) {
+    try {
+      // DTE — com timeout de 10s
+      const dteRes = await withTimeout(call("serpro_dte", { cnpj }, cliente.id));
+      if (dteRes.ok) {
         try {
-          const outer = JSON.parse((pgRes.content ?? [])[0]?.text ?? "{}");
+          const raw = (dteRes.content ?? [])[0]?.text ?? "{}";
+          const outer = JSON.parse(raw);
           const result = outer?.result ?? outer;
-          if (!result || result === "" || (typeof result === "object" && Object.keys(result).length === 0)) {
-            setPgdasOk(true); setPgdasDetail("Sem pendências de declaração");
-          } else if (outer?.ok === false) {
-            setPgdasOk(false); setPgdasDetail(outer.error ?? "Erro ao verificar");
-          } else {
-            const periodo = result?.periodoApuracao ?? result?.periodo ?? "";
-            setPgdasOk(true); setPgdasDetail(periodo ? `Última declaração: ${periodo}` : "Declarações em dia");
-          }
-        } catch { setPgdasOk(null); setPgdasDetail("Não verificado"); }
+          const status = result?.statusEnquadramento ?? "";
+          const ind    = result?.indicadorEnquadramento;
+          setDteStatus(ind === 2 || status.toLowerCase().includes("optante"));
+          setDteLbl(status || "Enquadrado");
+        } catch { setDteStatus(true); setDteLbl("Ativo"); }
       } else {
-        setPgdasOk(null); setPgdasDetail("Verificação indisponível");
+        setDteStatus(false); setDteLbl("Não foi possível consultar agora");
       }
-    }
 
-    setLoadingAuto(false);
-    setAutoFetched(true);
+      // Regime anos — com timeout de 10s
+      const raRes = await withTimeout(call("serpro_regime_anos", { cnpj }, cliente.id));
+      if (raRes.ok) {
+        try {
+          const outer = JSON.parse((raRes.content ?? [])[0]?.text ?? "{}");
+          const list = outer?.result ?? [];
+          setRegimeAnos(list.slice(0, 4).map((a: any) => ({
+            ano: a.anoCalendario,
+            regime: a.regimeApurado === "COMPETENCIA" ? "Competência" : a.regimeApurado,
+          })));
+        } catch {}
+      }
+
+      // PGDAS (Simples) ou PGMEI — com timeout de 10s
+      if (isSimples && !isMEI) {
+        const pgRes = await withTimeout(call("serpro_pgdas_ultima", { cnpj }, cliente.id));
+        if (pgRes.ok) {
+          try {
+            const outer = JSON.parse((pgRes.content ?? [])[0]?.text ?? "{}");
+            const result = outer?.result ?? outer;
+            if (!result || result === "" || (typeof result === "object" && Object.keys(result).length === 0)) {
+              setPgdasOk(true); setPgdasDetail("Sem pendências de declaração");
+            } else if (outer?.ok === false) {
+              setPgdasOk(false); setPgdasDetail(outer.error ?? "Erro ao verificar");
+            } else {
+              const periodo = result?.periodoApuracao ?? result?.periodo ?? "";
+              setPgdasOk(true); setPgdasDetail(periodo ? `Última declaração: ${periodo}` : "Declarações em dia");
+            }
+          } catch { setPgdasOk(null); setPgdasDetail("Não verificado"); }
+        } else {
+          setPgdasOk(null); setPgdasDetail("Não foi possível consultar agora. Tente novamente.");
+        }
+      }
+    } catch (err) {
+      // timeout ou erro de rede
+      setFetchError(true);
+      setDteStatus(false);
+      setDteLbl("Não foi possível consultar agora. Tente novamente.");
+      setPgdasOk(false);
+      setPgdasDetail("Não foi possível consultar agora. Tente novamente.");
+    } finally {
+      setLoadingAuto(false);
+      setAutoFetched(true);
+    }
   }, [cnpj, isSimples, isMEI, cliente.id]);
 
   useEffect(() => { if (cnpj) autoFetch(); }, [autoFetch]);
@@ -266,12 +281,26 @@ function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: bool
             ok={obgAtrasada === 0}
             detail={obgAtrasada > 0 ? `${obgAtrasada} em atraso` : obgPendente > 0 ? `${obgPendente} pendentes` : "Todas em dia"}
           />
-          {autoFetched && (
+          {fetchError && (
+            <div className="flex items-center gap-2 py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs mt-2">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span>Não foi possível consultar o SERPRO agora. Verifique a conexão e tente novamente.</span>
+            </div>
+          )}
+          {(autoFetched || fetchError) && (
             <button
-              className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={() => { didRun.current = false; setDteStatus(null); setPgdasOk(null); setRegimeAnos([]); setAutoFetched(false); autoFetch(); }}
+              className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={loadingAuto}
+              onClick={() => {
+                if (loadingAuto) return;
+                didRun.current = false;
+                setDteStatus(null); setPgdasOk(null); setRegimeAnos([]);
+                setAutoFetched(false); setFetchError(false);
+                autoFetch();
+              }}
             >
-              <RefreshCw className="h-3 w-3" /> Atualizar consultas
+              <RefreshCw className={`h-3 w-3 ${loadingAuto ? "animate-spin" : ""}`} />
+              {loadingAuto ? "Consultando…" : "Atualizar consultas"}
             </button>
           )}
         </FiscalCard>

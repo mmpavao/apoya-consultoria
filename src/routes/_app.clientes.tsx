@@ -4,7 +4,7 @@ import {
   AlertTriangle, Ban, CheckCircle2, Clock,
   ExternalLink, Loader2, MessageCircle, MoreHorizontal,
   FileText, Pencil, Phone, Plus, Trash2, Users,
-  ShieldCheck, ShieldAlert, FileKey2, FileSignature, FolderOpen, UserCheck, RefreshCw, CheckCircle, XCircle,
+  ShieldAlert, FileSignature, FolderOpen, UserCheck, RefreshCw, CheckCircle, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,40 +38,6 @@ const S_I: Record<Status, React.ElementType> = {
 const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
 /** Mini-badges de prontidão contábil exibidos nos cards da listagem */
-function ProntidaoMini({ c }: { c: Cliente }) {
-  const cert   = (c as any).tem_certificado  ?? false;
-  const proc   = (c as any).tem_procuracao   ?? false;
-
-  const items = [
-    { key: "cert",  ok: cert,  icon: FileKey2,      label: "Certificado Digital",  tip: cert  ? "Certificado Digital cadastrado" : "Sem certificado digital"  },
-    { key: "proc",  ok: proc,  icon: ShieldCheck,   label: "Procuração eCAC",      tip: proc  ? "Procuração eCAC cadastrada"    : "Sem procuração eCAC"       },
-  ];
-
-  // só mostrar se pelo menos um está ok, ou em hover
-  const algumOk = items.some(i => i.ok);
-
-  return (
-    <div className="flex items-center gap-1">
-      {items.map(item => {
-        const Icon = item.icon;
-        return (
-          <span
-            key={item.key}
-            title={item.tip}
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border transition-colors
-              ${item.ok
-                ? "bg-emerald-50 border-emerald-300 text-emerald-600"
-                : "bg-rose-50 border-rose-200 text-rose-400"
-              }`}
-          >
-            <Icon className="h-2.5 w-2.5" />
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 
 function Initials({nome, regime}:{nome:string; regime:Regime}){
   const init=nome.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
@@ -187,11 +153,7 @@ function ClientesPage(){
         );
       },
     },
-    {
-      key:"prontidao", header:"Prontidão",
-      headerClassName:"hidden lg:table-cell", className:"hidden lg:table-cell",
-      cell: c => <ProntidaoMini c={c} />,
-    },
+
     {
       key:"acoes", header:"", headerClassName:"w-24 text-right", className:"w-24 text-right",
       cell: c=>(
@@ -208,7 +170,7 @@ function ClientesPage(){
             </Button>
           )}
           {c.telefone && (
-            <a href={`tel:${c.telefone}`}>
+            <a href={`tel:${c.telefone}`} title={`Ligar — ${c.telefone}`}>
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
                 <Phone className="h-3.5 w-3.5"/>
               </Button>
@@ -216,7 +178,7 @@ function ClientesPage(){
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5"/></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="Mais opções"><MoreHorizontal className="h-3.5 w-3.5"/></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => navigate({ to: "/clientes/$id", params: { id: c.id } })}>

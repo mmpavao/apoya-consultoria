@@ -60,17 +60,18 @@ function SubAbaPeriodo({ clienteId, temEmpregados }: { clienteId: string; temEmp
             :<span className="text-xs text-muted-foreground">Sem período aberto</span>}
         </div>
 
-        {!atual&&(
-          <div className="flex items-center gap-3">
-            <Select value={novoComp} onValueChange={setNovoComp}>
-              <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
-              <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button size="sm" onClick={async()=>{const ok=await abrirPeriodo(clienteId,novoComp);if(ok)refresh();}} disabled={abrindo}>
-              <Plus className="h-4 w-4 mr-1"/>{abrindo?"Abrindo...":"Abrir Período"}
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-3 mt-2">
+          <Select value={novoComp} onValueChange={setNovoComp}>
+            <SelectTrigger className="w-40"><SelectValue/></SelectTrigger>
+            <SelectContent>{MESES_LIST().map(c=><SelectItem key={c} value={c}>{COMP_LABEL(c)}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button size="sm" onClick={async()=>{
+            const ok=await abrirPeriodo(clienteId,novoComp);
+            if(ok) refresh();
+          }} disabled={abrindo}>
+            <Plus className="h-4 w-4 mr-1"/>{abrindo?"Abrindo...":"Abrir Período"}
+          </Button>
+        </div>
 
         {atual?.status==="aberto"&&(
           <>
