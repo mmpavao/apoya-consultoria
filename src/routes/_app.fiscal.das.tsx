@@ -252,7 +252,7 @@ function DasPage() {
           <>
             <Select value={mes} onValueChange={v => setMes(v)}>
               <SelectTrigger className="h-8 w-28 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>{MESES.map((m,i)=><SelectItem key={m} value={(i+1).toString()}>{m}</SelectItem>)}</SelectContent>
+              <SelectContent>{MESES.map((m,i)=><SelectItem key={m} value={String(i+1).padStart(2,'0')}>{m}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={ano} onValueChange={v => setAno(v)}>
               <SelectTrigger className="h-8 w-24 rounded-lg text-xs"><SelectValue/></SelectTrigger>
