@@ -34,8 +34,8 @@ const STATUS_PG: Record<string, { label: string; cls: string; Icon: any }> = {
 };
 
 /* ── Modal Contratar ────────────────────────────────────────────────────── */
-function ModalContratar({ clienteId, onClose }: { clienteId: string; onClose: () => void }) {
-  const { servicos: cat } = useServicoCatalogo();
+function ModalContratar({ clienteId, onClose, catalogo, catLoading }: { clienteId: string; onClose: () => void; catalogo: ReturnType<typeof useServicoCatalogo>["servicos"]; catLoading: boolean }) {
+  const cat = catalogo;
   const { contratar } = useClienteServicos(clienteId);
   const [form, setForm] = useState({
     catalogo_id: "", valor_contratado: "", desconto: "0",
@@ -56,11 +56,16 @@ function ModalContratar({ clienteId, onClose }: { clienteId: string; onClose: ()
               const s = cat.find(c => c.id === id);
               setForm(p => ({ ...p, catalogo_id: id, valor_contratado: String(s?.valor_padrao ?? ""), periodicidade: (s?.unidade === "hora" ? "avulso" : s?.unidade ?? "mensal") as any }));
             }}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectTrigger disabled={catLoading}>
+                <SelectValue placeholder={catLoading ? "Carregando serviços…" : cat.length === 0 ? "Nenhum serviço no catálogo" : "Selecione um serviço…"} />
+              </SelectTrigger>
               <SelectContent>
-                {cat.filter(s => s.ativo).map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.nome} — {fmtBRL(s.valor_padrao)}/{s.unidade}</SelectItem>
-                ))}
+                {catLoading
+                  ? <SelectItem value="_loading" disabled>Carregando…</SelectItem>
+                  : cat.filter(s => s.ativo).map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.nome} — {fmtBRL(s.valor_padrao)}/{s.unidade}</SelectItem>
+                    ))
+                }
               </SelectContent>
             </Select>
             {sel?.descricao && <p className="text-xs text-muted-foreground">{sel.descricao}</p>}
@@ -234,6 +239,7 @@ function ServicoCard({ sv, pagamentos, clienteId }: { sv: ClienteServico; pagame
 /* ── Export principal ───────────────────────────────────────────────────── */
 export function TabServicos({ clienteId }: { clienteId: string }) {
   const { servicos, pagamentos, loading } = useClienteServicos(clienteId);
+  const { servicos: catalogoServicos, loading: catLoading } = useServicoCatalogo();
   const [showContratar, setShowContratar] = useState(false);
 
   const totalMensal   = servicos.filter(s=>s.status==="ativo"&&s.periodicidade==="mensal").reduce((a,s)=>a+(s.valor_final??0),0);
@@ -303,7 +309,7 @@ export function TabServicos({ clienteId }: { clienteId: string }) {
         </div>
       )}
 
-      {showContratar && <ModalContratar clienteId={clienteId} onClose={() => setShowContratar(false)} />}
+      {showContratar && <ModalContratar clienteId={clienteId} onClose={() => setShowContratar(false)} catalogo={catalogoServicos} catLoading={catLoading} />}
     </div>
   );
 }
