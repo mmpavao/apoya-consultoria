@@ -246,7 +246,7 @@ function DasPage() {
         onToggleAll={toggleAll}
         onToggleRow={toggleOne}
         emptyIcon={<FileText className="h-8 w-8"/>}
-        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — use "Gerar (0)" para criar as guias via SERPRO`}
+        emptyText={`Nenhuma guia DAS para ${MESES[parseInt(mes)-1]}/${ano} — use "Gerar (0)" para criar as guias via SERPRO`}
         rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
         toolbar={
           <>
@@ -256,7 +256,7 @@ function DasPage() {
             </Select>
             <Select value={ano} onValueChange={v => setAno(v)}>
               <SelectTrigger className="h-8 w-24 rounded-lg text-xs"><SelectValue/></SelectTrigger>
-              <SelectContent>{[now.getFullYear()-1,now.getFullYear(),now.getFullYear()+1].map(y=><SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+              <SelectContent>{[Number(ano)-1, Number(ano), Number(ano)+1].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
             </Select>
             <div className="h-4 w-px bg-border shrink-0"/>
             <TableSearch value={query} onChange={setQuery} placeholder="Buscar cliente ou CNPJ…"/>
