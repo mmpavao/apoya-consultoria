@@ -1,16 +1,17 @@
 /**
  * POST /api/cobranca/criar
  * Cria uma cobrança no banco de dados (sem emitir no Asaas ainda).
- * Após criar, chame /api/cobranca/emitir?mode=individual para gerar no Asaas.
+ *
+ * REGRA: cliente DEVE ter contrato ativo (contrato_cliente.status=ativo).
  *
  * Body:
  *   cliente_id    : uuid
  *   valor         : number
- *   competencia   : "YYYY-MM"  (ex: "2026-06")
+ *   competencia   : "YYYY-MM"
  *   vencimento    : "YYYY-MM-DD"
  *   descricao?    : string
- *   forma?        : "PIX" | "BOLETO" | "UNDEFINED"  (default UNDEFINED = aceita os dois)
- *   recorrente?   : boolean  (padrão: false)
+ *   forma?        : "PIX" | "BOLETO" | "UNDEFINED"
+ *   recorrente?   : boolean
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -55,7 +56,23 @@ export const Route = createFileRoute("/api/cobranca/criar")({
 
         const db = supabaseAdmin as any;
 
-        // Buscar dados do cliente
+        // ── REGRA: verificar contrato ativo ─────────────────────────────
+        const { data: contrato } = await db
+          .from("contrato_cliente")
+          .select("id,status")
+          .eq("cliente_id", cliente_id)
+          .eq("status", "ativo")
+          .limit(1)
+          .maybeSingle();
+
+        if (!contrato) {
+          return json({
+            error: "Cliente não possui contrato ativo. Assine o contrato de prestação de serviços antes de gerar cobranças.",
+            code: "SEM_CONTRATO",
+          }, 409);
+        }
+
+        // ── Buscar dados do cliente ─────────────────────────────────────
         const { data: cliente, error: cErr } = await db
           .from("clientes")
           .select("id,razao_social,cnpj,dia_vencimento,regime")
@@ -64,15 +81,15 @@ export const Route = createFileRoute("/api/cobranca/criar")({
 
         if (cErr || !cliente) return json({ error: "Cliente não encontrado" }, 404);
 
-        const now = new Date();
+        const now  = new Date();
         const comp = body.competencia ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
         // Calcular vencimento
         const [ano, mes] = comp.split("-").map(Number);
-        const diaVenc = cliente.dia_vencimento ?? 10;
+        const diaVenc    = cliente.dia_vencimento ?? 10;
         const vencimento = body.vencimento ?? new Date(ano, mes - 1, diaVenc).toISOString().split("T")[0];
 
-        // Verificar se já existe cobrança para este cliente/competência
+        // ── Verificar duplicidade ───────────────────────────────────────
         const { data: existente } = await db
           .from("cobrancas")
           .select("id,status")
@@ -99,6 +116,7 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           status:       "pendente",
           regua_stage:  "ok",
           dias_atraso:  0,
+          recorrente,
           created_by:   user.id,
         }).select().single();
 
