@@ -10,6 +10,6 @@
   "assets": {
     "directory": "dist/client",
     "binding": "ASSETS",
-    "not_found_handling": "none"
+    "not_found_handling": "spa"
   }
 }
