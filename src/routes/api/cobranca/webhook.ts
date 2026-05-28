@@ -1,14 +1,12 @@
 /**
  * POST /api/cobranca/webhook
- * Recebe eventos do Asaas e atualiza o banco + notifica cliente.
+ * Recebe eventos do Asaas → atualiza banco → notifica cliente.
  *
- * FLUXO PAYMENT_RECEIVED / PAYMENT_CONFIRMED:
- *   1. Atualiza cobrança → status "paga"
- *   2. Emite NFS-e no NFE.io (se cliente tiver inscrição municipal + código de serviço)
- *   3. Aguarda processamento e faz poll do PDF (até 30s)
- *   4. Envia PDF por e-mail ao cliente
- *   5. Envia PDF por WhatsApp ao cliente
- *   6. Registra na tabela nfse_emitida
+ * PAYMENT_RECEIVED / PAYMENT_CONFIRMED:
+ *   1. Atualiza cobrança → "paga"
+ *   2. Envia WhatsApp de confirmação imediata
+ *   3. Dispara edge function "nfse-pos-pagamento" (async, sem aguardar)
+ *      que cuida de: emitir NFS-e NFE.io → baixar PDF → email + WhatsApp com PDF
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -20,132 +18,15 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// ── Helpers NFE.io ────────────────────────────────────────────────────────────
-
-function getNfseKey(): string {
-  return (globalThis as any).__env__?.NFSEIO_API_KEY
-    ?? process.env.NFSEIO_API_KEY
-    ?? "";
-}
-
-const NFSEIO_BASE   = "https://api.nfe.io/v1";
-const EMITENTE_ID   = "d8e1f4b5f4674fdaaaf034e5a837b85d"; // APOYA AUDITORIA
-
-async function nfseioGet<T = any>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${NFSEIO_BASE}${path}`, {
-      headers: { Authorization: getNfseKey() },
-      redirect: "follow",
-    });
-    if (!res.ok) return null;
-    return await res.json() as T;
-  } catch { return null; }
-}
-
-async function emitirNfse(cli: any, cobranca: any): Promise<{
-  nfseioId?: string; numero?: string; pdfUrl?: string; pdfBase64?: string; erro?: string;
-}> {
-  try {
-    const key = getNfseKey();
-    if (!key) return { erro: "NFSEIO_API_KEY não configurada" };
-    if (!cli.inscricao_municipal) return { erro: "Cliente sem inscrição municipal" };
-
-    const cityServiceCode = cli.codigo_servico_nfse ?? "0107"; // contabilidade
-    const aliquota        = cli.aliquota_iss ?? 0.05;
-    const valor           = Number(cobranca.valor ?? 0);
-    const comp            = cobranca.competencia ?? new Date().toISOString().slice(0, 7);
-    const [ano, mes]      = comp.split("-");
-    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-                   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const descricao = `Honorários Contábeis — ${meses[Number(mes) - 1]}/${ano} — ${cli.razao_social}`;
-
-    const payload = {
-      cityServiceCode,
-      federalServiceCode: "17.20",
-      description:   descricao,
-      servicesAmount: valor,
-      taxationType:  "WithinCity",
-      issRate:       aliquota,
-      issRetained:   false,
-      borrower: {
-        federalTaxNumber: Number(cli.cnpj?.replace(/\D/g, "") ?? "0"),
-        name:  cli.razao_social,
-        email: cli.email ?? undefined,
-        address: {
-          country:    "BRA",
-          postalCode: cli.cep?.replace(/\D/g, "") ?? "12283030",
-          street:     cli.logradouro ?? "Endereço não informado",
-          number:     cli.numero ?? "s/n",
-          district:   cli.bairro ?? "",
-          additionalInformation: cli.complemento ?? undefined,
-          city: { code: Number(cli.codigo_municipio_ibge ?? 3508603), name: cli.municipio ?? "Caçapava" },
-          state: cli.uf ?? "SP",
-        },
-      },
-    };
-
-    const res = await fetch(`${NFSEIO_BASE}/companies/${EMITENTE_ID}/serviceinvoices`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: key },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json() as any;
-    if (!res.ok) {
-      const errMsg = data?.message ?? data?.error ?? `HTTP ${res.status}`;
-      console.error("[nfse] Erro ao emitir:", errMsg, JSON.stringify(data).slice(0, 300));
-      return { erro: errMsg };
-    }
-
-    const nfseioId = data?.id;
-    const numero   = String(data?.number ?? "");
-
-    // Poll PDF — NFE.io pode levar alguns segundos para processar
-    let pdfUrl: string | undefined;
-    let pdfBase64: string | undefined;
-
-    for (let i = 0; i < 6; i++) {
-      await new Promise(r => setTimeout(r, 5000)); // aguarda 5s por tentativa (30s total)
-      const nota = await nfseioGet<any>(`/companies/${EMITENTE_ID}/serviceinvoices/${nfseioId}`);
-      if (nota?.status === "Issued" && nota?.pdfUrl) {
-        pdfUrl = nota.pdfUrl;
-        break;
-      }
-      if (nota?.status === "Error") {
-        return { erro: nota?.rpsStatus ?? "Erro no processamento da nota" };
-      }
-    }
-
-    // Baixar PDF como base64 se tiver URL
-    if (pdfUrl) {
-      try {
-        const pdfRes = await fetch(`${NFSEIO_BASE}/companies/${EMITENTE_ID}/serviceinvoices/${nfseioId}/pdf`, {
-          headers: { Authorization: key },
-          redirect: "follow",
-        });
-        if (pdfRes.ok) {
-          const buf  = await pdfRes.arrayBuffer();
-          pdfBase64  = btoa(String.fromCharCode(...new Uint8Array(buf)));
-        }
-      } catch (e) {
-        console.warn("[nfse] Falha ao baixar PDF:", e);
-      }
-    }
-
-    return { nfseioId, numero, pdfUrl, pdfBase64 };
-  } catch (e: any) {
-    return { erro: e?.message ?? "Erro inesperado ao emitir NFS-e" };
-  }
-}
-
-// ── Enviar WhatsApp — texto ───────────────────────────────────────────────────
+// ── WhatsApp texto ────────────────────────────────────────────────────────────
 async function notificarWA(db: any, clienteId: string, mensagem: string): Promise<void> {
   try {
-    const { data: cli } = await db.from("clientes").select("whatsapp,telefone,razao_social").eq("id", clienteId).single();
+    const { data: cli } = await db.from("clientes").select("whatsapp,telefone").eq("id", clienteId).single();
     const tel = (cli?.whatsapp ?? cli?.telefone ?? "").replace(/\D/g, "");
     if (!tel) return;
     const numero = tel.startsWith("55") ? tel : `55${tel}`;
-    const { data: inst } = await db.from("wa_instance").select("nome,evolution_base_url,evolution_apikey").eq("ativo", true).limit(1).single();
+    const { data: inst } = await db.from("wa_instance")
+      .select("nome,evolution_base_url,evolution_apikey").eq("ativo", true).limit(1).single();
     if (!inst?.nome) return;
     const baseUrl = inst.evolution_base_url ?? process.env.EVOLUTION_BASE_URL ?? "";
     const apiKey  = inst.evolution_apikey   ?? process.env.EVOLUTION_API_KEY  ?? "";
@@ -154,149 +35,32 @@ async function notificarWA(db: any, clienteId: string, mensagem: string): Promis
       headers: { "Content-Type": "application/json", apikey: apiKey },
       body: JSON.stringify({ number: numero, text: mensagem }),
     });
-  } catch (e) { console.warn("[webhook] Falha WA texto:", e); }
+  } catch (e) { console.warn("[webhook] Falha WA:", e); }
 }
 
-// ── Enviar WhatsApp — documento (PDF base64) ──────────────────────────────────
-async function notificarWAPdf(db: any, clienteId: string, pdfBase64: string, filename: string, caption: string): Promise<void> {
+// ── Disparar edge function NFS-e (fire-and-forget) ────────────────────────────
+async function dispararNfse(cobrancaId: string, clienteId: string): Promise<void> {
   try {
-    const { data: cli } = await db.from("clientes").select("whatsapp,telefone").eq("id", clienteId).single();
-    const tel = (cli?.whatsapp ?? cli?.telefone ?? "").replace(/\D/g, "");
-    if (!tel) return;
-    const numero = tel.startsWith("55") ? tel : `55${tel}`;
-    const { data: inst } = await db.from("wa_instance").select("nome,evolution_base_url,evolution_apikey").eq("ativo", true).limit(1).single();
-    if (!inst?.nome) return;
-    const baseUrl = inst.evolution_base_url ?? process.env.EVOLUTION_BASE_URL ?? "";
-    const apiKey  = inst.evolution_apikey   ?? process.env.EVOLUTION_API_KEY  ?? "";
-    await fetch(`${baseUrl}/message/sendMedia/${inst.nome}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({
-        number: numero,
-        mediatype: "document",
-        mimetype:  "application/pdf",
-        media:     pdfBase64,
-        fileName:  filename,
-        caption,
-      }),
-    });
-    console.log(`[webhook] PDF WA enviado para ${numero}`);
-  } catch (e) { console.warn("[webhook] Falha WA PDF:", e); }
-}
+    const supabaseUrl = process.env.SUPABASE_URL
+      ?? "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
+    const secret      = process.env.APOYA_INTERNAL_SECRET ?? "apoya-nfse-2026";
 
-// ── Enviar e-mail com PDF via Resend API ──────────────────────────────────────
-async function enviarEmailNfse(cli: any, cobranca: any, numero: string, pdfBase64: string): Promise<void> {
-  try {
-    const resendKey = process.env.RESEND_API_KEY ?? "";
-    if (!resendKey) {
-      console.warn("[nfse-email] RESEND_API_KEY não configurada — pulando e-mail");
-      return;
-    }
-
-    const email = cli.email;
-    if (!email) { console.warn("[nfse-email] Cliente sem e-mail"); return; }
-
-    const comp = cobranca.competencia ?? "";
-    const [ano, mes] = comp.split("-");
-    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-                   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const mesLabel = meses[Number(mes) - 1] ?? comp;
-
-    const valorBRL = Number(cobranca.valor ?? 0).toLocaleString("pt-BR", {
-      style: "currency", currency: "BRL",
-    });
-
-    const htmlBody = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1)">
-
-      <!-- BANNER -->
-      <tr><td style="background:linear-gradient(135deg,#1B2A4A 0%,#2a3f6f 100%);padding:32px 40px">
-        <table width="100%"><tr>
-          <td>
-            <div style="color:#F26522;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">APOYA CONTÁBIL</div>
-            <div style="color:#fff;font-size:22px;font-weight:700;line-height:1.2">Nota Fiscal de Serviço</div>
-            <div style="color:#94a3b8;font-size:13px;margin-top:4px">NFS-e Nº ${numero} — ${mesLabel}/${ano}</div>
-          </td>
-          <td align="right">
-            <div style="background:#F26522;color:#fff;font-size:20px;font-weight:700;padding:12px 20px;border-radius:8px">${valorBRL}</div>
-          </td>
-        </tr></table>
-      </td></tr>
-
-      <!-- CORPO -->
-      <tr><td style="padding:32px 40px">
-        <p style="color:#374151;font-size:15px;margin:0 0 16px">Olá, <strong>${cli.razao_social}</strong>!</p>
-        <p style="color:#6b7280;font-size:14px;line-height:1.6;margin:0 0 24px">
-          Seu pagamento de <strong>${valorBRL}</strong> referente à competência <strong>${mesLabel}/${ano}</strong> foi confirmado.
-          A Nota Fiscal de Serviço (NFS-e) já foi emitida e está em anexo neste e-mail.
-        </p>
-
-        <table width="100%" style="background:#f8fafc;border-radius:8px;padding:20px;margin-bottom:24px">
-          <tr>
-            <td style="color:#6b7280;font-size:12px;padding-bottom:8px">EMITENTE</td>
-            <td style="color:#6b7280;font-size:12px;padding-bottom:8px" align="right">TOMADOR</td>
-          </tr>
-          <tr>
-            <td style="color:#1B2A4A;font-size:14px;font-weight:700">Apoya Auditoria, Consultoria e Contabilidade</td>
-            <td style="color:#1B2A4A;font-size:14px;font-weight:700" align="right">${cli.razao_social}</td>
-          </tr>
-          <tr>
-            <td style="color:#6b7280;font-size:12px">CNPJ: 43.507.838/0001-89</td>
-            <td style="color:#6b7280;font-size:12px" align="right">CNPJ: ${cli.cnpj ?? ""}</td>
-          </tr>
-        </table>
-
-        <p style="color:#6b7280;font-size:13px;margin:0">
-          O PDF da NFS-e está em anexo. Em caso de dúvidas, fale conosco pelo WhatsApp.
-        </p>
-      </td></tr>
-
-      <!-- RODAPÉ -->
-      <tr><td style="background:#1B2A4A;padding:20px 40px">
-        <table width="100%"><tr>
-          <td>
-            <div style="color:#94a3b8;font-size:11px">Apoya Auditoria, Consultoria e Contabilidade LTDA</div>
-            <div style="color:#94a3b8;font-size:11px">CNPJ 43.507.838/0001-89 · Caçapava/SP</div>
-            <div style="color:#94a3b8;font-size:11px">
-              <a href="https://www.apoya.com.br" style="color:#F26522;text-decoration:none">www.apoya.com.br</a>
-            </div>
-          </td>
-          <td align="right">
-            <div style="color:#F26522;font-size:11px;font-weight:700">CRC 2SP044240/O-0</div>
-          </td>
-        </tr></table>
-      </td></tr>
-
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
-
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${resendKey}` },
-      body: JSON.stringify({
-        from:    "Apoya Contábil <noreply@apoya.com.br>",
-        to:      [email],
-        subject: `NFS-e Nº ${numero} — Honorários ${mesLabel}/${ano} — ${valorBRL}`,
-        html:    htmlBody,
-        attachments: [{
-          filename: `NFS-e_${numero}_${comp}.pdf`,
-          content:  pdfBase64,
-        }],
-      }),
-    });
-
-    console.log(`[nfse-email] E-mail enviado para ${email} com NFS-e ${numero}`);
+    const res = await fetch(
+      `${supabaseUrl}/functions/v1/nfse-pos-pagamento`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":    "application/json",
+          "x-apoya-secret":  secret,
+          "Authorization":   `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`,
+        },
+        body: JSON.stringify({ cobranca_id: cobrancaId, cliente_id: clienteId }),
+      }
+    );
+    const data = await res.json() as any;
+    console.log(`[webhook] NFS-e dispatch → ${res.status} | ${data?.ok ? "✅" : "⚠️"} ${data?.numero ?? data?.erro ?? ""}`);
   } catch (e) {
-    console.warn("[nfse-email] Falha ao enviar e-mail:", e);
+    console.warn("[webhook] Falha dispatch NFS-e:", e);
   }
 }
 
@@ -313,11 +77,12 @@ async function upsertCobranca(db: any, payment: any): Promise<any | null> {
   if (!asaasKey || !payment.customer) return null;
 
   try {
-    const custRes = await fetch(`https://api.asaas.com/v3/customers/${payment.customer}`, {
-      headers: { "access_token": asaasKey },
-    });
+    const custRes = await fetch(
+      `https://api.asaas.com/v3/customers/${payment.customer}`,
+      { headers: { "access_token": asaasKey } }
+    );
     if (!custRes.ok) return null;
-    const cust = await custRes.json() as any;
+    const cust    = await custRes.json() as any;
     const cpfCnpj = (cust.cpfCnpj ?? "").replace(/\D/g, "");
     const { data: cli } = await db.from("clientes").select("id,razao_social,cnpj")
       .eq("cnpj", cpfCnpj).maybeSingle();
@@ -347,7 +112,7 @@ async function upsertCobranca(db: any, payment: any): Promise<any | null> {
   }
 }
 
-// ── ROTA PRINCIPAL ────────────────────────────────────────────────────────────
+// ── ROTA PRINCIPAL ─────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/api/cobranca/webhook")({
   server: {
     handlers: {
@@ -359,11 +124,10 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
         const { event, payment } = evento;
         if (!payment?.id) return json({ ok: true, msg: "evento sem payment" });
 
-        console.log(`[webhook] Evento: ${event} | payment: ${payment.id} | valor: R$${payment.value}`);
+        console.log(`[webhook] ${event} | ${payment.id} | R$${payment.value}`);
 
-        const db       = supabaseAdmin as any;
-        const now      = new Date().toISOString();
-        const asaasKey = process.env.ASAAS_API_KEY ?? "";
+        const db  = supabaseAdmin as any;
+        const now = new Date().toISOString();
 
         const cob = await upsertCobranca(db, payment);
         if (!cob) {
@@ -372,16 +136,16 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
         }
 
         const { data: cli } = await db.from("clientes")
-          .select("razao_social,whatsapp,telefone,email,status,cnpj,inscricao_municipal,codigo_servico_nfse,aliquota_iss,cep,logradouro,numero,complemento,bairro,municipio,uf,codigo_municipio_ibge")
+          .select("razao_social,whatsapp,telefone,email,status")
           .eq("id", cob.cliente_id).single();
 
         switch (event) {
-          // ── PAGAMENTO CONFIRMADO ──────────────────────────────────────
+          // ── PAGAMENTO CONFIRMADO ──────────────────────────────────────────
           case "PAYMENT_RECEIVED":
           case "PAYMENT_CONFIRMED": {
             const valor    = Number(payment.value ?? cob.valor);
             const valorBRL = valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-            const nomePrimeiro = (cli?.razao_social ?? "Cliente").split(" ")[0];
+            const nome     = (cli?.razao_social ?? "Cliente").split(" ")[0];
 
             // 1. Atualizar cobrança
             await db.from("cobrancas").update({
@@ -399,145 +163,55 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
                 data_inadimplencia: null,
                 data_suspensao:     null,
                 motivo_suspensao:   null,
-                updated_at:         now,
               }).eq("id", cob.cliente_id);
             }
 
-            // 3. Mensagem texto de confirmação (imediata)
-            const msgConfirmacao = `✅ *Pagamento confirmado!*
+            // 3. Mensagem de confirmação imediata (antes da nota)
+            const msgConfirm = `✅ *Pagamento confirmado!*
 
 `
-              + `Olá *${nomePrimeiro}*! Recebemos seu pagamento de *${valorBRL}* referente ao mês *${cob.competencia ?? ""}*.
+              + `Olá *${nome}*! Recebemos seu pagamento de *${valorBRL}* — competência *${cob.competencia ?? ""}*.
 
 `
-              + `Estamos emitindo sua Nota Fiscal — você receberá em instantes. 🧾
+              + `Estamos emitindo sua Nota Fiscal. Você receberá o PDF em instantes. 🧾
 
 `
               + `_Apoya Contábil · apoya.com.br_`;
+            notificarWA(db, cob.cliente_id, msgConfirm).catch(() => {});
 
-            notificarWA(db, cob.cliente_id, msgConfirmacao).catch(() => {});
+            // 4. Disparar pipeline NFS-e em background (fire-and-forget)
+            dispararNfse(cob.id, cob.cliente_id).catch(() => {});
 
-            // 4. Pipeline NFS-e em background
-            (async () => {
-              try {
-                // Verificar se já emitiu nota para esta cobrança
-                const { data: notaExistente } = await db.from("nfse_emitida")
-                  .select("id").eq("cliente_id", cob.cliente_id).eq("competencia", cob.competencia)
-                  .eq("status", "emitida").maybeSingle();
-                if (notaExistente) {
-                  console.log(`[nfse] Nota já emitida para ${cob.cliente_id} / ${cob.competencia}`);
-                  return;
-                }
-
-                // Emitir NFS-e
-                const resultado = await emitirNfse(cli, cob);
-
-                if (resultado.erro) {
-                  console.error(`[nfse] Erro ao emitir:`, resultado.erro);
-                  // Registrar falha no banco
-                  await db.from("nfse_emitida").insert({
-                    cliente_id:     cob.cliente_id,
-                    status:         "erro",
-                    competencia:    cob.competencia,
-                    tomador_nome:   cli?.razao_social,
-                    tomador_cnpj_cpf: cli?.cnpj,
-                    valor_servico:  Number(cob.valor),
-                    erro_msg:       resultado.erro,
-                  });
-                  return;
-                }
-
-                // 5. Registrar no banco
-                await db.from("nfse_emitida").insert({
-                  cliente_id:           cob.cliente_id,
-                  nfseio_id:            resultado.nfseioId,
-                  numero:               resultado.numero,
-                  status:               "emitida",
-                  competencia:          cob.competencia,
-                  data_emissao:         now.slice(0, 10),
-                  tomador_nome:         cli?.razao_social,
-                  tomador_cnpj_cpf:     cli?.cnpj,
-                  tomador_email:        cli?.email,
-                  descricao_servico:    `Honorários Contábeis — ${cob.competencia}`,
-                  codigo_servico:       cli?.codigo_servico_nfse ?? "0107",
-                  valor_servico:        Number(cob.valor),
-                  aliquota_iss:         cli?.aliquota_iss ?? 0.05,
-                  pdf_url:              resultado.pdfUrl,
-                  issretido:            false,
-                });
-
-                // Atualizar cobrança com referência da nota
-                await db.from("cobrancas").update({ updated_at: now }).eq("id", cob.id);
-
-                const numero = resultado.numero ?? "s/n";
-                const pdfB64 = resultado.pdfBase64;
-                const comp   = cob.competencia ?? "";
-
-                // 6. Enviar e-mail com PDF
-                if (pdfB64 && cli?.email) {
-                  await enviarEmailNfse(cli, cob, numero, pdfB64);
-                }
-
-                // 7. Enviar PDF por WhatsApp
-                if (pdfB64) {
-                  const caption = `🧾 *Nota Fiscal Nº ${numero}*
-`
-                    + `Honorários Contábeis — ${comp}
-`
-                    + `Valor: ${valorBRL}
-
-`
-                    + `_Apoya Contábil · apoya.com.br_`;
-                  await notificarWAPdf(db, cob.cliente_id, pdfB64, `NFS-e_${numero}_${comp}.pdf`, caption);
-                } else if (resultado.pdfUrl) {
-                  // Fallback: enviar link se não conseguiu base64
-                  await notificarWA(db, cob.cliente_id,
-                    `🧾 *Sua Nota Fiscal foi emitida!*
-
-NFS-e Nº ${numero} · ${valorBRL}
-Acesse o PDF: ${resultado.pdfUrl}
-
-_Apoya Contábil_`);
-                }
-
-                console.log(`[nfse] ✅ NFS-e ${numero} emitida e enviada para ${cli?.razao_social}`);
-              } catch (e) {
-                console.error("[nfse] Falha no pipeline pós-pagamento:", e);
-              }
-            })();
-
-            console.log(`[webhook] ✅ PAGAMENTO CONFIRMADO — ${cob.id} — ${valorBRL} — ${cli?.razao_social}`);
+            console.log(`[webhook] ✅ PAGO — ${cob.id} — ${valorBRL} — ${cli?.razao_social}`);
             break;
           }
 
-          // ── VENCIDA ─────────────────────────────────────────────────────
+          // ── VENCIDA ───────────────────────────────────────────────────────
           case "PAYMENT_OVERDUE": {
-            const diasAtraso = payment.daysOverdue ?? 1;
+            const dias = payment.daysOverdue ?? 1;
             await db.from("cobrancas").update({
               status:      "vencida",
               regua_stage: "cobranca",
-              dias_atraso: diasAtraso,
+              dias_atraso: dias,
               updated_at:  now,
             }).eq("id", cob.id);
 
-            const nomePrimeiro = (cli?.razao_social ?? "Cliente").split(" ")[0];
-            const valorBRL = Number(cob.valor ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-            const link = cob.link_pagamento ?? "";
-            const msgVencida = `⚠️ *Fatura em aberto*
+            const valorBRL = Number(cob.valor ?? 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+            const link     = cob.link_pagamento ?? "";
+            const nome     = (cli?.razao_social ?? "Cliente").split(" ")[0];
+            const msgVenc = `⚠️ *Fatura em aberto*
 
-Olá *${nomePrimeiro}*, sua fatura de *${valorBRL}* venceu há ${diasAtraso} dia(s).
+Olá *${nome}*, sua fatura de *${valorBRL}* venceu há ${dias} dia(s).
 
-Regularize agora:
+Regularize aqui:
 ${link}
 
 _Apoya Contábil_`;
-            notificarWA(db, cob.cliente_id, msgVencida).catch(() => {});
-
-            console.log(`[webhook] ⚠️ VENCIDA — ${cob.id} — ${diasAtraso} dias`);
+            notificarWA(db, cob.cliente_id, msgVenc).catch(() => {});
             break;
           }
 
-          // ── CANCELADA / ESTORNADA ────────────────────────────────────────
+          // ── CANCELADA ─────────────────────────────────────────────────────
           case "PAYMENT_DELETED":
           case "PAYMENT_REFUNDED":
           case "PAYMENT_PARTIALLY_REFUNDED":
@@ -547,32 +221,23 @@ _Apoya Contábil_`;
               cancelado_em: now,
               updated_at:   now,
             }).eq("id", cob.id);
-            const valorBRL = Number(cob.valor ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-            const msgCancel = `ℹ️ *Cobrança cancelada*
-
-Sua cobrança de ${valorBRL} foi cancelada/estornada.
-_Apoya Contábil_`;
-            notificarWA(db, cob.cliente_id, msgCancel).catch(() => {});
-            console.log(`[webhook] 🚫 CANCELADA — ${cob.id}`);
+            const valorBRL = Number(cob.valor ?? 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+            notificarWA(db, cob.cliente_id,
+              `ℹ️ Sua cobrança de ${valorBRL} foi cancelada/estornada.
+_Apoya Contábil_`).catch(() => {});
             break;
           }
 
-          // ── RESTAURADA ───────────────────────────────────────────────────
           case "PAYMENT_RESTORED": {
-            await db.from("cobrancas").update({
-              status:       "pendente",
-              cancelado_em: null,
-              updated_at:   now,
-            }).eq("id", cob.id);
+            await db.from("cobrancas").update({ status: "pendente", cancelado_em: null, updated_at: now }).eq("id", cob.id);
             break;
           }
 
-          // ── ATUALIZADA ───────────────────────────────────────────────────
           case "PAYMENT_UPDATED": {
-            const updates: Record<string, unknown> = { updated_at: now };
-            if (payment.value)   updates.valor     = payment.value;
-            if (payment.dueDate) updates.vencimento = payment.dueDate;
-            await db.from("cobrancas").update(updates).eq("id", cob.id);
+            const up: Record<string, unknown> = { updated_at: now };
+            if (payment.value)   up.valor      = payment.value;
+            if (payment.dueDate) up.vencimento = payment.dueDate;
+            await db.from("cobrancas").update(up).eq("id", cob.id);
             break;
           }
 
