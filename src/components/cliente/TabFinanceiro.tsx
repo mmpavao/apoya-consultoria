@@ -72,14 +72,17 @@ function FinCard({ title, icon: Icon, children }: { title: string; icon: any; ch
 }
 
 // ── emissão manual de NFS-e ──────────────────────────────────────────────
-// Chama a rota interna do Worker /api/nfse/ com action=emitir_por_cobranca
+// Chama a rota interna do Worker /api/nfse/emitir-cobranca
 async function emitirNFManual(cobrancaId: string, _clienteId: string): Promise<{ ok: boolean; erro?: string }> {
   try {
-    // Buscar dados da cobrança e cliente via Supabase (service role via rota)
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? "";
     const r = await fetch("/api/nfse/emitir-cobranca", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
       body: JSON.stringify({ cobranca_id: cobrancaId }),
     });
     if (!r.ok) {
