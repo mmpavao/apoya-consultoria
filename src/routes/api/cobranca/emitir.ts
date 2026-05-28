@@ -131,25 +131,36 @@ export const Route = createFileRoute("/api/cobranca/emitir")({
 
         // ── Gerar cobranças mensais primeiro (se mode=gerar_mensal) ──────
         if (mode === "gerar_mensal") {
+          // REGRA: só gera para clientes com contrato ativo
+          const { data: contratos } = await db
+            .from("contrato_cliente")
+            .select("cliente_id")
+            .eq("status", "ativo");
+
+          const clientesComContrato = new Set((contratos ?? []).map((c: any) => c.cliente_id));
+
           const { data: clientes } = await db
             .from("clientes")
-            .select("id,razao_social,cnpj,valor_honorario,dia_vencimento,forma_pagamento,regime")
+            .select("id,razao_social,cnpj,valor_honorario,dia_vencimento,forma_pagamento_padrao,regime")
             .eq("status", "ativo")
             .gt("valor_honorario", 0);
 
-          if (!clientes?.length) return json({ ok: true, geradas: 0, msg: "Nenhum cliente ativo com honorário" });
+          // Filtrar apenas quem tem contrato ativo
+          const clientesFiltrados = (clientes ?? []).filter((c: any) => clientesComContrato.has(c.id));
+
+          if (!clientesFiltrados.length) return json({ ok: true, geradas: 0, msg: "Nenhum cliente ativo com contrato e honorário" });
 
           const [ano, mes] = comp.split("-").map(Number);
-          const dia = 20; // dia padrão de vencimento (configurável por cliente)
 
           let novasGeradas = 0;
-          for (const cli of clientes) {
+          for (const cli of clientesFiltrados) {
             // Verificar se já existe cobrança para este cliente/competência
             const { data: existe } = await db.from("cobrancas")
-              .select("id").eq("cliente_id", cli.id).eq("competencia", comp).maybeSingle();
+              .select("id").eq("cliente_id", cli.id).eq("competencia", comp)
+              .not("status", "eq", "cancelada").maybeSingle();
             if (existe) continue;
 
-            const diaVenc = cli.dia_vencimento ?? 20;
+            const diaVenc = cli.dia_vencimento ?? 10;
             const vencimento = new Date(ano, mes - 1, diaVenc).toISOString().split("T")[0];
 
             await db.from("cobrancas").insert({
@@ -158,7 +169,7 @@ export const Route = createFileRoute("/api/cobranca/emitir")({
               cnpj:          cli.cnpj,
               descricao:     `Mensalidade APOYA — ${comp}`,
               valor:         cli.valor_honorario,
-              forma:         cli.forma_pagamento ?? "PIX",
+              forma:         cli.forma_pagamento_padrao ?? "UNDEFINED",
               vencimento,
               competencia:   comp,
               status:        "pendente",
