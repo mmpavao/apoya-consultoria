@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Shield, Link, useRouterState } from "@tanstack/react-router";
 import {
   Workflow,
   Users2,
@@ -49,6 +49,7 @@ const items: NavItem[] = [
 ];
 
 const bottom: NavItem[] = [
+  { to: "/administracao", label: "Administração",  icon: Shield },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
