@@ -193,7 +193,6 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
               + `Olá *${nomePrimeiro}*!\n\n`
               + `Recebemos seu pagamento de *${valorBRL}* referente ao mês *${cob.competencia ?? ""}*.\n\n`
               + `Sua conta está ativa e todos os serviços continuam normalmente. 🎉\n\n`
-              + `Dúvidas? (12) 99685-3626\n`
               + `_meucontador.io — by Apoya Contábil_`;
 
             notificarWA(db, cob.cliente_id, msgWA).catch(() => {});
@@ -231,7 +230,7 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
               updated_at:   now,
             }).eq("id", cob.id);
 
-            const msgCancel = `ℹ️ *Cobrança cancelada*\n\nSua cobrança de R$ ${cob.valor} foi cancelada/estornada.\nDúvidas: (12) 99685-3626\n_meucontador.io_`;
+            const msgCancel = `ℹ️ *Cobrança cancelada*\n\nSua cobrança de R$ ${cob.valor} foi cancelada/estornada.\n_meucontador.io — by Apoya Contábil_`;
             notificarWA(db, cob.cliente_id, msgCancel).catch(() => {});
 
             console.log(`[webhook] 🚫 CANCELADA — ${cob.id}`);
