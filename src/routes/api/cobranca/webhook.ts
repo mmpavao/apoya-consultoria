@@ -178,8 +178,28 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
               + `_Apoya Contábil · apoya.com.br_`;
             notificarWA(db, cob.cliente_id, msgConfirm).catch(() => {});
 
-            // 4. Disparar pipeline NFS-e em background (fire-and-forget)
-            dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+            // 4. Disparar NFS-e apenas se emissão for automática
+            // Verificar contrato ativo do cliente para checar campo emissao_nf
+            try {
+              const { data: contratoAtivo } = await db
+                .from("contrato_cliente")
+                .select("emissao_nf")
+                .eq("cliente_id", cob.cliente_id)
+                .eq("status", "ativo")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              const emissaoNf = contratoAtivo?.emissao_nf ?? "automatica";
+              if (emissaoNf !== "manual") {
+                dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+              } else {
+                console.log(`[webhook] 📋 NFS-e manual para ${cob.id} — aguarda ação do escritório`);
+              }
+            } catch {
+              // fallback: emitir automaticamente se não conseguir buscar contrato
+              dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+            }
 
             console.log(`[webhook] ✅ PAGO — ${cob.id} — ${valorBRL} — ${cli?.razao_social}`);
             break;
