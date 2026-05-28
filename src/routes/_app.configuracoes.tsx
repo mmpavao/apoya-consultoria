@@ -49,49 +49,58 @@ function ConfiguracoesPage() {
         title="Configurações"
         subtitle="Escritório · Usuários · Integrações · MCP"
       />
-      <Tabs defaultValue="geral" className="space-y-5">
-        <TabsList className="h-10 rounded-xl bg-muted/60 p-1">
-          <TabsTrigger value="geral"   className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <Building2 className="h-4 w-4" />Geral
+      <Tabs defaultValue="escritorio" className="space-y-5">
+        <TabsList className="h-10 rounded-xl bg-muted/60 p-1 flex flex-wrap gap-0.5">
+          <TabsTrigger value="escritorio" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Building2 className="h-4 w-4" />Escritório
           </TabsTrigger>
-          <TabsTrigger value="mcp"     className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+          <TabsTrigger value="usuarios" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Users className="h-4 w-4" />Usuários
+          </TabsTrigger>
+          <TabsTrigger value="integracoes" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Plug className="h-4 w-4" />Integrações
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <MessageSquare className="h-4 w-4" />WhatsApp
+          </TabsTrigger>
+          <TabsTrigger value="permissoes" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Shield className="h-4 w-4" />Permissões
+          </TabsTrigger>
+          <TabsTrigger value="servicos" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Package className="h-4 w-4" />Serviços
+          </TabsTrigger>
+          <TabsTrigger value="mcp" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <Network className="h-4 w-4" />MCP / API
           </TabsTrigger>
         </TabsList>
 
-        {/* ── ABA GERAL ── */}
-        <TabsContent value="geral" className="space-y-8">
-          {/* Escritório */}
-          <section>
-            <SectionTitle>🏢 Escritório</SectionTitle>
-            <EscritorioSection />
-          </section>
+        {/* ── ABA ESCRITÓRIO ── */}
+        <TabsContent value="escritorio" className="space-y-6">
+          <EscritorioSection />
+        </TabsContent>
 
-          {/* Usuários */}
-          <section>
-            <SectionTitle>👤 Usuários</SectionTitle>
-            <UsuariosSection />
-          </section>
+        {/* ── ABA USUÁRIOS ── */}
+        <TabsContent value="usuarios" className="space-y-6">
+          <UsuariosSection />
+        </TabsContent>
 
-          {/* Integrações */}
-          <section>
-            <SectionTitle>🔌 Integrações</SectionTitle>
-            <IntegracoesSection />
-          </section>
+        {/* ── ABA INTEGRAÇÕES ── */}
+        <TabsContent value="integracoes" className="space-y-6">
+          <IntegracoesSection />
+        </TabsContent>
 
-          {/* Templates WhatsApp */}
-          <section>
-            <SectionTitle>💬 Templates WhatsApp</SectionTitle>
-            <TemplatesSection />
-          </section>
+        {/* ── ABA WHATSAPP ── */}
+        <TabsContent value="whatsapp" className="space-y-6">
+          <TemplatesSection />
+        </TabsContent>
 
-          {/* Permissões */}
-          <section>
-            <SectionTitle>🛡️ Permissões e Setores</SectionTitle>
-            <PermissoesTab />
-          </section>
+        {/* ── ABA PERMISSÕES ── */}
+        <TabsContent value="permissoes" className="space-y-6">
+          <PermissoesTab />
+        </TabsContent>
 
-          {/* Serviços */}
+        {/* ── ABA SERVIÇOS ── */}
+        <TabsContent value="servicos" className="space-y-6">
           <section>
             <SectionTitle>📦 Catálogo de Serviços</SectionTitle>
             <div className="surface-card p-6 rounded-xl flex items-center gap-4">

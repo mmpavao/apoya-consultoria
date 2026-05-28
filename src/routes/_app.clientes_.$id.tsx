@@ -326,7 +326,7 @@ function ClienteDetailPage() {
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setModalNfse(true)}>
                   <ReceiptText className="mr-1.5 h-3.5 w-3.5" />Emitir NFS-e
                 </Button>
-                <Button size="sm" onClick={() => setEditMode(true)}>
+                <Button size="sm" onClick={() => { setEditMode(true); setTab("geral"); setTimeout(() => document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}>
                   <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
                 </Button>
                 {cliente.whatsapp && (
@@ -582,7 +582,7 @@ function ClienteDetailPage() {
 
       {/* ═════════════════════ FORMULÁRIO DE EDIÇÃO ═════════════════════ */}
       {editMode && (
-        <div className="surface-card p-6 space-y-6">
+        <div id="edit-form" className="surface-card p-6 space-y-6">
           <h3 className="font-semibold text-base flex items-center gap-2"><Edit className="h-4 w-4" />Editar dados do cliente</h3>
           <Separator />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -752,19 +752,23 @@ function ClienteDetailPage() {
           </div>
         </div>
       )}
-    </div>
+
       {/* ═════════════════════ ABA: DEP. PESSOAL ═══════════════════ */}
       {tab === "dp" && cliente?.temEmpregados && <TabDP clienteId={id} />}
       {tab === "dp" && !cliente?.temEmpregados && (
         <div className="text-center text-muted-foreground py-12">
-          Este cliente não tem empregados cadastrados. Ative "Tem empregados CLT" no cadastro.
+          <Users2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="font-medium">Sem empregados cadastrados</p>
+          <p className="text-sm mt-1">Ative "Tem empregados CLT" no cadastro para habilitar este módulo.</p>
         </div>
       )}
 
       {/* ═════════════════════ ABA: CONTÁBIL ═════════════════════ */}
       {tab === "contabil" && <TabContabil clienteId={id} />}
 
-  <EmitirNfseModal
+    </div>
+
+    <EmitirNfseModal
       open={modalNfse}
       onClose={() => setModalNfse(false)}
       clientePreSelecionado={cliente}

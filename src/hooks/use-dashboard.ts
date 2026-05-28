@@ -110,9 +110,10 @@ export function useDashboard() {
       const { data: dasGuias } = await supabase
         .from("das_guias")
         .select("status, vencimento")
-        .in("status", ["pendente", "gerada", "enviada", "vencida"]);
+        .in("status", ["pendente", "gerada", "enviada", "vencida"])
+        .throwOnError().then(r => r).catch(() => ({ data: [] })) as any;
 
-      const dasArr       = dasGuias ?? [];
+      const dasArr       = (dasGuias ?? []) as any[];
       const dasEmAberto  = dasArr.filter(d => ["pendente","gerada","enviada"].includes(d.status)).length;
       const dasVencHoje  = dasArr.filter(d => d.vencimento === hoje || d.vencimento === amanha).length;
 
@@ -140,18 +141,22 @@ export function useDashboard() {
       const obAtrasadas = obArr.filter(o => o.status === "atrasada").length;
 
       /* ── 5. WhatsApp não lidas ──────────────────────────── */
-      const { count: waNaoLidas } = await supabase
+      const waNaoLidasResult = await supabase
         .from("mensagem_whatsapp")
         .select("id", { count: "exact", head: true })
         .is("lida_em", null)
-        .eq("direcao", "recebida");
+        .eq("direcao", "recebida")
+        .then(r => r).catch(() => ({ count: 0 }));
+      const waNaoLidas = waNaoLidasResult.count;
 
       /* ── 6. NFS-e emitidas no mês ───────────────────────── */
-      const { count: nfseCount } = await supabase
+      const nfseResult = await supabase
         .from("nfse_emitida")
         .select("id", { count: "exact", head: true })
         .eq("status", "emitida")
-        .gte("created_at", `${mesAtual}-01`);
+        .gte("created_at", `${mesAtual}-01`)
+        .then(r => r).catch(() => ({ count: 0 }));
+      const nfseCount = nfseResult.count;
 
       /* ── 7. Honorários por mês (últimos 6) ──────────────── */
       const honorariosData: HonorarioMes[] = [];
@@ -169,12 +174,14 @@ export function useDashboard() {
       }
 
       /* ── 8. Calendário fiscal — próximas obrigações ─────── */
-      const { data: calItems } = await supabase
+      const calFiscalResult = await supabase
         .from("calendario_fiscal")
         .select("nome, dia_vencimento, mes_vencimento, periodicidade")
         .eq("ativo", true)
         .order("dia_vencimento", { ascending: true })
-        .limit(5);
+        .limit(5)
+        .then(r => r).catch(() => ({ data: [] }));
+      const calItems = calFiscalResult.data;
 
       const calFiscal: CalFiscalItem[] = (calItems ?? []).map(item => {
         const mesRef  = item.mes_vencimento ?? (month + 1);

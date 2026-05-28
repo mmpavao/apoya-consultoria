@@ -237,14 +237,16 @@ function DasPage() {
               <MessageCircle className="h-4 w-4" /> WhatsApp
             </Button>
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={gerarTodosDoMes} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
-              Inicializar Mês
+              onClick={gerarTodosDoMes} disabled={busy}
+              title="Gera guias DAS para todos os clientes Simples Nacional e MEI do mês selecionado">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Plus className="h-4 w-4"/>}
+              {kpi.total === 0 ? "Gerar DAS do Mês" : "Inicializar Mês"}
             </Button>
             <Button size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={gerarLote} disabled={busy||sel.size===0}>
+              onClick={gerarLote} disabled={busy||sel.size===0}
+              title="Selecione guias geradas para enviar via SERPRO">
               {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
-              Gerar ({sel.size})
+              Enviar SERPRO ({sel.size})
             </Button>
           </>
         }
@@ -276,7 +278,7 @@ function DasPage() {
         onToggleAll={toggleAll}
         onToggleRow={toggleOne}
         emptyIcon={<FileText className="h-8 w-8"/>}
-        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — use "Gerar (0)" para criar as guias via SERPRO`}
+        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — clique em "Gerar DAS do Mês" para criar as guias via SERPRO para todos os clientes`}
         rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
         toolbar={
           <>
