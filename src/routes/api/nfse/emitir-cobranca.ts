@@ -56,13 +56,22 @@ export const Route = createFileRoute("/api/nfse/emitir-cobranca")({
     handlers: {
       POST: async ({ request }) => {
         // ── Auth ──────────────────────────────────────────────────────
-        const authHeader = request.headers.get("authorization") ?? "";
-        // Suportar também cookie de sessão (acesso pelo painel)
+        const authHeader  = request.headers.get("authorization") ?? "";
+        const isInternal  = request.headers.get("x-internal") === "webhook";
+        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
         let userId = "system";
-        if (authHeader) {
+
+        if (isInternal && SERVICE_KEY && authHeader === `Bearer ${SERVICE_KEY}`) {
+          // Chamada interna do webhook Asaas — aceitar diretamente
+          userId = "webhook-asaas";
+        } else if (authHeader) {
+          // Chamada do frontend — validar token de usuário
           const user = await getSupabaseUser(authHeader);
           if (!user) return err("Unauthorized", 401);
           userId = user.userId;
+        } else {
+          return err("Unauthorized", 401);
         }
 
         // ── Body ──────────────────────────────────────────────────────
