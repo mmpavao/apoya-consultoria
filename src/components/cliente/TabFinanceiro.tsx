@@ -71,9 +71,38 @@ function FinCard({ title, icon: Icon, children }: { title: string; icon: any; ch
   );
 }
 
+// ── emissão manual de NFS-e ──────────────────────────────────────────────
+async function emitirNFManual(cobrancaId: string, clienteId: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/nfse-pos-pagamento`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        "x-apoya-secret": "apoya-nfse-2026",
+      },
+      body: JSON.stringify({ cobranca_id: cobrancaId, cliente_id: clienteId }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
 // ── tabela de cobranças reutilizável ───────────────────────────────────────
-function TabelaCobrancas({ cobrancas }: { cobrancas: Cobranca[] }) {
+function TabelaCobrancas({ cobrancas, clienteId }: { cobrancas: Cobranca[]; clienteId?: string }) {
   const [query, setQuery] = useState("");
+  const [emitindo, setEmitindo] = useState<string | null>(null);
+
+  const handleEmitirNF = async (cob: Cobranca) => {
+    if (!clienteId) return;
+    setEmitindo(cob.id);
+    const ok = await emitirNFManual(cob.id, clienteId);
+    setEmitindo(null);
+    if (ok) {
+      toast.success("NFS-e emitida! PDF enviado por e-mail e WhatsApp.");
+    } else {
+      toast.error("Erro ao emitir NFS-e. Verifique os dados fiscais.");
+    }
+  };
 
   const STATUS_COR: Record<string, "green"|"red"|"amber"|"gray"> = {
     paga:"green", vencida:"red", pendente:"amber", cancelada:"gray"
@@ -123,7 +152,31 @@ function TabelaCobrancas({ cobrancas }: { cobrancas: Cobranca[] }) {
                   <td>{c.competencia}</td>
                   <td className="text-right font-semibold">{fmtBRL(c.valor)}</td>
                   <td>{fmtDate(c.vencimento)}</td>
-                  <td><Pill cor={STATUS_COR[c.status] ?? "gray"}>{STATUS_LBL[c.status] ?? c.status}</Pill></td>
+                  <td>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Pill cor={STATUS_COR[c.status] ?? "gray"}>{STATUS_LBL[c.status] ?? c.status}</Pill>
+                      {c.status === "paga" && !c.nfseStatus && clienteId && (
+                        <button onClick={() => handleEmitirNF(c)} disabled={emitindo === c.id}
+                          title="Emitir NFS-e" className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                          {emitindo === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ReceiptText className="h-3 w-3" />}
+                          {emitindo === c.id ? "…" : "Emitir NF"}
+                        </button>
+                      )}
+                      {c.nfseStatus === "emitida" && (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-700">
+                          <FileText className="h-3 w-3" /> NF ✓
+                        </span>
+                      )}
+                      {c.nfseStatus === "erro" && clienteId && (
+                        <button onClick={() => handleEmitirNF(c)} disabled={emitindo === c.id}
+                          title={c.nfseErro ?? "Erro — clique para tentar novamente"}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50">
+                          <ReceiptText className="h-3 w-3" />
+                          NF Erro ↺
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td className="text-muted-foreground">{fmtDate(c.pagoEm)}</td>
                 </tr>
               ))}
@@ -338,7 +391,7 @@ export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
       )}
 
       {/* ── COBRANÇAS ── */}
-      {sub === "cobrancas" && <TabelaCobrancas cobrancas={cobCliente} />}
+      {sub === "cobrancas" && <TabelaCobrancas cobrancas={cobCliente} clienteId={cliente.id} />}
 
       {/* ── HONORÁRIOS ── */}
       {sub === "honorarios" && (
@@ -398,7 +451,7 @@ export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
           </div>
 
           {/* Tabela completa */}
-          <TabelaCobrancas cobrancas={cobCliente} />
+          <TabelaCobrancas cobrancas={cobCliente} clienteId={cliente.id} />
         </div>
       )}
     </div>
