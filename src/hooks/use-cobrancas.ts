@@ -30,6 +30,9 @@ export interface Cobranca {
   reguaStage: ReguaStage;
   ultimoEnvioWhatsapp?: string;
   diasAtraso: number;
+  nfseStatus: string | null;
+  nfseTentativas: number;
+  nfseErro: string | null;
 }
 
 function fromDb(r: Record<string, unknown>): Cobranca {
