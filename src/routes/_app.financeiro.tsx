@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
   Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
-  RefreshCw, Zap, ExternalLink, TrendingDown} from "lucide-react";
+  RefreshCw, Zap, ExternalLink, TrendingDown, FileCheck2, ReceiptText, FileClock} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,6 +36,32 @@ function FinanceiroPage(){
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
+  const [emitindoNf,  setEmitindoNf]  = useState<string|null>(null);
+
+  const emitirNfManual = async (cobrancaId: string) => {
+    setEmitindoNf(cobrancaId);
+    try {
+      const { data: { session } } = await (await import('@/integrations/supabase/client')).supabase.auth.getSession();
+      const token = session?.access_token ?? '';
+      const res = await fetch('/api/nfse/emitir-cobranca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ cobranca_id: cobrancaId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error ?? 'Erro ao emitir NFS-e');
+      } else {
+        toast.success(`NFS-e nº ${data.numero} emitida com sucesso!`);
+        refresh();
+      }
+    } catch (e: any) {
+      toast.error('Erro ao emitir NFS-e: ' + (e?.message ?? ''));
+    } finally {
+      setEmitindoNf(null);
+    }
+  };
+
   type FinView = "cobrancas" | "inadimplencia";
   const [finView, setFinView]          = useState<FinView>("cobrancas");
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
@@ -261,6 +287,62 @@ function FinanceiroPage(){
           {c.asaasId && <div className="text-[10px] text-muted-foreground">Asaas ✓</div>}
         </div>
       ),
+    },
+    {
+      key:"nfse", header:"NFS-e",
+      headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
+      cell: (c) => {
+        const st = c.nfseStatus;
+        if (st === "emitida") {
+          return (
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
+              <FileCheck2 className="h-3.5 w-3.5" /> Emitida
+            </span>
+          );
+        }
+        if (st === "processando") {
+          return (
+            <span className="inline-flex items-center gap-1 text-[11px] text-blue-600">
+              <FileClock className="h-3.5 w-3.5 animate-pulse" /> Processando
+            </span>
+          );
+        }
+        if (st === "erro") {
+          return (
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1 text-[11px] text-red-600 font-medium">
+                <ReceiptText className="h-3.5 w-3.5" /> Erro
+              </span>
+              {c.status === "paga" && (
+                <button
+                  onClick={() => emitirNfManual(c.id)}
+                  disabled={emitindoNf === c.id}
+                  className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-50"
+                >
+                  {emitindoNf === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Retentar
+                </button>
+              )}
+            </div>
+          );
+        }
+        // Sem nota: mostrar botão apenas se paga
+        if (c.status === "paga") {
+          return (
+            <button
+              onClick={() => emitirNfManual(c.id)}
+              disabled={emitindoNf === c.id}
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium disabled:opacity-50 hover:underline"
+            >
+              {emitindoNf === c.id
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Emitindo…</>
+                : <><ReceiptText className="h-3.5 w-3.5" /> Emitir NF</>
+              }
+            </button>
+          );
+        }
+        return <span className="text-[11px] text-muted-foreground">—</span>;
+      },
     },
   ];
 
