@@ -38,26 +38,25 @@ async function notificarWA(db: any, clienteId: string, mensagem: string): Promis
   } catch (e) { console.warn("[webhook] Falha WA:", e); }
 }
 
-// ── Disparar edge function NFS-e (fire-and-forget) ────────────────────────────
-async function dispararNfse(cobrancaId: string, clienteId: string): Promise<void> {
+// ── Disparar NFS-e via rota interna do Worker (fire-and-forget) ──────────────
+// Usa /api/nfse/emitir-cobranca com SERVICE_ROLE para bypass de auth
+async function dispararNfse(cobrancaId: string, _clienteId: string): Promise<void> {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-      ?? "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
-    const secret      = process.env.APOYA_INTERNAL_SECRET ?? "apoya-nfse-2026";
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    const workerUrl      = process.env.WORKER_BASE_URL ?? "https://apoya-gestao.talkzzbot.workers.dev";
 
-    const res = await fetch(
-      `${supabaseUrl}/functions/v1/nfse-pos-pagamento`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":    "application/json",
-          "x-apoya-secret":  secret,
-          "Authorization":   `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`,
-        },
-        body: JSON.stringify({ cobranca_id: cobrancaId, cliente_id: clienteId }),
-      }
-    );
-    const data = await res.json() as any;
+    const res = await fetch(`${workerUrl}/api/nfse/emitir-cobranca`, {
+      method: "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "x-internal":    "webhook",
+      },
+      body: JSON.stringify({ cobranca_id: cobrancaId }),
+    });
+
+    let data: any = {};
+    try { data = await res.json(); } catch {}
     console.log(`[webhook] NFS-e dispatch → ${res.status} | ${data?.ok ? "✅" : "⚠️"} ${data?.numero ?? data?.erro ?? ""}`);
   } catch (e) {
     console.warn("[webhook] Falha dispatch NFS-e:", e);
