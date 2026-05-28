@@ -158,7 +158,7 @@ export function useClienteServicos(clienteId: string) {
   }) => {
     const { data, error } = await supabase
       .from("cliente_servico")
-      .insert({ ...payload, cliente_id: clienteId, desconto: payload.desconto ?? 0, valor_final: (payload.valor_contratado - (payload.desconto ?? 0)), status: "ativo" })
+      .insert({ ...payload, cliente_id: clienteId, desconto: payload.desconto ?? 0, status: "ativo" })
       .select()
       .single();
     if (error) { toast.error("Erro ao contratar serviço"); throw error; }
