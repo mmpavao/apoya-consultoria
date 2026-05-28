@@ -1,4 +1,4 @@
-name: Deploy — Cloudflare Workers
+name: Deploy — Cloudflare Workers + Supabase Edge Functions
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -18,8 +18,8 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -35,3 +35,32 @@ jobs:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # ── Injetar secrets no Worker (wrangler secret put) ─────────────────
+      - name: Inject Worker Secrets
+        run: |
+          echo "${{ secrets.ASAAS_API_KEY }}"          | npx wrangler secret put ASAAS_API_KEY          --name apoya-gestao
+          echo "${{ secrets.NFSEIO_API_KEY }}"         | npx wrangler secret put NFSEIO_API_KEY         --name apoya-gestao
+          echo "${{ secrets.EVOLUTION_API_KEY }}"      | npx wrangler secret put EVOLUTION_API_KEY      --name apoya-gestao
+          echo "${{ secrets.SUPABASE_URL }}"           | npx wrangler secret put SUPABASE_URL           --name apoya-gestao
+          echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name apoya-gestao
+          echo "apoya-nfse-2026"                       | npx wrangler secret put APOYA_INTERNAL_SECRET  --name apoya-gestao
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        continue-on-error: true
+
+      # ── Deploy Supabase Edge Functions ────────────────────────────────────
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        run: |
+          supabase functions deploy nfse-pos-pagamento --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy sync-nfse-nfeio    --project-ref ajaqbdsalxfgrwpjbtbn
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
