@@ -13,8 +13,8 @@ type Props = { open: boolean; onClose: () => void; onCreated?: () => void; };
 
 const now = new Date();
 const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-const nextMonth20 = (() => {
-  const d = new Date(now.getFullYear(), now.getMonth() + 1, 20);
+const nextMonth10 = (() => {
+  const d = new Date(now.getFullYear(), now.getMonth() + 1, 10);
   return d.toISOString().split("T")[0];
 })();
 
@@ -24,10 +24,10 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     clienteId: "",
-    descricao: "Honorários contábeis",
+    descricao: "Mensalidade APOYA",
     valor: "",
-    forma: "PIX" as "PIX" | "BOLETO" | "DEBITO",
-    vencimento: nextMonth20,
+    forma: "UNDEFINED" as "PIX" | "BOLETO" | "UNDEFINED",
+    vencimento: nextMonth10,
     competencia: thisMonth,
   });
 
@@ -39,7 +39,7 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
   useEffect(() => {
     if (!form.clienteId) return;
     const c = clientes.find(x => x.id === form.clienteId);
-    if (c?.valorHonorario) setForm(f => ({ ...f, valor: String(c.valorHonorario), forma: (c.formaPagamento as any) ?? "PIX" }));
+    if (c?.valorHonorario) setForm(f => ({ ...f, valor: String(c.valorHonorario), forma: (c.formaPagamento as any) ?? "UNDEFINED" }));
   }, [form.clienteId, clientes]);
 
   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -49,25 +49,48 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
       toast.error("Preencha os campos obrigatórios");
       return;
     }
-    const cliente = clientes.find(c => c.id === form.clienteId);
     setSaving(true);
-    const { error } = await supabase.from("cobrancas").insert({
-      cliente_id: form.clienteId,
-      cliente_nome: cliente?.razaoSocial ?? "",
-      cnpj: cliente?.cnpj ?? "",
-      descricao: form.descricao,
-      valor: parseFloat(form.valor),
-      forma: form.forma,
-      vencimento: form.vencimento,
-      competencia: form.competencia,
-      status: "pendente",
-    });
-    setSaving(false);
-    if (error) { toast.error("Erro ao criar cobrança: " + error.message); return; }
-    toast.success("Cobrança criada com sucesso!");
-    window.dispatchEvent(new Event("apoya:cobrancas:changed"));
-    onCreated?.();
-    onClose();
+    try {
+      // Usar rota do servidor (supabaseAdmin) para contornar RLS
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+
+      const res = await fetch("/api/cobranca/criar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cliente_id:  form.clienteId,
+          valor:       parseFloat(form.valor),
+          descricao:   form.descricao,
+          forma:       form.forma,
+          vencimento:  form.vencimento,
+          competencia: form.competencia,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast.warning(`Cobrança já existe para ${form.competencia}. Status: ${data.status}`);
+        } else {
+          toast.error("Erro ao criar cobrança: " + (data.error ?? res.statusText));
+        }
+        return;
+      }
+
+      toast.success("Cobrança criada com sucesso!");
+      window.dispatchEvent(new Event("apoya:cobrancas:changed"));
+      onCreated?.();
+      onClose();
+    } catch (e: unknown) {
+      toast.error("Erro inesperado: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -99,9 +122,9 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
               <Select value={form.forma} onValueChange={v => up("forma", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="UNDEFINED">PIX / Boleto / Cartão</SelectItem>
                   <SelectItem value="PIX">PIX</SelectItem>
                   <SelectItem value="BOLETO">Boleto</SelectItem>
-                  <SelectItem value="DEBITO">Débito automático</SelectItem>
                 </SelectContent>
               </Select>
             </div>
