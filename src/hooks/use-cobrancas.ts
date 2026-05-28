@@ -52,6 +52,9 @@ function fromDb(r: Record<string, unknown>): Cobranca {
     reguaStage:          (r.regua_stage as string ?? "ok") as ReguaStage,
     ultimoEnvioWhatsapp: r.ultimo_envio_whatsapp as string | undefined,
     diasAtraso:          Number(r.dias_atraso ?? 0),
+    nfseStatus:          (r.nfse_status as string | null) ?? null,
+    nfseTentativas:      Number(r.nfse_tentativas ?? 0),
+    nfseErro:            (r.nfse_erro as string | null) ?? null,
   };
 }
 
