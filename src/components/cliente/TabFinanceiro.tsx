@@ -72,19 +72,25 @@ function FinCard({ title, icon: Icon, children }: { title: string; icon: any; ch
 }
 
 // ── emissão manual de NFS-e ──────────────────────────────────────────────
-async function emitirNFManual(cobrancaId: string, clienteId: string): Promise<boolean> {
+// Chama a rota interna do Worker /api/nfse/ com action=emitir_por_cobranca
+async function emitirNFManual(cobrancaId: string, _clienteId: string): Promise<{ ok: boolean; erro?: string }> {
   try {
-    const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/nfse-pos-pagamento`, {
+    // Buscar dados da cobrança e cliente via Supabase (service role via rota)
+    const r = await fetch("/api/nfse/emitir-cobranca", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        "x-apoya-secret": "apoya-nfse-2026",
-      },
-      body: JSON.stringify({ cobranca_id: cobrancaId, cliente_id: clienteId }),
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ cobranca_id: cobrancaId }),
     });
-    return r.ok;
-  } catch { return false; }
+    if (!r.ok) {
+      let msg = `HTTP ${r.status}`;
+      try { const e = await r.json(); msg = e.error ?? msg; } catch {}
+      return { ok: false, erro: msg };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, erro: e?.message ?? "Erro de rede" };
+  }
 }
 
 // ── tabela de cobranças reutilizável ───────────────────────────────────────
@@ -95,12 +101,12 @@ function TabelaCobrancas({ cobrancas, clienteId }: { cobrancas: Cobranca[]; clie
   const handleEmitirNF = async (cob: Cobranca) => {
     if (!clienteId) return;
     setEmitindo(cob.id);
-    const ok = await emitirNFManual(cob.id, clienteId);
+    const { ok, erro } = await emitirNFManual(cob.id, clienteId);
     setEmitindo(null);
     if (ok) {
-      toast.success("NFS-e emitida! PDF enviado por e-mail e WhatsApp.");
+      toast.success("NFS-e emitida com sucesso! PDF enviado por e-mail e WhatsApp.");
     } else {
-      toast.error("Erro ao emitir NFS-e. Verifique os dados fiscais.");
+      toast.error(`Erro ao emitir NFS-e: ${erro ?? "verifique os dados fiscais"}`);
     }
   };
 
