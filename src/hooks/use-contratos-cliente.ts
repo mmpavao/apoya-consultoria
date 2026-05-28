@@ -80,6 +80,7 @@ export interface NovoContratoPayload {
   notificacao_canal?: CanalNotificacao;
   deadline_days?:   number;
   observacoes?:     string;
+  emissao_nf?:      "automatica" | "manual";
 }
 
 const SUPABASE_EF_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -256,6 +257,7 @@ export function useContratosCliente(clienteId: string) {
         notificacao_canal: dados.notificacao_canal ?? "email",
         deadline_days: dados.deadline_days ?? 5,
         observacoes: dados.observacoes ?? null,
+        emissao_nf: dados.emissao_nf ?? "automatica",
         status: "rascunho",
       };
       
