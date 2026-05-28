@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, redirect, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { Eye, EyeOff, ArrowRight, CheckCircle2, BarChart3, FileText, MessageSquare } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, CheckCircle2, BarChart3, FileText, MessageSquare, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApoyaLogo } from "@/components/ApoyaLogo";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,10 +50,33 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
-  const reset = () => { setError(null); setInfo(null); };
+  const reset = () => { setError(null); setInfo(null); setResetSent(false); };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Digite seu e-mail no campo acima para receber o link de recuperação.");
+      return;
+    }
+    setLoadingReset(true);
+    setError(null);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login?reset=true`,
+      });
+      if (err) throw err;
+      setResetSent(true);
+      setInfo(`Link de recuperação enviado para ${email}. Verifique sua caixa de entrada.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível enviar o e-mail de recuperação.");
+    } finally {
+      setLoadingReset(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,8 +245,18 @@ function LoginPage() {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-foreground">Senha</label>
                 {mode === "signin" && (
-                  <button type="button" className="text-xs text-primary hover:underline">
-                    Esqueci a senha
+                  <button
+                    type="button"
+                    disabled={loadingReset}
+                    onClick={handleForgotPassword}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingReset
+                      ? <><span className="animate-spin">⟳</span> Enviando…</>
+                      : resetSent
+                      ? <><Mail className="h-3 w-3" /> Link enviado! ✓</>
+                      : "Esqueci a senha"
+                    }
                   </button>
                 )}
               </div>
