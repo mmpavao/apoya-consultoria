@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useClientes } from "@/hooks/use-clientes";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,26 +21,43 @@ const nextMonth10 = (() => {
 
 export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
   const { clientes } = useClientes();
+  // Apenas clientes ativos ou inadimplentes
   const ativos = clientes.filter(c => c.status === "ativo" || c.status === "inadimplente");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [semContrato, setSemContrato] = useState(false);
   const [form, setForm] = useState({
-    clienteId: "",
-    descricao: "Mensalidade APOYA",
-    valor: "",
-    forma: "UNDEFINED" as "PIX" | "BOLETO" | "UNDEFINED",
-    vencimento: nextMonth10,
+    clienteId:   "",
+    descricao:   "Mensalidade APOYA",
+    valor:       "",
+    forma:       "UNDEFINED" as "PIX" | "BOLETO" | "UNDEFINED",
+    vencimento:  nextMonth10,
     competencia: thisMonth,
   });
 
+  // Reset ao abrir
   useEffect(() => {
     if (!open) return;
     setForm(f => ({ ...f, clienteId: "", valor: "" }));
+    setSemContrato(false);
   }, [open]);
 
+  // Preenche valor do honorário ao selecionar cliente + verifica contrato
   useEffect(() => {
-    if (!form.clienteId) return;
+    if (!form.clienteId) { setSemContrato(false); return; }
     const c = clientes.find(x => x.id === form.clienteId);
-    if (c?.valorHonorario) setForm(f => ({ ...f, valor: String(c.valorHonorario), forma: (c.formaPagamento as any) ?? "UNDEFINED" }));
+    if (c?.valorHonorario) setForm(f => ({ ...f, valor: String(c.valorHonorario) }));
+
+    // Verifica contrato ativo via Supabase
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("contrato_cliente")
+        .select("id")
+        .eq("cliente_id", form.clienteId)
+        .eq("status", "ativo")
+        .limit(1)
+        .maybeSingle();
+      setSemContrato(!data);
+    })();
   }, [form.clienteId, clientes]);
 
   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -49,9 +67,13 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
       toast.error("Preencha os campos obrigatórios");
       return;
     }
+    if (semContrato) {
+      toast.error("Este cliente não possui contrato ativo. Assine o contrato antes de gerar cobrança.");
+      return;
+    }
+
     setSaving(true);
     try {
-      // Usar rota do servidor (supabaseAdmin) para contornar RLS
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token ?? "";
 
@@ -82,7 +104,7 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
         return;
       }
 
-      toast.success("Cobrança criada com sucesso!");
+      toast.success("Cobrança criada! Use 'Emitir' para enviar ao Asaas.");
       window.dispatchEvent(new Event("apoya:cobrancas:changed"));
       onCreated?.();
       onClose();
@@ -105,9 +127,22 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
             <Label>Cliente *</Label>
             <Select value={form.clienteId} onValueChange={v => up("clienteId", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-              <SelectContent>{ativos.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {ativos.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
+
+          {/* Aviso sem contrato */}
+          {semContrato && form.clienteId && (
+            <Alert variant="destructive" className="py-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Este cliente não possui contrato ativo. Assine o contrato de prestação de serviços antes de gerar cobranças.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid gap-1.5">
             <Label>Descrição</Label>
             <Input value={form.descricao} onChange={e => up("descricao", e.target.value)} />
@@ -115,7 +150,8 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Valor (R$) *</Label>
-              <Input type="number" min="0" step="0.01" value={form.valor} onChange={e => up("valor", e.target.value)} placeholder="0,00" />
+              <Input type="number" min="0" step="0.01" value={form.valor}
+                onChange={e => up("valor", e.target.value)} placeholder="0,00" />
             </div>
             <div className="grid gap-1.5">
               <Label>Forma</Label>
@@ -142,8 +178,9 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar cobrança
+          <Button onClick={handleSave} disabled={saving || semContrato}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar cobrança
           </Button>
         </DialogFooter>
       </DialogContent>
