@@ -8,7 +8,7 @@ import {
   FileText, Plus, Send, RefreshCw, XCircle, Download,
   ExternalLink, Copy, Clock, CheckCircle2, AlertTriangle,
   ChevronDown, ChevronRight, Eye, Trash2, Edit3,
-  Mail, MessageSquare, Shield,
+  Mail, MessageSquare, Shield, ReceiptText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -297,6 +297,7 @@ function ModalNovoContrato({
     valor_total: 0,
     notificacao_canal: "email",
     deadline_days: 30,
+    emissao_nf: "automatica" as "automatica" | "manual",
   });
   const [notifEmail, setNotifEmail]       = useState(true);
   const [notifWhatsapp, setNotifWhatsapp] = useState(false);
@@ -434,6 +435,36 @@ function ModalNovoContrato({
                   <MessageSquare className="h-3 w-3" /> Notificar por WhatsApp
                 </Label>
               </div>
+            </div>
+          </div>
+
+          {/* Emissão de NFS-e */}
+          <div className="rounded-xl border border-border/60 p-3 space-y-2 bg-blue-50/40">
+            <p className="text-xs font-semibold flex items-center gap-1.5 text-blue-700">
+              <ReceiptText className="h-3.5 w-3.5" />
+              Emissão de Nota Fiscal (NFS-e)
+            </p>
+            <div className="flex items-start gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="emissao_nf" value="automatica"
+                  checked={(form.emissao_nf ?? "automatica") === "automatica"}
+                  onChange={() => setForm(f => ({ ...f, emissao_nf: "automatica" }))}
+                  className="accent-primary" />
+                <div>
+                  <span className="text-xs font-medium">Automática</span>
+                  <p className="text-[10px] text-muted-foreground">NFS-e gerada ao confirmar pagamento</p>
+                </div>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="emissao_nf" value="manual"
+                  checked={form.emissao_nf === "manual"}
+                  onChange={() => setForm(f => ({ ...f, emissao_nf: "manual" }))}
+                  className="accent-primary" />
+                <div>
+                  <span className="text-xs font-medium">Manual</span>
+                  <p className="text-[10px] text-muted-foreground">NFS-e emitida manualmente pelo escritório</p>
+                </div>
+              </label>
             </div>
           </div>
 
