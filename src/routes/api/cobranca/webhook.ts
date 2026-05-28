@@ -1,16 +1,15 @@
 /**
- * POST /api/cobranca/webhook (alias para /api/public/asaas-webhook)
- * Recebe eventos do Asaas — endpoint configurado no painel Asaas.
+ * POST /api/cobranca/webhook  (alias para /api/public/asaas-webhook)
+ * Recebe eventos do Asaas.
  *
  * Eventos tratados:
- *   PAYMENT_RECEIVED / PAYMENT_CONFIRMED → status=paga
- *   PAYMENT_OVERDUE                       → status=vencida
- *   PAYMENT_DELETED / PAYMENT_REFUNDED   → status=cancelada
+ *   PAYMENT_RECEIVED / PAYMENT_CONFIRMED → paga + confirma WA + email
+ *   PAYMENT_OVERDUE                       → vencida
+ *   PAYMENT_DELETED / PAYMENT_REFUNDED   → cancelada
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const APP_URL = "https://apoya-gestao.talkzzbot.workers.dev";
+import { evo } from "@/integrations/evolution/client.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -19,31 +18,69 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function enviarConfirmacaoWA(
-  token: string,
+/** Envia WhatsApp via Evolution API direto — sem necessidade de auth de usuário */
+async function notificarWAPagamento(
+  db: any,
   clienteId: string,
   telefone: string,
   nome: string,
   valor: string,
+  linkFatura: string,
 ): Promise<void> {
   try {
-    await fetch(`${APP_URL}/api/wa/send`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body:    JSON.stringify({
-        telefone,
-        mensagem: `✅ ${nome}, recebemos seu pagamento de ${valor}. Obrigado!\n\nSua conta APOYA está ativa. 🙏\n\nQualquer dúvida: (12) 99685-3626`,
-        cliente_id: clienteId,
-      }),
+    const { data: instancia } = await db
+      .from("wa_instance")
+      .select("nome, evolution_base_url, evolution_apikey")
+      .eq("ativo", true)
+      .limit(1)
+      .single();
+
+    if (!instancia?.nome) return;
+
+    const baseUrl = instancia.evolution_base_url
+      ?? process.env.EVOLUTION_BASE_URL
+      ?? "https://evolution-api-production-f159.up.railway.app";
+    const apiKey = instancia.evolution_apikey ?? process.env.EVOLUTION_API_KEY ?? "";
+    const instance = instancia.nome;
+
+    const phone = telefone.replace(/\D/g, "");
+    const numero = phone.startsWith("55") ? phone : `55${phone}`;
+
+    const msg = `✅ *Pagamento confirmado!*\n\n`
+      + `Olá *${nome}*! Recebemos seu pagamento de *${valor}*.\n\n`
+      + `Sua conta APOYA está ativa e os serviços continuam normalmente. 🎉\n\n`
+      + `Qualquer dúvida: (12) 99685-3626\n`
+      + `_meucontador.io — by Apoya Contábil_`;
+
+    await fetch(`${baseUrl}/message/sendText/${instance}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": apiKey },
+      body: JSON.stringify({ number: numero, text: msg }),
     });
-  } catch { /* fire-and-forget */ }
+  } catch (e) {
+    console.warn("[webhook] Falha ao enviar WA confirmação:", e);
+  }
+}
+
+/** Envia email de confirmação via Asaas notification API */
+async function notificarEmailPagamento(
+  asaasKey: string,
+  paymentId: string,
+): Promise<void> {
+  try {
+    await fetch(`https://www.asaas.com/api/v3/payments/${paymentId}/sendBillingEmailCopy`, {
+      method: "POST",
+      headers: { "access_token": asaasKey },
+    });
+  } catch (e) {
+    console.warn("[webhook] Falha ao enviar email Asaas:", e);
+  }
 }
 
 export const Route = createFileRoute("/api/cobranca/webhook")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
-        // Asaas não envia Bearer token — validar pelo token do webhook (opcional)
         let evento: any;
         try { evento = await request.json(); }
         catch { return json({ error: "Body inválido" }, 400); }
@@ -53,61 +90,68 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
 
         const db  = supabaseAdmin as any;
         const now = new Date().toISOString();
+        const asaasKey = process.env.ASAAS_API_KEY ?? "";
 
         // Buscar cobrança pelo asaas_payment_id
         const { data: cob } = await db
           .from("cobrancas")
-          .select("id,cliente_id,cliente_nome,valor,asaas_id")
+          .select("id,cliente_id,cliente_nome,valor,asaas_id,link_pagamento")
           .or(`asaas_id.eq.${payment.id},asaas_payment_id.eq.${payment.id}`)
           .maybeSingle();
 
         if (!cob) {
-          // Pode ser cobrança de outro sistema — ignorar silenciosamente
-          return json({ ok: true, msg: "cobrança não encontrada no sistema" });
+          console.log(`[webhook] Cobrança não encontrada para payment ${payment.id} — ignorando`);
+          return json({ ok: true, msg: "cobrança não encontrada" });
         }
 
-        // Buscar dados do cliente para WhatsApp
+        // Buscar dados do cliente
         const { data: cli } = await db
           .from("clientes")
-          .select("whatsapp,telefone,razao_social,asaas_customer_id")
+          .select("whatsapp,telefone,email,razao_social,status")
           .eq("id", cob.cliente_id)
           .single();
 
         switch (event) {
           case "PAYMENT_RECEIVED":
           case "PAYMENT_CONFIRMED": {
-            const valorBRL = Number(payment.value ?? cob.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+            const valor = Number(payment.value ?? cob.valor);
+            const valorBRL = valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-            // Atualizar cobrança
+            // Atualizar cobrança → paga
             await db.from("cobrancas").update({
-              status:       "paga",
-              pago_em:      payment.paymentDate ?? now.split("T")[0],
-              regua_stage:  "ok",
-              dias_atraso:  0,
-              updated_at:   now,
+              status:      "paga",
+              pago_em:     payment.paymentDate ?? now.split("T")[0],
+              regua_stage: "ok",
+              dias_atraso: 0,
+              updated_at:  now,
             }).eq("id", cob.id);
 
-            // Reativar cliente (se estava suspenso)
-            await db.from("clientes").update({
-              status:           "ativo",
-              data_inadimplencia: null,
-              data_suspensao:     null,
-              motivo_suspensao:   null,
-              updated_at:         now,
-            }).eq("id", cob.cliente_id).eq("status", "suspenso");
-
-            // Enviar confirmação WhatsApp
-            const tel = cli?.whatsapp ?? cli?.telefone ?? "";
-            if (tel && cli) {
-              const nome = (cli.razao_social ?? "Cliente").split(" ")[0];
-              // Buscar um token de service para enviar (sem auth de usuário no webhook)
-              const { data: { session } } = await (supabaseAdmin as any).auth.admin
-                .getUserById("00000000-0000-0000-0000-000000000000").catch(() => ({ data: null }));
-              // Fire-and-forget sem token — o /api/wa/send fará o melhor possível
-              enviarConfirmacaoWA("", cob.cliente_id, tel, nome, valorBRL);
+            // Reativar cliente suspenso (se aplicável)
+            if (cli?.status === "suspenso") {
+              await db.from("clientes").update({
+                status:             "ativo",
+                data_inadimplencia: null,
+                data_suspensao:     null,
+                motivo_suspensao:   null,
+                updated_at:         now,
+              }).eq("id", cob.cliente_id);
             }
 
-            console.log(`[webhook] PAGAMENTO CONFIRMADO — ${cob.id} — ${payment.value}`);
+            // ── Notificações ──────────────────────────────────────────
+            const tel  = cli?.whatsapp ?? cli?.telefone ?? "";
+            const nome = (cli?.razao_social ?? "Cliente").split(" ")[0];
+            const link = cob.link_pagamento ?? `https://apoya-gestao.talkzzbot.workers.dev/checkout/${cob.id}`;
+
+            if (tel) {
+              notificarWAPagamento(db, cob.cliente_id, tel, nome, valorBRL, link)
+                .catch(() => {});
+            }
+
+            if (asaasKey && payment.id) {
+              notificarEmailPagamento(asaasKey, payment.id).catch(() => {});
+            }
+
+            console.log(`[webhook] ✅ PAGAMENTO CONFIRMADO — ${cob.id} — ${valorBRL}`);
             break;
           }
 
@@ -132,7 +176,6 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
           }
 
           default:
-            // Outros eventos (PAYMENT_UPDATED, PAYMENT_AWAITING_RISK_ANALYSIS, etc.) — ignorar
             console.log(`[webhook] Evento ignorado: ${event}`);
         }
 
