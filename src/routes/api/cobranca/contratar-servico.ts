@@ -104,7 +104,7 @@ export const Route = createFileRoute("/api/cobranca/contratar-servico")({
             nome_servico:     cat.nome,
             valor_contratado: valorContrat,
             desconto,
-            valor_final:      valorFinal,
+            // valor_final é GENERATED ALWAYS AS (valor_contratado - desconto) — não inserir
             periodicidade,
             data_inicio:      dataInicio,
             data_fim:         body.data_fim ?? null,
@@ -114,7 +114,10 @@ export const Route = createFileRoute("/api/cobranca/contratar-servico")({
           .select()
           .single();
 
-        if (csErr) return json({ error: csErr.message }, 500);
+        if (csErr) {
+          console.error("[contratar-servico] Erro insert cliente_servico:", JSON.stringify(csErr));
+          return json({ error: csErr.message, details: csErr.details, hint: csErr.hint }, 500);
+        }
 
         return json({ ok: true, cliente_servico: cs, contrato_id: contrato.id });
       },
