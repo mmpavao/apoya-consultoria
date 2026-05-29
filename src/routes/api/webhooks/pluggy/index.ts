@@ -150,7 +150,7 @@ async function notificarErroConexao(db: any, itemId: string, erro: PluggyEvent["
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
-export const Route = createFileRoute("/api/webhooks/pluggy/route")({
+export const Route = createFileRoute("/api/webhooks/pluggy/")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
@@ -170,20 +170,23 @@ export const Route = createFileRoute("/api/webhooks/pluggy/route")({
         const db = supabaseAdmin as any;
 
         // Registrar o evento recebido (auditoria)
-        db.from("open_finance_eventos").insert({
-          event_id:   eventId,
-          event_type: event,
-          item_id:    itemId,
-          payload:    body,
-          recebido_em: new Date().toISOString(),
-        }).catch(() => {});   // fire-and-forget — não bloqueia a resposta
+        // Registrar evento (fire-and-forget)
+        void (async () => { try {
+          await db.from("open_finance_eventos").insert({
+            event_id:   eventId,
+            event_type: event,
+            item_id:    itemId,
+            payload:    body,
+            recebido_em: new Date().toISOString(),
+          });
+        } catch {} })();
 
         // ── Processar por tipo de evento ──────────────────────────────────
         switch (event) {
 
           // Nova conexão criada (cliente acabou de autorizar o banco)
           case "item/created": {
-            atualizarConexao(db, itemId, { status: "ativo" }).catch(() => {});
+            void atualizarConexao(db, itemId, { status: "ativo" });
 
             // Buscar empresa_id e disparar sincronização inicial
             db.from("open_finance_conexoes")
@@ -201,7 +204,7 @@ export const Route = createFileRoute("/api/webhooks/pluggy/route")({
 
           // Dados atualizados (Pluggy faz polling e encontrou novas transações)
           case "item/updated": {
-            atualizarConexao(db, itemId, { status: "ativo" }).catch(() => {});
+            void atualizarConexao(db, itemId, { status: "ativo" });
 
             db.from("open_finance_conexoes")
               .select("empresa_id")
@@ -218,12 +221,12 @@ export const Route = createFileRoute("/api/webhooks/pluggy/route")({
 
           // Erro na conexão (token expirado, MFA necessário, etc.)
           case "item/error": {
-            atualizarConexao(db, itemId, {
+            void atualizarConexao(db, itemId, {
               status:    "erro",
               ultimo_erro: itemError?.message ?? "Erro desconhecido",
-            }).catch(() => {});
+            });
 
-            notificarErroConexao(db, itemId, itemError).catch(() => {});
+            void notificarErroConexao(db, itemId, itemError);
             break;
           }
 

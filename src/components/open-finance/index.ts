@@ -1,2 +1,2 @@
 export { PluggyConnectWidget } from "./PluggyConnectWidget";
-export { OpenFinanceDialog }   from "./OpenFinanceDialog";
+export { OpenFinanceDialog } from "./OpenFinanceDialog";

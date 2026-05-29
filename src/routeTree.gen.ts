@@ -34,6 +34,8 @@ import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
 import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
 import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
+import { Route as ApiPluggyConnectTokenRouteImport } from './routes/api/pluggy/connect-token'
+import { Route as ApiNfseEmitirCobrancaRouteImport } from './routes/api/nfse/emitir-cobranca'
 import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
 import { Route as ApiCobrancaWebhookRouteImport } from './routes/api/cobranca/webhook'
 import { Route as ApiCobrancaSetupWebhookRouteImport } from './routes/api/cobranca/setup-webhook'
@@ -50,6 +52,7 @@ import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
 import { Route as AppDpEmpresaIdRouteImport } from './routes/_app.dp_.$empresaId'
 import { Route as AppConfiguracoesServicosRouteImport } from './routes/_app.configuracoes_.servicos'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
+import { Route as ApiWebhooksPluggyIndexRouteImport } from './routes/api/webhooks/pluggy/index'
 import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
 
 const LoginDevRoute = LoginDevRouteImport.update({
@@ -176,6 +179,16 @@ const ApiSerproCallRoute = ApiSerproCallRouteImport.update({
   path: '/api/serpro/call',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPluggyConnectTokenRoute = ApiPluggyConnectTokenRouteImport.update({
+  id: '/api/pluggy/connect-token',
+  path: '/api/pluggy/connect-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNfseEmitirCobrancaRoute = ApiNfseEmitirCobrancaRouteImport.update({
+  id: '/api/nfse/emitir-cobranca',
+  path: '/api/nfse/emitir-cobranca',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDasGerarRoute = ApiDasGerarRouteImport.update({
   id: '/api/das/gerar',
   path: '/api/das/gerar',
@@ -258,6 +271,11 @@ const AppClientesIdRoute = AppClientesIdRouteImport.update({
   path: '/clientes/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiWebhooksPluggyIndexRoute = ApiWebhooksPluggyIndexRouteImport.update({
+  id: '/api/webhooks/pluggy/',
+  path: '/api/webhooks/pluggy/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicEvolutionWebhookInstanceRoute =
   ApiPublicEvolutionWebhookInstanceRouteImport.update({
     id: '/api/public/evolution-webhook/$instance',
@@ -299,6 +317,8 @@ export interface FileRoutesByFullPath {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -307,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
+  '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -342,6 +363,8 @@ export interface FileRoutesByTo {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -350,6 +373,7 @@ export interface FileRoutesByTo {
   '/fiscal': typeof AppFiscalIndexRoute
   '/api/nfse': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
+  '/api/webhooks/pluggy': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -387,6 +411,8 @@ export interface FileRoutesById {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -395,6 +421,7 @@ export interface FileRoutesById {
   '/_app/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
+  '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -432,6 +459,8 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/nfse/emitir-cobranca'
+    | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -440,6 +469,7 @@ export interface FileRouteTypes {
     | '/fiscal/'
     | '/api/nfse/'
     | '/api/public/evolution-webhook/$instance'
+    | '/api/webhooks/pluggy/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -475,6 +505,8 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/nfse/emitir-cobranca'
+    | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -483,6 +515,7 @@ export interface FileRouteTypes {
     | '/fiscal'
     | '/api/nfse'
     | '/api/public/evolution-webhook/$instance'
+    | '/api/webhooks/pluggy'
   id:
     | '__root__'
     | '/_app'
@@ -519,6 +552,8 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/nfse/emitir-cobranca'
+    | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -527,6 +562,7 @@ export interface FileRouteTypes {
     | '/_app/fiscal/'
     | '/api/nfse/'
     | '/api/public/evolution-webhook/$instance'
+    | '/api/webhooks/pluggy/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -544,6 +580,8 @@ export interface RootRouteChildren {
   ApiCobrancaSetupWebhookRoute: typeof ApiCobrancaSetupWebhookRoute
   ApiCobrancaWebhookRoute: typeof ApiCobrancaWebhookRoute
   ApiDasGerarRoute: typeof ApiDasGerarRoute
+  ApiNfseEmitirCobrancaRoute: typeof ApiNfseEmitirCobrancaRoute
+  ApiPluggyConnectTokenRoute: typeof ApiPluggyConnectTokenRoute
   ApiSerproCallRoute: typeof ApiSerproCallRoute
   ApiSerproStatusRoute: typeof ApiSerproStatusRoute
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
@@ -551,6 +589,7 @@ export interface RootRouteChildren {
   ApiWaSendRoute: typeof ApiWaSendRoute
   ApiNfseIndexRoute: typeof ApiNfseIndexRoute
   ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
+  ApiWebhooksPluggyIndexRoute: typeof ApiWebhooksPluggyIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -730,6 +769,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSerproCallRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pluggy/connect-token': {
+      id: '/api/pluggy/connect-token'
+      path: '/api/pluggy/connect-token'
+      fullPath: '/api/pluggy/connect-token'
+      preLoaderRoute: typeof ApiPluggyConnectTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nfse/emitir-cobranca': {
+      id: '/api/nfse/emitir-cobranca'
+      path: '/api/nfse/emitir-cobranca'
+      fullPath: '/api/nfse/emitir-cobranca'
+      preLoaderRoute: typeof ApiNfseEmitirCobrancaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/das/gerar': {
       id: '/api/das/gerar'
       path: '/api/das/gerar'
@@ -842,6 +895,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/webhooks/pluggy/': {
+      id: '/api/webhooks/pluggy/'
+      path: '/api/webhooks/pluggy'
+      fullPath: '/api/webhooks/pluggy/'
+      preLoaderRoute: typeof ApiWebhooksPluggyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/evolution-webhook/$instance': {
       id: '/api/public/evolution-webhook/$instance'
       path: '/api/public/evolution-webhook/$instance'
@@ -917,6 +977,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCobrancaSetupWebhookRoute: ApiCobrancaSetupWebhookRoute,
   ApiCobrancaWebhookRoute: ApiCobrancaWebhookRoute,
   ApiDasGerarRoute: ApiDasGerarRoute,
+  ApiNfseEmitirCobrancaRoute: ApiNfseEmitirCobrancaRoute,
+  ApiPluggyConnectTokenRoute: ApiPluggyConnectTokenRoute,
   ApiSerproCallRoute: ApiSerproCallRoute,
   ApiSerproStatusRoute: ApiSerproStatusRoute,
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
@@ -925,6 +987,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNfseIndexRoute: ApiNfseIndexRoute,
   ApiPublicEvolutionWebhookInstanceRoute:
     ApiPublicEvolutionWebhookInstanceRoute,
+  ApiWebhooksPluggyIndexRoute: ApiWebhooksPluggyIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
