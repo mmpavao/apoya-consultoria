@@ -56,7 +56,7 @@ function fromDb(row: Record<string, unknown>): Cliente {
     razaoSocial:       row.razao_social as string,
     nomeFantasia:      row.nome_fantasia as string | undefined,
     cnpj:              row.cnpj as string,
-    regime:            (row.regime as string).replace("Simples Nacional", "Simples") as Regime,
+    regime:            ((row.regime as string) ?? "Simples").replace("Simples Nacional", "Simples") as Regime,
     regimeHibrido:     row.regime_hibrido as boolean,
     tier:              row.tier as TierServico | undefined,
     status:            row.status as Status,
@@ -155,13 +155,18 @@ export function useClientes() {
         .from("clientes")
         .select("*")
         .order("razao_social");
-      if (err) throw err;
+      if (err) {
+        console.error("[useClientes] PostgrestError:", JSON.stringify(err));
+        throw new Error(err.message ?? err.code ?? JSON.stringify(err));
+      }
       setClientes((data ?? []).map(fromDb));
       setError(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Erro ao carregar clientes";
+      const msg = e instanceof Error
+        ? e.message
+        : (e as any)?.message ?? JSON.stringify(e) ?? "Erro ao carregar clientes";
       setError(msg);
-      console.error("[useClientes]", e);
+      console.error("[useClientes] erro real:", e);
     } finally {
       setLoading(false);
     }
