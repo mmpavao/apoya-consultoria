@@ -44,6 +44,8 @@ jobs:
           echo "${{ secrets.EVOLUTION_API_KEY }}"      | npx wrangler secret put EVOLUTION_API_KEY      --name apoya-gestao
           echo "${{ secrets.SUPABASE_URL }}"           | npx wrangler secret put SUPABASE_URL           --name apoya-gestao
           echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name apoya-gestao
+          echo "${{ secrets.PLUGGY_CLIENT_ID }}"        | npx wrangler secret put PLUGGY_CLIENT_ID        --name apoya-gestao
+          echo "${{ secrets.PLUGGY_CLIENT_SECRET }}"     | npx wrangler secret put PLUGGY_CLIENT_SECRET     --name apoya-gestao
           echo "apoya-nfse-2026"                       | npx wrangler secret put APOYA_INTERNAL_SECRET  --name apoya-gestao
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
