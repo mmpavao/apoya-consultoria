@@ -24,7 +24,11 @@ export interface EscritorioConfig {
   evolution_configurado: boolean;
   // Focus NF-e
   focus_ambiente: string | null;
-  // (unificado em focus_ambiente)
+  focusnfe_api_token: string | null;
+  inscricao_municipal: string | null;
+  municipio: string | null;
+  uf: string | null;
+  codigo_municipio_ibge: string | null;
   // Templates WhatsApp
   template_wa_cobranca: string | null;
   template_wa_das: string | null;
@@ -47,6 +51,11 @@ export interface UpdateEscritorioPayload {
   evolution_api_key?: string;
   evolution_api_url?: string;
   focus_ambiente?: string;
+  focusnfe_api_token?: string;
+  inscricao_municipal?: string;
+  municipio?: string;
+  uf?: string;
+  codigo_municipio_ibge?: string;
   
   template_wa_cobranca?: string;
   template_wa_das?: string;
@@ -87,6 +96,11 @@ export function useEscritorioConfig() {
         nfeio_configurado: !!data.nfeio_api_key,
         evolution_configurado: !!data.evolution_api_key,
         focus_ambiente: (data as any).focus_ambiente ?? 'homologacao',
+        focusnfe_api_token: (data as any).focusnfe_api_token ?? null,
+        inscricao_municipal: (data as any).inscricao_municipal ?? null,
+        municipio: (data as any).municipio ?? null,
+        uf: (data as any).uf ?? null,
+        codigo_municipio_ibge: (data as any).codigo_municipio_ibge ?? null,
         
         template_wa_cobranca: data.template_wa_cobranca,
         template_wa_das: data.template_wa_das,
@@ -109,7 +123,7 @@ export function useEscritorioConfig() {
     const fields: (keyof UpdateEscritorioPayload)[] = [
       "razao_social","nome_fantasia","cnpj","crc","email","telefone","whatsapp",
       "dia_cobranca","dias_suspensao","asaas_api_key","nfeio_api_key",
-      "evolution_api_key","evolution_api_url","focus_ambiente",
+      "evolution_api_key","evolution_api_url","focus_ambiente","focusnfe_api_token","inscricao_municipal","municipio","uf","codigo_municipio_ibge",
       "template_wa_cobranca","template_wa_das","template_wa_nfse"
     ];
     for (const f of fields) {

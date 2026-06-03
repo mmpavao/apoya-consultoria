@@ -28,6 +28,7 @@ function getFocusBase(ambiente?: string | null): string {
 
 // Cache em memória para evitar query no banco a cada request
 let _cachedToken: string | null = null;
+let _cachedAmbiente: string | null = null;
 let _cachedTokenTs = 0;
 const TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
@@ -298,9 +299,9 @@ export const Route = createFileRoute("/api/nfse/")({
               regime_especial_tributacao: nota.regime_especial_tributacao ?? "6",
               incentivo_fiscal:           nota.incentivo_fiscal ?? false,
               prestador: {
-                cnpj:               config.cnpj,
-                inscricao_municipal: nota.prestador?.inscricao_municipal ?? config.inscricao_municipal ?? "",
-                codigo_municipio:    nota.prestador?.codigo_municipio ?? config.codigo_municipio ?? nota.servico?.codigo_municipio ?? "",
+                cnpj:                config.cnpj,
+                inscricao_municipal: config.inscricao_municipal || nota.prestador?.inscricao_municipal || "",
+                codigo_municipio:    config.codigo_municipio || nota.prestador?.codigo_municipio || "",
               },
               tomador: {
                 cnpj:         nota.tomador?.cnpj?.replace(/\D/g, "") || undefined,
@@ -320,15 +321,17 @@ export const Route = createFileRoute("/api/nfse/")({
                   : undefined,
               },
               servico: {
-                valor_servicos:              nota.servico?.valor_servicos,
+                valor_servicos:              nota.servico?.valor_servicos ?? nota.valor_servicos,
                 valor_deducoes:              nota.servico?.valor_deducoes ?? 0,
                 valor_iss:                   nota.servico?.valor_iss,
-                aliquota_iss:                nota.servico?.aliquota_iss,
-                iss_retido:                  nota.servico?.iss_retido ?? false,
-                item_lista_servico:          nota.servico?.item_lista_servico ?? "17.19",
-                codigo_tributacao_municipio: nota.servico?.codigo_tributacao_municipio,
-                discriminacao:               nota.servico?.discriminacao,
-                codigo_municipio:            nota.servico?.codigo_municipio,
+                aliquota_iss:                nota.servico?.aliquota_iss ?? nota.aliquota_iss,
+                aliquota:                    nota.servico?.aliquota_iss ?? nota.aliquota_iss,
+                iss_retido:                  nota.servico?.iss_retido ?? nota.issretido ?? false,
+                item_lista_servico:          nota.servico?.item_lista_servico ?? nota.codigo_servico ?? "17.19",
+                codigo_tributacao_municipio: nota.servico?.codigo_tributacao_municipio ?? nota.servico?.item_lista_servico ?? nota.codigo_servico,
+                discriminacao:               nota.servico?.discriminacao ?? nota.discriminacao,
+                // codigo_municipio do serviço = município do PRESTADOR (escritório)
+                codigo_municipio:            config.codigo_municipio || nota.servico?.codigo_municipio,
               },
             };
 

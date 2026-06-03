@@ -244,8 +244,7 @@ export function EmitirNfseModal({ open, onClose, clientePreSelecionado, onSucess
       regime_especial_tributacao: form.regimeTrib,
       optante_simples_nacional: true,
       prestador: {
-        inscricao_municipal: form.inscricaoMunicipal || undefined,
-        codigo_municipio:    form.tomCodigoIbge || undefined,
+        // inscricao_municipal e codigo_municipio vêm do escritorio_config no backend
       },
       tomador: {
         cnpj:  digits.length === 14 ? digits : undefined,

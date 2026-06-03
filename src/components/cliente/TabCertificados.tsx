@@ -65,7 +65,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
       try {
         const { data } = await (supabase as any)
           .from("cliente_certificado")
-          .select("*")
+          .select("id,tipo,pfx_nome_razao,pfx_cnpj,pfx_serial,pfx_validade,has_procuracao,procuracao_validade,focus_cert_ref,focus_cert_enviado_em")
           .eq("cliente_id", clienteId)
           .maybeSingle();
         if (data) {
@@ -78,9 +78,9 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
             pfxValidade:         data.pfx_validade,
             hasProcuracao:       data.has_procuracao ?? false,
             procuracaoValidade:  data.procuracao_validade,
-            focusEntregue:      !!data.nfseio_cert_id,
-            focusEntregueEm:    data.nfseio_cert_uploaded_at,
-            focusCertId:        data.nfseio_cert_id,
+            focusEntregue:      !!data.focus_cert_ref,
+            focusEntregueEm:    data.focus_cert_enviado_em,
+            focusCertId:        data.focus_cert_ref,
           });
         }
       } catch (e) { console.error(e); }
@@ -142,18 +142,11 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         .upload(storagePath, selectedFile, { upsert: true, contentType: "application/x-pkcs12" });
       if (storErr) throw storErr;
 
-      // 4. Upload Focus NF-e via Edge Function
-      let focusCertId: string | undefined;
-      let focusUploadedAt: string | undefined;
-      try {
-        const { data: nfResp } = await supabase.functions.invoke("upload-certificate-nfeio", {
-          body: { pfxBase64: b64, password: senha, cnpj: certMeta.cnpj }
-        });
-        if (nfResp?.ok && nfResp.certId) {
-          focusCertId = nfResp.certId;
-          focusUploadedAt = new Date().toISOString();
-        }
-      } catch { /* Focus não crítico */ }
+      // 4. Marcar referência Focus NF-e (certificado gerenciado pelo painel app.focusnfe.com.br)
+      // O upload real do certificado é feito manualmente no painel da Focus.
+      // Aqui apenas registramos o CNPJ como referência para rastrear o status.
+      let focusCertId: string | undefined = certMeta.cnpj || undefined;
+      let focusUploadedAt: string | undefined = focusCertId ? new Date().toISOString() : undefined;
 
       // 5. Persistir no banco
       const row: Record<string, unknown> = {
@@ -163,8 +156,8 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         pfx_nome_razao:          certMeta.nomeRazao || undefined,
         pfx_serial:              certMeta.serial || undefined,
         pfx_validade:            certMeta.validoAte || undefined,
-        nfseio_cert_id:          focusCertId || undefined,
-        nfseio_cert_uploaded_at: focusUploadedAt || undefined,
+        focus_cert_ref:          focusCertId || undefined,
+        focus_cert_enviado_em:   focusUploadedAt || undefined,
         has_procuracao:          cert.hasProcuracao,
         procuracao_validade:     cert.procuracaoValidade || null,
       };
@@ -311,7 +304,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
             <div className="mt-1">
               {cert.focusEntregue
                 ? <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Ativo</Badge>
-                : <span className="text-xs text-muted-foreground">Aguardando certificado</span>
+                : <span className="text-xs text-muted-foreground">Certificado não cadastrado no painel Focus</span>
               }
             </div>
           </div>
