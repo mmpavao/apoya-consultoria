@@ -30,6 +30,7 @@ import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWhatsappWebhookRouteImport } from './routes/api/whatsapp/webhook'
 import { Route as ApiWhatsappModoHumanoRouteImport } from './routes/api/whatsapp/modo-humano'
+import { Route as ApiWebhooksFocusNfseRouteImport } from './routes/api/webhooks/focus-nfse'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
 import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
@@ -151,6 +152,11 @@ const ApiWhatsappWebhookRoute = ApiWhatsappWebhookRouteImport.update({
 const ApiWhatsappModoHumanoRoute = ApiWhatsappModoHumanoRouteImport.update({
   id: '/api/whatsapp/modo-humano',
   path: '/api/whatsapp/modo-humano',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksFocusNfseRoute = ApiWebhooksFocusNfseRouteImport.update({
+  id: '/api/webhooks/focus-nfse',
+  path: '/api/webhooks/focus-nfse',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWaSendRoute = ApiWaSendRouteImport.update({
@@ -280,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/webhooks/focus-nfse': typeof ApiWebhooksFocusNfseRoute
   '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/fiscal/': typeof AppFiscalIndexRoute
@@ -320,6 +327,7 @@ export interface FileRoutesByTo {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/webhooks/focus-nfse': typeof ApiWebhooksFocusNfseRoute
   '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/fiscal': typeof AppFiscalIndexRoute
@@ -362,6 +370,7 @@ export interface FileRoutesById {
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/api/wa/instances': typeof ApiWaInstancesRoute
   '/api/wa/send': typeof ApiWaSendRoute
+  '/api/webhooks/focus-nfse': typeof ApiWebhooksFocusNfseRoute
   '/api/whatsapp/modo-humano': typeof ApiWhatsappModoHumanoRoute
   '/api/whatsapp/webhook': typeof ApiWhatsappWebhookRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
@@ -404,6 +413,7 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/webhooks/focus-nfse'
     | '/api/whatsapp/modo-humano'
     | '/api/whatsapp/webhook'
     | '/fiscal/'
@@ -444,6 +454,7 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/webhooks/focus-nfse'
     | '/api/whatsapp/modo-humano'
     | '/api/whatsapp/webhook'
     | '/fiscal'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/api/usuarios/convidar'
     | '/api/wa/instances'
     | '/api/wa/send'
+    | '/api/webhooks/focus-nfse'
     | '/api/whatsapp/modo-humano'
     | '/api/whatsapp/webhook'
     | '/_app/fiscal/'
@@ -508,6 +520,7 @@ export interface RootRouteChildren {
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
   ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiWaSendRoute: typeof ApiWaSendRoute
+  ApiWebhooksFocusNfseRoute: typeof ApiWebhooksFocusNfseRoute
   ApiWhatsappModoHumanoRoute: typeof ApiWhatsappModoHumanoRoute
   ApiWhatsappWebhookRoute: typeof ApiWhatsappWebhookRoute
   ApiNfseIndexRoute: typeof ApiNfseIndexRoute
@@ -661,6 +674,13 @@ declare module '@tanstack/react-router' {
       path: '/api/whatsapp/modo-humano'
       fullPath: '/api/whatsapp/modo-humano'
       preLoaderRoute: typeof ApiWhatsappModoHumanoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/focus-nfse': {
+      id: '/api/webhooks/focus-nfse'
+      path: '/api/webhooks/focus-nfse'
+      fullPath: '/api/webhooks/focus-nfse'
+      preLoaderRoute: typeof ApiWebhooksFocusNfseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/wa/send': {
@@ -856,6 +876,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
   ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiWaSendRoute: ApiWaSendRoute,
+  ApiWebhooksFocusNfseRoute: ApiWebhooksFocusNfseRoute,
   ApiWhatsappModoHumanoRoute: ApiWhatsappModoHumanoRoute,
   ApiWhatsappWebhookRoute: ApiWhatsappWebhookRoute,
   ApiNfseIndexRoute: ApiNfseIndexRoute,
