@@ -36,6 +36,7 @@ import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
 import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
 import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
+import { Route as ApiFocusProxyRouteImport } from './routes/api/focus/proxy'
 import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
 import { Route as ApiCobrancaWebhookRouteImport } from './routes/api/cobranca/webhook'
 import { Route as ApiCobrancaSetupWebhookRouteImport } from './routes/api/cobranca/setup-webhook'
@@ -184,6 +185,11 @@ const ApiSerproCallRoute = ApiSerproCallRouteImport.update({
   path: '/api/serpro/call',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFocusProxyRoute = ApiFocusProxyRouteImport.update({
+  id: '/api/focus/proxy',
+  path: '/api/focus/proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDasGerarRoute = ApiDasGerarRouteImport.update({
   id: '/api/das/gerar',
   path: '/api/das/gerar',
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/focus/proxy': typeof ApiFocusProxyRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/focus/proxy': typeof ApiFocusProxyRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -365,6 +373,7 @@ export interface FileRoutesById {
   '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
+  '/api/focus/proxy': typeof ApiFocusProxyRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/focus/proxy'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/focus/proxy'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -491,6 +502,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/setup-webhook'
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
+    | '/api/focus/proxy'
     | '/api/serpro/call'
     | '/api/serpro/status'
     | '/api/usuarios/convidar'
@@ -515,6 +527,7 @@ export interface RootRouteChildren {
   ApiCobrancaSetupWebhookRoute: typeof ApiCobrancaSetupWebhookRoute
   ApiCobrancaWebhookRoute: typeof ApiCobrancaWebhookRoute
   ApiDasGerarRoute: typeof ApiDasGerarRoute
+  ApiFocusProxyRoute: typeof ApiFocusProxyRoute
   ApiSerproCallRoute: typeof ApiSerproCallRoute
   ApiSerproStatusRoute: typeof ApiSerproStatusRoute
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
@@ -718,6 +731,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSerproCallRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/focus/proxy': {
+      id: '/api/focus/proxy'
+      path: '/api/focus/proxy'
+      fullPath: '/api/focus/proxy'
+      preLoaderRoute: typeof ApiFocusProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/das/gerar': {
       id: '/api/das/gerar'
       path: '/api/das/gerar'
@@ -871,6 +891,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCobrancaSetupWebhookRoute: ApiCobrancaSetupWebhookRoute,
   ApiCobrancaWebhookRoute: ApiCobrancaWebhookRoute,
   ApiDasGerarRoute: ApiDasGerarRoute,
+  ApiFocusProxyRoute: ApiFocusProxyRoute,
   ApiSerproCallRoute: ApiSerproCallRoute,
   ApiSerproStatusRoute: ApiSerproStatusRoute,
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
