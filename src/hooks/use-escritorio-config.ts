@@ -22,9 +22,9 @@ export interface EscritorioConfig {
   asaas_configurado: boolean;
   nfeio_configurado: boolean;
   evolution_configurado: boolean;
-  // NFE.io
-  nfseio_emitente_id: string | null;
-  nfseio_ambiente: string | null;
+  // Focus NF-e
+  focus_ambiente: string | null;
+  // (unificado em focus_ambiente)
   // Templates WhatsApp
   template_wa_cobranca: string | null;
   template_wa_das: string | null;
@@ -46,8 +46,8 @@ export interface UpdateEscritorioPayload {
   nfeio_api_key?: string;
   evolution_api_key?: string;
   evolution_api_url?: string;
-  nfseio_emitente_id?: string;
-  nfseio_ambiente?: string;
+  focus_ambiente?: string;
+  
   template_wa_cobranca?: string;
   template_wa_das?: string;
   template_wa_nfse?: string;
@@ -86,8 +86,8 @@ export function useEscritorioConfig() {
         asaas_configurado: !!data.asaas_api_key,
         nfeio_configurado: !!data.nfeio_api_key,
         evolution_configurado: !!data.evolution_api_key,
-        nfseio_emitente_id: data.nfseio_emitente_id,
-        nfseio_ambiente: data.nfseio_ambiente,
+        focus_ambiente: (data as any).focus_ambiente ?? 'homologacao',
+        
         template_wa_cobranca: data.template_wa_cobranca,
         template_wa_das: data.template_wa_das,
         template_wa_nfse: data.template_wa_nfse,
@@ -109,7 +109,7 @@ export function useEscritorioConfig() {
     const fields: (keyof UpdateEscritorioPayload)[] = [
       "razao_social","nome_fantasia","cnpj","crc","email","telefone","whatsapp",
       "dia_cobranca","dias_suspensao","asaas_api_key","nfeio_api_key",
-      "evolution_api_key","evolution_api_url","nfseio_emitente_id","nfseio_ambiente",
+      "evolution_api_key","evolution_api_url","focus_ambiente",
       "template_wa_cobranca","template_wa_das","template_wa_nfse"
     ];
     for (const f of fields) {

@@ -25,12 +25,12 @@ interface CertInfo {
   pfxValidade?:          string;
   hasProcuracao:         boolean;
   procuracaoValidade?:   string;
-  nfseioEntregue:        boolean;
-  nfseioEntregueEm?:     string;
-  nfseioId?:             string;
+  focusEntregue:        boolean;
+  focusEntregueEm?:     string;
+  focusCertId?:             string;
 }
 
-const EMPTY: CertInfo = { tipo: "A1", hasProcuracao: false, nfseioEntregue: false };
+const EMPTY: CertInfo = { tipo: "A1", hasProcuracao: false, focusEntregue: false };
 
 function diasParaVencer(iso?: string): number | null {
   if (!iso) return null;
@@ -78,9 +78,9 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
             pfxValidade:         data.pfx_validade,
             hasProcuracao:       data.has_procuracao ?? false,
             procuracaoValidade:  data.procuracao_validade,
-            nfseioEntregue:      !!data.nfseio_cert_id,
-            nfseioEntregueEm:    data.nfseio_cert_uploaded_at,
-            nfseioId:            data.nfseio_cert_id,
+            focusEntregue:      !!data.nfseio_cert_id,
+            focusEntregueEm:    data.nfseio_cert_uploaded_at,
+            focusCertId:        data.nfseio_cert_id,
           });
         }
       } catch (e) { console.error(e); }
@@ -122,7 +122,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         serial:    "",
         validoAte: "",
         tipo:      "A1" as "A1" | "A3",
-        nfseioId:  undefined as string | undefined,
+        focusCertId: undefined as string | undefined,
       };
 
       try {
@@ -142,18 +142,18 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         .upload(storagePath, selectedFile, { upsert: true, contentType: "application/x-pkcs12" });
       if (storErr) throw storErr;
 
-      // 4. Upload NFE.io via Edge Function
-      let nfseioId: string | undefined;
-      let nfseioUploadedAt: string | undefined;
+      // 4. Upload Focus NF-e via Edge Function
+      let focusCertId: string | undefined;
+      let focusUploadedAt: string | undefined;
       try {
         const { data: nfResp } = await supabase.functions.invoke("upload-certificate-nfeio", {
           body: { pfxBase64: b64, password: senha, cnpj: certMeta.cnpj }
         });
         if (nfResp?.ok && nfResp.certId) {
-          nfseioId = nfResp.certId;
-          nfseioUploadedAt = new Date().toISOString();
+          focusCertId = nfResp.certId;
+          focusUploadedAt = new Date().toISOString();
         }
-      } catch { /* NFE.io não crítico */ }
+      } catch { /* Focus não crítico */ }
 
       // 5. Persistir no banco
       const row: Record<string, unknown> = {
@@ -163,8 +163,8 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         pfx_nome_razao:          certMeta.nomeRazao || undefined,
         pfx_serial:              certMeta.serial || undefined,
         pfx_validade:            certMeta.validoAte || undefined,
-        nfseio_cert_id:          nfseioId || undefined,
-        nfseio_cert_uploaded_at: nfseioUploadedAt || undefined,
+        nfseio_cert_id:          focusCertId || undefined,
+        nfseio_cert_uploaded_at: focusUploadedAt || undefined,
         has_procuracao:          cert.hasProcuracao,
         procuracao_validade:     cert.procuracaoValidade || null,
       };
@@ -207,9 +207,9 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         pfxCnpj:         certMeta.cnpj,
         pfxSerial:       certMeta.serial,
         pfxValidade:     certMeta.validoAte,
-        nfseioEntregue:  !!nfseioId,
-        nfseioEntregueEm: nfseioUploadedAt,
-        nfseioId,
+        focusEntregue:  !!focusCertId,
+        focusEntregueEm: focusUploadedAt,
+        focusCertId,
       }));
 
       setSelectedFile(null);
@@ -257,7 +257,7 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
     </div>
   );
 
-  const temCert  = !!cert.pfxValidade || cert.nfseioEntregue;
+  const temCert  = !!cert.pfxValidade || cert.focusEntregue;
   const diasCert = diasParaVencer(cert.pfxValidade);
   const diasProc = diasParaVencer(cert.procuracaoValidade);
 
@@ -301,15 +301,15 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
           </div>
         </div>
 
-        <div className={`rounded-xl p-4 border-2 flex items-start gap-3 ${cert.nfseioEntregue ? "border-emerald-400 bg-emerald-50" : "border-border bg-muted/30"}`}>
-          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${cert.nfseioEntregue ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+        <div className={`rounded-xl p-4 border-2 flex items-start gap-3 ${cert.focusEntregue ? "border-emerald-400 bg-emerald-50" : "border-border bg-muted/30"}`}>
+          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${cert.focusEntregue ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
             <CheckCircle2 className="h-5 w-5"/>
           </div>
           <div>
-            <p className="font-semibold text-sm">NFE.io</p>
+            <p className="font-semibold text-sm">Focus NF-e</p>
             <p className="text-xs text-muted-foreground">Emissão de NFS-e</p>
             <div className="mt-1">
-              {cert.nfseioEntregue
+              {cert.focusEntregue
                 ? <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Ativo</Badge>
                 : <span className="text-xs text-muted-foreground">Aguardando certificado</span>
               }

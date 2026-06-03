@@ -3,7 +3,7 @@
  *
  * Sub-abas:
  *   Resumo Fiscal  → dados fixos + status PGDAS/DAS/DTE (auto-fetch SERPRO)
- *   NF Emitidas    → notas emitidas pela empresa (NFE.io)
+ *   NF Emitidas    → notas emitidas pela empresa (Focus NF-e)
  *   NF Recebidas   → notas recebidas pela empresa
  *   Emitir NFS-e   → formulário de emissão
  *   Consultas      → acesso completo ao MCP SERPRO
@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useSerpro } from "@/hooks/use-serpro";
 import { useNfse } from "@/hooks/use-nfse";
-import { useNfseEmitidas, useNfseRecebidas } from "@/hooks/use-nfse-local";
+import { useNfseEmitidas, useNfseRecebidas, type SyncInfo } from "@/hooks/use-nfse-local";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { DocumentosFiscaisTab } from "@/components/motor/DocumentosFiscaisTab";
 import { ApuracaoMensalCard } from "@/components/motor/ApuracaoMensalCard";
@@ -341,7 +341,7 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
   const [ano, setAno] = useState(now.getFullYear());
 
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
-  const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseEmitidas(cliente.id, competencia);
+  const { notas, loading: fetching, syncing, error, syncInfo, refetch: load, sincronizar } = useNfseEmitidas(cliente.id, competencia);
 
   // Auto-sync ao montar — busca automaticamente sem precisar clicar
   useEffect(() => {
@@ -361,13 +361,6 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
   };
   const STATUS_LBL: Record<string, string> = {
     emitida: "Emitida", processando: "Processando", rascunho: "Rascunho", cancelada: "Cancelada", erro: "Erro"
-  };
-
-  const CAMADA_CLS: Record<number, string> = {
-    1: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    2: "bg-blue-50 text-blue-700 border-blue-200",
-    3: "bg-amber-50 text-amber-700 border-amber-200",
-    4: "bg-orange-50 text-orange-700 border-orange-200",
   };
 
   return (
@@ -401,13 +394,10 @@ function NfEmitidas({ cliente }: { cliente: Cliente }) {
         )}
       </div>
 
-      {cascata.camada_usada && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${CAMADA_CLS[cascata.camada_usada] ?? ""}`}>
+      {syncInfo.fonte_label && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
           <Wifi className="h-3.5 w-3.5" />
-          <span>Fonte: {cascata.fonte_label ?? "Camada " + cascata.camada_usada} · {cascata.total ?? notas.length} nota{(cascata.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(cascata.total ?? notas.length) !== 1 ? "s" : ""}</span>
-          {(cascata.camada_usada ?? 0) >= 3 && (
-            <span className="opacity-60">(custo: {cascata.camada_usada === 3 ? "R$ 0,24" : "pago"})</span>
-          )}
+          <span>Fonte: {syncInfo.fonte_label} · {syncInfo.total ?? notas.length} nota{(syncInfo.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(syncInfo.total ?? notas.length) !== 1 ? "s" : ""}</span>
         </div>
       )}
 
@@ -499,7 +489,7 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const competencia = mes ? `${ano}-${String(mes).padStart(2, "0")}` : undefined;
-  const { notas, loading: fetching, syncing, error, cascata, refetch: load, sincronizar } = useNfseRecebidas(cliente.id, competencia);
+  const { notas, loading: fetching, syncing, error, syncInfo, refetch: load, sincronizar } = useNfseRecebidas(cliente.id, competencia);
 
   // Auto-sync ao montar
   useEffect(() => {
@@ -508,13 +498,6 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente.cnpj]);
-
-  const CAMADA_CLS: Record<number, string> = {
-    1: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    2: "bg-blue-50 text-blue-700 border-blue-200",
-    3: "bg-amber-50 text-amber-700 border-amber-200",
-    4: "bg-orange-50 text-orange-700 border-orange-200",
-  };
 
   return (
     <div className="space-y-4">
@@ -543,13 +526,10 @@ function NfRecebidas({ cliente }: { cliente: Cliente }) {
         )}
       </div>
 
-      {cascata.camada_usada && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${CAMADA_CLS[cascata.camada_usada] ?? ""}`}>
+      {syncInfo.fonte_label && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
           <Wifi className="h-3.5 w-3.5" />
-          <span>Fonte: {cascata.fonte_label ?? "Camada " + cascata.camada_usada} · {cascata.total ?? notas.length} nota{(cascata.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(cascata.total ?? notas.length) !== 1 ? "s" : ""}</span>
-          {(cascata.camada_usada ?? 0) >= 3 && (
-            <span className="opacity-60">(custo: {cascata.camada_usada === 3 ? "R$ 0,24" : "pago"})</span>
-          )}
+          <span>Fonte: {syncInfo.fonte_label} · {syncInfo.total ?? notas.length} nota{(syncInfo.total ?? notas.length) !== 1 ? "s" : ""} encontrada{(syncInfo.total ?? notas.length) !== 1 ? "s" : ""}</span>
         </div>
       )}
 

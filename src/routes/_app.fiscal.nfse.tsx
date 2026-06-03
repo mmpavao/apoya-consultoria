@@ -1,6 +1,6 @@
 /**
  * Página /fiscal/nfse — NFS-e emitidas e recebidas
- * Integrada ao NFE.io via /api/nfse
+ * Integrada ao Focus NF-e via /api/nfse
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -123,7 +123,8 @@ function NfsePage() {
   }), [emitidas, recebidas]);
 
   async function handlePdf(nota: NfseEmitida) {
-    const b64 = await baixarPdf(nota.id, nota.nfseio_id);
+    const pdfUrl = await obterPdf(nota.id);
+        if (pdfUrl) { window.open(pdfUrl, '_blank'); return; }
     if (b64) downloadBlob(b64, `NFS-e_${nota.numero ?? nota.id}.pdf`, "application/pdf");
   }
 

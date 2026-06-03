@@ -1,240 +1,182 @@
 /**
  * POST /api/nfse/emitir-cobranca
- * Emite NFS-e para uma cobrança paga que ainda não tem nota.
- * 
- * Body: { cobranca_id: string }
- * 
+ *
+ * Emissão automática de NFS-e ao receber confirmação de pagamento.
+ * Chamado pelo webhook do Asaas quando cobrança é paga.
+ *
  * Fluxo:
- *  1. Busca cobrança (deve estar paga e sem nfse_status)
- *  2. Busca cliente (dados fiscais: inscricao_municipal, codigo_servico, aliquota_iss)
- *  3. Monta payload NFE.io e chama POST /api/nfse/ com action=emitir
- *  4. Atualiza cobrancas.nfse_status = "emitida" | "erro"
- *  5. Envia PDF por WhatsApp se emitido com sucesso
+ *  1. Recebe { cobranca_id }
+ *  2. Busca dados da cobrança + cliente no banco
+ *  3. Chama /api/nfse POST { action: "emitir" } (Focus NF-e)
+ *  4. Salva nfse_emitida.cobranca_id + pdf_url + focus_ref
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseServiceFetch } from "@/lib/supabase-server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
+    status, headers: { "Content-Type": "application/json" },
   });
 }
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
+function err(msg: string, status = 400) { return json({ error: msg }, status); }
+
+// ── Focus NF-e helpers ───────────────────────────────────────────────────────
+const FOCUS_HML  = "https://homologacao.focusnfe.com.br/v2";
+const FOCUS_PROD = "https://api.focusnfe.com.br/v2";
+
+function getFocusToken(): string {
+  return (globalThis as any).__env__?.FOCUSNFE_API_TOKEN
+    ?? process.env.FOCUSNFE_API_TOKEN ?? "";
+}
+function focusAuth(t: string): string { return "Basic " + btoa(`${t}:`); }
+
+function getFocusBase(amb?: string | null): string {
+  return amb === "producao" ? FOCUS_PROD : FOCUS_HML;
 }
 
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
-const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
-
-async function getSupabaseUser(authHeader: string) {
-  const token = authHeader.replace("Bearer ", "");
-  // Aceitar cookie de sessão ou bearer token
-  const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: ANON_KEY },
+async function focusEmitir(payload: any, focusRef: string, ambiente?: string | null) {
+  const token = getFocusToken();
+  if (!token) throw new Error("FOCUSNFE_API_TOKEN não configurado");
+  const base = getFocusBase(ambiente);
+  const res = await fetch(`${base}/nfse?ref=${focusRef}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: focusAuth(token) },
+    body: JSON.stringify(payload),
+    redirect: "follow",
   });
-  if (!r.ok) return null;
-  const d = await r.json();
-  return { userId: d.id as string, token };
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d?.mensagem ?? d?.erro ?? `Focus HTTP ${res.status}`);
+  return d;
 }
 
-function getNfseKey(): string {
-  return (globalThis as any).__env__?.NFSEIO_API_KEY ?? process.env.NFSEIO_API_KEY ?? "";
+function mapStatus(s: string): string {
+  return { autorizado: "emitida", processando_autorizacao: "processando",
+    erro_autorizacao: "erro", cancelado: "cancelada" }[s] ?? "processando";
 }
 
-function getEvolutionCreds() {
-  const env = (globalThis as any).__env__ ?? process.env;
-  return {
-    base: env.EVOLUTION_BASE_URL ?? "",
-    key:  env.EVOLUTION_API_KEY  ?? "",
-    instance: env.EVOLUTION_INSTANCE ?? "meucontador",
-  };
-}
-
+// ── Rota ─────────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/api/nfse/emitir-cobranca")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // ── Auth ──────────────────────────────────────────────────────
-        const authHeader  = request.headers.get("authorization") ?? "";
-        const isInternal  = request.headers.get("x-internal") === "webhook";
-        const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-        let userId = "system";
-
-        if (isInternal && SERVICE_KEY && authHeader === `Bearer ${SERVICE_KEY}`) {
-          // Chamada interna do webhook Asaas — aceitar diretamente
-          userId = "webhook-asaas";
-        } else if (authHeader) {
-          // Chamada do frontend — validar token de usuário
-          const user = await getSupabaseUser(authHeader);
-          if (!user) return err("Unauthorized", 401);
-          userId = user.userId;
-        } else {
-          return err("Unauthorized", 401);
-        }
-
-        // ── Body ──────────────────────────────────────────────────────
         let body: any;
         try { body = await request.json(); } catch { return err("JSON inválido"); }
-        const { cobranca_id } = body;
-        if (!cobranca_id) return err("cobranca_id é obrigatório");
 
-        // ── Buscar cobrança ───────────────────────────────────────────
+        const { cobranca_id } = body;
+        if (!cobranca_id) return err("cobranca_id obrigatório");
+
+        // 1. Buscar cobrança
         const cobRows = await supabaseServiceFetch(
           "cobrancas",
           "GET",
-          `id=eq.${cobranca_id}&select=id,cliente_id,cliente_nome,cnpj,valor,competencia,descricao,status,nfse_status`
-        ) as any[];
-        const cob = cobRows?.[0];
+          `select=id,cliente_id,valor,descricao,competencia,nfse_status&id=eq.${cobranca_id}&limit=1`,
+        );
+        const cob = Array.isArray(cobRows) ? cobRows[0] : null;
         if (!cob) return err("Cobrança não encontrada", 404);
-        if (cob.status !== "paga") return err("Cobrança não está paga", 400);
-        if (cob.nfse_status === "emitida") return err("NFS-e já emitida para esta cobrança", 409);
+        if (cob.nfse_status === "emitida") return json({ ok: true, msg: "Nota já emitida" });
 
-        // ── Buscar cliente ────────────────────────────────────────────
+        // 2. Buscar cliente
         const cliRows = await supabaseServiceFetch(
           "clientes",
           "GET",
-          `id=eq.${cob.cliente_id}&select=id,razao_social,cnpj,email,inscricao_municipal,codigo_servico_nfse,aliquota_iss,municipio,uf,logradouro,numero,bairro,cep,whatsapp,telefone`
-        ) as any[];
-        const cli = cliRows?.[0];
+          `select=id,cnpj,razao_social,regime,email,municipio,uf,codigo_municipio_ibge,aliquota_iss,codigo_servico_nfse,inscricao_municipal&id=eq.${cob.cliente_id}&limit=1`,
+        );
+        const cli = Array.isArray(cliRows) ? cliRows[0] : null;
         if (!cli) return err("Cliente não encontrado", 404);
 
-        // ── Buscar emitente (APOYA) ───────────────────────────────────
-        const FALLBACK_EMITENTE = "c134d1687b1a4e23aaa63217bda1d124"; // APOYA PROD
-        let emitenteId = FALLBACK_EMITENTE;
-        try {
-          const cfgRows = await supabaseServiceFetch(
-            "escritorio_config",
-            "GET",
-            "select=nfseio_emitente_id&limit=1"
-          ) as any[];
-          if (cfgRows?.[0]?.nfseio_emitente_id) {
-            emitenteId = cfgRows[0].nfseio_emitente_id;
-          }
-        } catch {}
+        // 3. Config do escritório
+        const cfgRows = await supabaseServiceFetch(
+          "escritorio_config",
+          "GET",
+          "select=cnpj,focus_ambiente,inscricao_municipal,codigo_municipio_ibge&limit=1",
+        );
+        const cfg = Array.isArray(cfgRows) ? cfgRows[0] : null;
+        const cnpjEscritorioLimpo = (cfg?.cnpj ?? "").replace(/\D/g, "");
+        const ambiente            = cfg?.focus_ambiente ?? "homologacao";
 
-        // ── Montar payload NFE.io ─────────────────────────────────────
-        const cnpjNum = (cli.cnpj ?? "").replace(/\D/g, "");
-        const [year, month] = (cob.competencia ?? "2026-05").split("-");
-        const competencia = `${year}-${month}`;
+        if (!cnpjEscritorioLimpo) {
+          await supabaseServiceFetch("cobrancas", "PATCH", `id=eq.${cobranca_id}`,
+            { nfse_status: "erro", nfse_erro: "CNPJ do escritório não configurado" });
+          return err("CNPJ do escritório não configurado", 500);
+        }
 
-        const nota = {
-          cityServiceCode: cli.codigo_servico_nfse ?? "0107",
-          federalServiceCode: "17.20",
-          description: cob.descricao ?? `Honorários Contábeis — ${competencia}`,
-          servicesAmount: Number(cob.valor),
-          issRate: Number(cli.aliquota_iss ?? 2),
-          issRetained: false,
-          taxationType: "WithinCity",
-          competencia,
-          borrower: {
-            type: cnpjNum.length === 14 ? "J" : "F",
-            name: cli.razao_social ?? cob.cliente_nome,
-            federalTaxNumber: parseInt(cnpjNum, 10),
-            email: cli.email ?? "",
-            address: {
-              country: "BRA",
-              postalCode: (cli.cep ?? "").replace(/\D/g, ""),
-              street: cli.logradouro ?? "",
-              number: cli.numero ?? "S/N",
-              district: cli.bairro ?? "",
-              city: {
-                code: "3509502", // Caçapava padrão; idealmente buscar do cliente
-                name: cli.municipio ?? "São Paulo",
-              },
-              state: cli.uf ?? "SP",
-            },
+        // 4. Criar rascunho local
+        const rascunho = await supabaseServiceFetch("nfse_emitida", "POST", undefined, {
+          cliente_id:       cob.cliente_id,
+          cobranca_id:      cobranca_id,
+          status:           "processando",
+          competencia:      cob.competencia ?? new Date().toISOString().slice(0, 7),
+          tomador_nome:     cli.razao_social,
+          tomador_cnpj_cpf: (cli.cnpj ?? "").replace(/\D/g, ""),
+          descricao_servico: cob.descricao ?? `Serviços contábeis — ${cob.competencia ?? ""}`,
+          codigo_servico:   cli.codigo_servico_nfse ?? "17.19",
+          valor_servico:    cob.valor,
+          aliquota_iss:     cli.aliquota_iss ?? 3,
+        });
+        const localId = (Array.isArray(rascunho) ? rascunho[0] : rascunho)?.id;
+        if (!localId) return err("Falha ao criar rascunho", 500);
+
+        const focusRef = localId;
+        const val  = parseFloat(cob.valor) || 0;
+        const ali  = parseFloat(cli.aliquota_iss ?? 3) || 3;
+
+        const payload = {
+          data_emissao:               new Date().toISOString(),
+          natureza_operacao:          "1",
+          optante_simples_nacional:   true,
+          regime_especial_tributacao: "6",
+          incentivo_fiscal:           false,
+          prestador: {
+            cnpj:                cnpjEscritorioLimpo,
+            inscricao_municipal: cfg?.inscricao_municipal ?? "",
+            codigo_municipio:    cfg?.codigo_municipio_ibge ?? "",
+          },
+          tomador: {
+            cnpj:         (cli.cnpj ?? "").replace(/\D/g, "") || undefined,
+            razao_social: cli.razao_social,
+            email:        cli.email || undefined,
+            endereco:     cli.municipio
+              ? { municipio: cli.municipio, uf: cli.uf ?? "SP",
+                  codigo_municipio: cli.codigo_municipio_ibge ?? "" }
+              : undefined,
+          },
+          servico: {
+            valor_servicos:              val,
+            aliquota_iss:                ali,
+            valor_iss:                   +(val * ali / 100).toFixed(2),
+            iss_retido:                  false,
+            item_lista_servico:          cli.codigo_servico_nfse ?? "17.19",
+            discriminacao:               cob.descricao ?? `Serviços contábeis — competência ${cob.competencia ?? ""}`,
+            codigo_municipio:            cli.codigo_municipio_ibge ?? "",
+            codigo_tributacao_municipio: cli.codigo_servico_nfse ?? "17.19",
           },
         };
 
-        // ── Marcar como processando ───────────────────────────────────
-        await supabaseServiceFetch(
-          `cobrancas?id=eq.${cobranca_id}`,
-          "PATCH",
-          undefined,
-          { nfse_status: "processando", nfse_tentativas: (cob.nfse_tentativas ?? 0) + 1 }
-        );
-
-        // ── Chamar NFE.io ─────────────────────────────────────────────
-        const nfseKey = getNfseKey();
-        if (!nfseKey) {
-          await supabaseServiceFetch(
-            `cobrancas?id=eq.${cobranca_id}`,
-            "PATCH",
-            undefined,
-            { nfse_status: "erro", nfse_erro: "NFSEIO_API_KEY não configurada" }
-          );
-          return err("NFSEIO_API_KEY não configurada", 500);
-        }
-
-        let nfseioResult: any;
         try {
-          const nfseRes = await fetch(`https://api.nfe.io/v1/companies/${emitenteId}/serviceinvoices`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: nfseKey },
-            body: JSON.stringify(nota),
+          // Corrigir referência config (config.cnpj → cnpjEscritorioLimpo)
+          
+          const result = await focusEmitir(payload, focusRef, ambiente);
+          const numero = String(result?.numero ?? "");
+          const status = mapStatus(result?.status ?? "processando_autorizacao");
+          const pdfUrl = result?.caminho_pdf_nota_fiscal ?? null;
+
+          await supabaseServiceFetch("nfse_emitida", "PATCH", `id=eq.${localId}`, {
+            focus_ref: focusRef, numero, status,
+            data_emissao: new Date().toISOString().slice(0, 10), pdf_url: pdfUrl,
           });
-          nfseioResult = await nfseRes.json().catch(() => ({}));
-          if (!nfseRes.ok) throw new Error(nfseioResult?.message ?? `NFE.io HTTP ${nfseRes.status}`);
+          await supabaseServiceFetch("cobrancas", "PATCH", `id=eq.${cobranca_id}`, {
+            nfse_status: status, nfse_emitida_em: new Date().toISOString(),
+            nfse_numero: numero, nfse_pdf_url: pdfUrl,
+          });
+
+          return json({ ok: true, focus_ref: focusRef, numero, status, pdf_url: pdfUrl });
         } catch (e: any) {
-          await supabaseServiceFetch(
-            `cobrancas?id=eq.${cobranca_id}`,
-            "PATCH",
-            undefined,
-            { nfse_status: "erro", nfse_erro: e.message ?? "Erro NFE.io" }
-          );
-          return err(e.message ?? "Erro ao emitir nota", 502);
+          await supabaseServiceFetch("nfse_emitida", "PATCH", `id=eq.${localId}`,
+            { status: "erro", erro_msg: e?.message });
+          await supabaseServiceFetch("cobrancas", "PATCH", `id=eq.${cobranca_id}`,
+            { nfse_status: "erro", nfse_erro: e?.message });
+          return err(e?.message ?? "Falha ao emitir", 502);
         }
-
-        const nfseioId  = nfseioResult?.id;
-        const numero    = String(nfseioResult?.number ?? "");
-        const pdfUrl    = nfseioResult?.pdfUrl ?? null;
-
-        // ── Registrar nota no banco ───────────────────────────────────
-        await supabaseServiceFetch("nfse_emitida", "POST", undefined, {
-          cliente_id:       cob.cliente_id,
-          cobranca_id:      cobranca_id,
-          nfseio_id:        nfseioId,
-          numero,
-          status:           "emitida",
-          competencia,
-          data_emissao:     new Date().toISOString().slice(0, 10),
-          valor_servico:    cob.valor,
-          tomador_nome:     cli.razao_social ?? cob.cliente_nome,
-          tomador_cnpj_cpf: cnpjNum,
-          pdf_url:          pdfUrl,
-          created_by:       userId,
-        });
-
-        // ── Atualizar cobrança ────────────────────────────────────────
-        await supabaseServiceFetch(
-          `cobrancas?id=eq.${cobranca_id}`,
-          "PATCH",
-          undefined,
-          { nfse_status: "emitida" }
-        );
-
-        // ── Enviar PDF por WhatsApp (se tiver número e PDF) ──────────
-        const whatsapp = (cli.whatsapp ?? cli.telefone ?? "").replace(/\D/g, "");
-        if (whatsapp && pdfUrl) {
-          const { base, key, instance } = getEvolutionCreds();
-          try {
-            await fetch(`${base}/message/sendMedia/${instance}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", apikey: key },
-              body: JSON.stringify({
-                number: whatsapp,
-                mediatype: "document",
-                media: pdfUrl,
-                fileName: `NFS-e_${numero}_${competencia}.pdf`,
-                caption: `✅ *Nota Fiscal emitida!*\n\n📄 NFS-e nº ${numero}\n📅 Competência: ${competencia}\n💰 Valor: R$ ${Number(cob.valor).toFixed(2)}\n\nSegue em anexo o PDF da sua nota fiscal.`,
-              }),
-            });
-          } catch {}
-        }
-
-        return json({ ok: true, numero, pdf_url: pdfUrl, nfseio_id: nfseioId });
       },
     },
   },

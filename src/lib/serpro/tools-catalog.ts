@@ -41,7 +41,7 @@ export const SERPRO_TOOLS: SerproToolDef[] = [
   // ── NF-e CASCATA — busca automática multi-fonte ────────────────────────
   {
     name: "nfe_buscar_cascata",
-    description: "Busca NF-e emitidas/recebidas do cliente com cascata automática de fontes (SEFAZ → SERPRO → Infosimples → NFE.io). Retorna camada_usada (1-4) e log_cascata.",
+    description: "Busca NF-e emitidas/recebidas do cliente via SERPRO/SEFAZ. Para NFS-e, use a Focus NF-e via /api/nfse.",
     category: "nfe",
     params: ["cnpj_cliente", "tipo"],
     requiresCert: false,

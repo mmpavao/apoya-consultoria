@@ -388,7 +388,7 @@ function UsuariosSection() {
 const INTEG_META: Record<string, { icon: string; descricao: string; label: string }> = {
   evolution:  { icon: "💬", label: "WhatsApp",  descricao: "Envio de mensagens via Evolution API self-hosted" },
   serpro:     { icon: "🏛️", label: "SERPRO",    descricao: "Consultas fiscais MEI, PGDAS, Simples Nacional via gateway" },
-  nfeio:      { icon: "🧾", label: "NFE.io",    descricao: "Emissão de NFS-e e consulta de notas fiscais" },
+  focus:      { icon: "🧾", label: "Focus NF-e", descricao: "Emissão de NFS-e e consulta de notas fiscais" },
   asaas:      { icon: "💰", label: "Asaas",     descricao: "Cobranças, boletos e Pix via Asaas" },
   clicksign:  { icon: "✍️", label: "ClickSign", descricao: "Assinatura eletrônica de contratos" },
   elevenlabs: { icon: "🎙️", label: "ElevenLabs",descricao: "Síntese de voz para atendimento automatizado" },
