@@ -26,12 +26,66 @@ function getFocusBase(ambiente?: string | null): string {
   return ambiente === "producao" ? FOCUS_PROD : FOCUS_HML;
 }
 
-function getFocusToken(): string {
-  const k =
+// Cache em memória para evitar query no banco a cada request
+let _cachedToken: string | null = null;
+let _cachedTokenTs = 0;
+const TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+async function getFocusToken(): Promise<string> {
+  // 1. Tentar env do Worker
+  const fromEnv =
     (globalThis as any).__env__?.FOCUSNFE_API_TOKEN ??
     process.env.FOCUSNFE_API_TOKEN ?? "";
-  if (!k) throw new Error("FOCUSNFE_API_TOKEN não configurado no Worker");
-  return k;
+  if (fromEnv) return fromEnv;
+
+  // 2. Cache em memória
+  if (_cachedToken && Date.now() - _cachedTokenTs < TOKEN_CACHE_TTL) {
+    return _cachedToken;
+  }
+
+  // 3. Fallback: buscar do banco (escritorio_config.focusnfe_api_token)
+  try {
+    const rows = await supabaseServiceFetch(
+      "escritorio_config",
+      "GET",
+      "select=focusnfe_api_token,focus_ambiente&limit=1",
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row?.focusnfe_api_token) {
+      _cachedToken = row.focusnfe_api_token;
+      _cachedTokenTs = Date.now();
+      return row.focusnfe_api_token;
+    }
+  } catch {}
+
+  throw new Error("FOCUSNFE_API_TOKEN não configurado. Configure em Configurações → Integrações.");
+}
+
+async function getEscritorioConfigFull(): Promise<{ cnpj: string; ambiente: string; inscricao_municipal: string; codigo_municipio: string; token: string }> {
+  try {
+    const rows = await supabaseServiceFetch(
+      "escritorio_config",
+      "GET",
+      "select=cnpj,focus_ambiente,inscricao_municipal,codigo_municipio_ibge,focusnfe_api_token&limit=1",
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    const token = row?.focusnfe_api_token
+      ?? (globalThis as any).__env__?.FOCUSNFE_API_TOKEN
+      ?? process.env.FOCUSNFE_API_TOKEN ?? "";
+    if (token) {
+      _cachedToken = token;
+      _cachedTokenTs = Date.now();
+    }
+    return {
+      cnpj:               (row?.cnpj ?? "").replace(/\D/g, ""),
+      ambiente:            row?.focus_ambiente ?? "homologacao",
+      inscricao_municipal: row?.inscricao_municipal ?? "",
+      codigo_municipio:    row?.codigo_municipio_ibge ?? "",
+      token,
+    };
+  } catch {
+    return { cnpj: "", ambiente: "homologacao", inscricao_municipal: "", codigo_municipio: "", token: "" };
+  }
 }
 
 /** HTTP Basic Auth: login = token, senha = vazio */
@@ -46,7 +100,7 @@ async function focusRequest<T = any>(
   body?: unknown,
   ambiente?: string | null,
 ): Promise<{ data: T; status: number }> {
-  const token = getFocusToken();
+  const token = await getFocusToken();
   const base  = getFocusBase(ambiente);
   const res = await fetch(`${base}${path}`, {
     method,
@@ -143,26 +197,7 @@ async function logOp(
   } catch { /* log nunca pode quebrar a operação */ }
 }
 
-// ── Config do escritório (CNPJ + ambiente) ──────────────────────────────────
-async function getEscritorioConfig(
-  _token: string,
-): Promise<{ cnpj: string; ambiente: string }> {
-  try {
-    const rows = await supabaseServiceFetch(
-      "escritorio_config",
-      "GET",
-      "select=cnpj,focus_ambiente&limit=1",
-    );
-    const row = Array.isArray(rows) ? rows[0] : null;
-    if (row?.cnpj) {
-      return {
-        cnpj:     row.cnpj.replace(/\D/g, ""),
-        ambiente: row.focus_ambiente ?? "homologacao",
-      };
-    }
-  } catch {}
-  return { cnpj: "", ambiente: "homologacao" };
-}
+// getEscritorioConfig substituído por getEscritorioConfigFull acima
 
 // ── Mapeamento de status Focus → interno ────────────────────────────────────
 function mapStatus(s: string): string {
@@ -220,7 +255,8 @@ export const Route = createFileRoute("/api/nfse/")({
 
         const { action, cliente_id } = body;
         const t0     = Date.now();
-        const config = await getEscritorioConfig(token);
+        const config = await getEscritorioConfigFull();
+        if (!config.token) return err("FOCUSNFE_API_TOKEN não configurado. Acesse Configurações → Integrações e salve o token da Focus NF-e.", 500);
 
         // ────────────────────────────────────────────────────────────────────
         // EMITIR NFS-e
@@ -263,8 +299,8 @@ export const Route = createFileRoute("/api/nfse/")({
               incentivo_fiscal:           nota.incentivo_fiscal ?? false,
               prestador: {
                 cnpj:               config.cnpj,
-                inscricao_municipal: nota.prestador?.inscricao_municipal ?? "",
-                codigo_municipio:    nota.prestador?.codigo_municipio ?? nota.servico?.codigo_municipio ?? "",
+                inscricao_municipal: nota.prestador?.inscricao_municipal ?? config.inscricao_municipal ?? "",
+                codigo_municipio:    nota.prestador?.codigo_municipio ?? config.codigo_municipio ?? nota.servico?.codigo_municipio ?? "",
               },
               tomador: {
                 cnpj:         nota.tomador?.cnpj?.replace(/\D/g, "") || undefined,
@@ -321,11 +357,16 @@ export const Route = createFileRoute("/api/nfse/")({
             return json({ ok: true, id: localId, focus_ref: focusRef, numero, pdf_url: pdfUrl, status });
 
           } catch (e: any) {
+            const msg = e?.message ?? "Falha ao emitir";
+            const statusCode = msg.includes("não autorizado") || msg.includes("permissao_negada") ? 403 : 502;
+            const msgClara = statusCode === 403
+              ? "CNPJ do emitente não cadastrado na Focus NF-e. Acesse o painel em app.focusnfe.com.br e cadastre o emitente APOYA antes de emitir notas."
+              : msg;
             await supaRest(token, `nfse_emitida?id=eq.${localId}`, "PATCH",
-              { status: "erro", erro_msg: e?.message });
+              { status: "erro", erro_msg: msgClara });
             await logOp(token, cliente_id, "emitir", focusRef, "erro",
-              nota, null, e?.message, Date.now() - t0, userId);
-            return err(e?.message ?? "Falha ao emitir", 502);
+              nota, null, msgClara, Date.now() - t0, userId);
+            return err(msgClara, statusCode);
           }
         }
 
@@ -373,7 +414,7 @@ export const Route = createFileRoute("/api/nfse/")({
           if (!row?.focus_ref) return err("Nota sem ref Focus");
 
           try {
-            const tkn  = getFocusToken();
+            const tkn  = await getFocusToken();
             const base = getFocusBase(config.ambiente);
             const r = await fetch(`${base}/nfse?ref=${row.focus_ref}`,
               { headers: { Authorization: focusAuth(tkn) } });
@@ -404,7 +445,7 @@ export const Route = createFileRoute("/api/nfse/")({
           if (!row?.focus_ref) return err("Nota sem ref Focus");
 
           try {
-            const tkn  = getFocusToken();
+            const tkn  = await getFocusToken();
             const base = getFocusBase(config.ambiente);
             const r = await fetch(`${base}/nfse?ref=${row.focus_ref}&completo=1`,
               { headers: { Authorization: focusAuth(tkn) } });
@@ -452,73 +493,49 @@ export const Route = createFileRoute("/api/nfse/")({
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // SINCRONIZAR EMITIDAS — puxa do Focus e persiste no banco
+        // SINCRONIZAR EMITIDAS — atualiza status das notas existentes no banco
+        // Nota: Focus NF-e não possui endpoint de listagem por CNPJ/período.
+        // Sincronizamos consultando nota a nota pelas refs já salvas no banco.
         // ────────────────────────────────────────────────────────────────────
         if (action === "sincronizar_emitidas") {
-          const { cnpj, competencia: comp } = body;
-          if (!cnpj || !cliente_id) return err("cnpj e cliente_id obrigatórios");
-          const cnpjLimpo = cnpj.replace(/\D/g, "");
-
-          let dataInicio: string;
-          let dataFim: string;
-          if (comp) {
-            const [yyyy, mm] = comp.split("-");
-            dataInicio = `${yyyy}-${mm}-01`;
-            const lastDay = new Date(Number(yyyy), Number(mm), 0).getDate();
-            dataFim    = `${yyyy}-${mm}-${String(lastDay).padStart(2, "0")}`;
-          } else {
-            const now  = new Date();
-            dataInicio = `${now.getFullYear()}-01-01`;
-            dataFim    = now.toISOString().slice(0, 10);
-          }
+          if (!cliente_id) return err("cliente_id obrigatório");
 
           try {
-            const qs = new URLSearchParams({
-              cnpj_prestador: cnpjLimpo,
-              data_inicio:    dataInicio,
-              data_fim:       dataFim,
-            });
-            const { data } = await focusRequest("GET",
-              `/nfse?${qs}`, undefined, config.ambiente);
+            // Buscar notas com focus_ref no banco que ainda não estão concluídas
+            const notas: any[] = await supabaseServiceFetch(
+              "nfse_emitida",
+              "GET",
+              `select=id,focus_ref,status&cliente_id=eq.${cliente_id}&focus_ref=not.is.null&status=not.in.(emitida,cancelada)&limit=50`,
+            ) as any[];
 
-            const notas: any[] = Array.isArray(data) ? data
-              : (data?.notas_fiscais_servico ?? data?.data ?? []);
-
-            let upserted = 0;
+            let atualizadas = 0;
             for (const n of notas) {
+              if (!n.focus_ref) continue;
               try {
-                const focusRef = n.ref ?? null;
-                await supabaseServiceFetch("nfse_emitida", "POST", undefined, {
-                  cliente_id,
-                  focus_ref:        focusRef,
-                  numero:           String(n.numero ?? ""),
-                  status:           mapStatus(n.status ?? "autorizado"),
-                  competencia:      (n.data_emissao ?? "").slice(0, 7) || null,
-                  data_emissao:     (n.data_emissao ?? "").slice(0, 10) || null,
-                  tomador_nome:     n.tomador?.razao_social ?? null,
-                  tomador_cnpj_cpf: String(n.tomador?.cnpj ?? n.tomador?.cpf ?? ""),
-                  descricao_servico: n.discriminacao ?? null,
-                  codigo_servico:   n.item_lista_servico ?? null,
-                  valor_servico:    n.valor_servicos ?? 0,
-                  aliquota_iss:     n.aliquota_iss ?? 0,
-                  valor_iss:        n.valor_iss ?? 0,
-                  issretido:        n.iss_retido === true,
-                  pdf_url:          n.caminho_pdf_nota_fiscal ?? null,
-                  created_by:       userId,
-                });
-                upserted++;
-              } catch { /* skip duplicates */ }
+                const { data } = await focusRequest("GET",
+                  `/nfse/${n.focus_ref}`, undefined, config.ambiente);
+                const novoStatus = mapStatus(data?.status ?? n.status);
+                const numero     = String(data?.numero ?? "");
+                const pdfUrl     = data?.caminho_pdf_nota_fiscal ?? null;
+
+                if (novoStatus !== n.status || numero || pdfUrl) {
+                  await supabaseServiceFetch("nfse_emitida", "PATCH",
+                    `id=eq.${n.id}`,
+                    { status: novoStatus, ...(numero ? { numero } : {}), ...(pdfUrl ? { pdf_url: pdfUrl } : {}) });
+                  atualizadas++;
+                }
+              } catch { /* nota não encontrada no Focus — manter status local */ }
             }
 
             await logOp(token, cliente_id, "sincronizar_emitidas", undefined, "ok",
-              { cnpj: cnpjLimpo }, { total: notas.length, upserted },
-              undefined, Date.now() - t0, userId);
-            return json({ ok: true, total: notas.length, upserted });
+              {}, { total: notas.length, atualizadas }, undefined, Date.now() - t0, userId);
+            return json({ ok: true, total: notas.length, atualizadas,
+              msg: `${atualizadas} nota(s) atualizada(s) de ${notas.length} consultada(s)` });
 
           } catch (e: any) {
             await logOp(token, cliente_id, "sincronizar_emitidas", undefined, "erro",
-              { cnpj: cnpjLimpo }, null, e?.message, Date.now() - t0, userId);
-            return err(e?.message ?? "Falha ao sincronizar emitidas", 502);
+              {}, null, e?.message, Date.now() - t0, userId);
+            return err(e?.message ?? "Falha ao sincronizar", 502);
           }
         }
 
@@ -544,51 +561,21 @@ export const Route = createFileRoute("/api/nfse/")({
           }
 
           try {
-            const qs = new URLSearchParams({ cnpj_tomador: cnpjLimpo });
-            if (ini) qs.set("data_inicio", ini);
-            if (fim) qs.set("data_fim",    fim);
+            // Focus NF-e não possui endpoint de listagem de notas recebidas.
+            // Retornamos as notas já importadas manualmente no banco.
+            const existentes: any[] = await supabaseServiceFetch(
+              "nfse_recebida", "GET",
+              `select=id&cliente_id=eq.${cliente_id}&limit=1`,
+            ) as any[];
 
-            const { data } = await focusRequest("GET",
-              `/nfse_recebidas?${qs}`, undefined, config.ambiente);
-
-            const notas: any[] = Array.isArray(data) ? data
-              : (data?.notas_fiscais_servico ?? data?.data ?? []);
-
-            let inserted = 0;
-            for (const n of notas) {
-              try {
-                await supabaseServiceFetch("nfse_recebida", "POST", undefined, {
-                  cliente_id,
-                  cnpj_tomador:     cnpjLimpo,
-                  prestador_nome:   n.prestador?.razao_social ?? null,
-                  prestador_cnpj:   String(n.prestador?.cnpj ?? ""),
-                  numero:           String(n.numero ?? n.ref ?? ""),
-                  codigo_verificacao: n.codigo_verificacao ?? null,
-                  data_emissao:     (n.data_emissao ?? "").slice(0, 10) || null,
-                  competencia:      (n.data_emissao ?? "").slice(0, 7)  || null,
-                  valor_servico:    n.valor_servicos ?? 0,
-                  valor_iss:        n.valor_iss ?? 0,
-                  aliquota_iss:     n.aliquota_iss ?? 0,
-                  issretido:        n.iss_retido === true,
-                  descricao_servico: n.discriminacao ?? null,
-                  codigo_servico:   n.item_lista_servico ?? null,
-                  focus_ref:        n.ref ?? null,
-                  fonte:            "focus",
-                  pdf_url:          n.caminho_pdf_nota_fiscal ?? null,
-                });
-                inserted++;
-              } catch { /* skip duplicates */ }
-            }
-
-            await logOp(token, cliente_id, "sincronizar_recebidas", undefined, "ok",
-              { cnpj: cnpjLimpo }, { total: notas.length, inserted },
-              undefined, Date.now() - t0, userId);
-            return json({ ok: true, total: notas.length, inserted });
-
+            return json({
+              ok: true,
+              total: existentes.length,
+              inserted: 0,
+              msg: "Focus NF-e não oferece consulta automática de notas recebidas. Utilize importação manual via XML ou consulta no portal da prefeitura.",
+            });
           } catch (e: any) {
-            await logOp(token, cliente_id, "sincronizar_recebidas", undefined, "erro",
-              { cnpj: cnpjLimpo }, null, e?.message, Date.now() - t0, userId);
-            return err(e?.message ?? "Falha ao sincronizar recebidas", 502);
+            return err(e?.message ?? "Falha ao consultar recebidas", 502);
           }
         }
 
