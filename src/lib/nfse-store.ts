@@ -1,4 +1,4 @@
-// Mock NFS-e store backed by localStorage. Será substituído por integração NFE.io real em M7.
+// Mock NFS-e store backed by localStorage. Será substituído por integração Focus NF-e real em M7.
 import { clientesStore, type Cliente } from "./clientes-store";
 
 export type NfseStatus = "rascunho" | "emitida" | "cancelada" | "erro";
@@ -121,10 +121,10 @@ function ensureForCompetencia(competencia: string) {
   return list.filter((n) => n.competencia === competencia);
 }
 
-async function simulaNfeIo(n: NfseNota): Promise<NfseNota> {
+async function simulaFocusNfe(n: NfseNota): Promise<NfseNota> {
   await new Promise((r) => setTimeout(r, 400 + Math.random() * 700));
   if (Math.random() < 0.06) {
-    return { ...n, status: "erro", erro: "Rejeição NFE.io: código de serviço inválido (mock)" };
+    return { ...n, status: "erro", erro: "Rejeição Focus NF-e: código de serviço inválido (mock)" };
   }
   const numero = Math.floor(100000 + Math.random() * 900000).toString();
   return {
@@ -144,13 +144,13 @@ export const nfseStore = {
     const list = read();
     const idx = list.findIndex((n) => n.id === id);
     if (idx === -1) return;
-    list[idx] = await simulaNfeIo(list[idx]);
+    list[idx] = await simulaFocusNfe(list[idx]);
     write(list);
   },
   async emitirLote(ids: string[]) {
     const list = read();
     const updated = await Promise.all(
-      list.map(async (n) => (ids.includes(n.id) ? await simulaNfeIo(n) : n)),
+      list.map(async (n) => (ids.includes(n.id) ? await simulaFocusNfe(n) : n)),
     );
     write(updated);
   },

@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type IntegracaoTipo = "asaas" | "nfeio" | "evolution" | "serpro";
+export type IntegracaoTipo = "asaas" | "focusnfe" | "evolution" | "serpro";
 
 export interface Integracao {
   id: string;
@@ -28,7 +28,7 @@ export interface IntegracaoDisplay {
 
 const DISPLAY_META: Record<IntegracaoTipo, { nome: string; descricao: string }> = {
   asaas:     { nome: "Asaas",         descricao: "Gateway de cobrança (PIX/boleto)" },
-  nfeio:     { nome: "NFE.io",        descricao: "Emissão de NFS-e" },
+  focusnfe:  { nome: "Focus NF-e",    descricao: "Emissão de NFS-e, NF-e, NFC-e e documentos fiscais" },
   evolution: { nome: "Evolution API", descricao: "WhatsApp (Evolution API self-hosted)" },
   serpro:    { nome: "SERPRO",        descricao: "Consulta CNPJ + gateway DAS" },
 };

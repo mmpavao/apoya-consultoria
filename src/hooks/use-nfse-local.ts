@@ -24,7 +24,7 @@ export interface NfseEmitidaRow {
   tomador_nome?: string;
   tomador_cnpj_cpf?: string;
   pdf_url?: string;
-  nfseio_id?: string;
+  focus_ref?: string;
   created_at?: string;
 }
 
@@ -109,7 +109,7 @@ async function persistEmitidas(clienteId: string, notas: Record<string, unknown>
   if (!notas?.length) return;
   const rows = notas.map((n) => ({
     cliente_id: clienteId,
-    nfseio_id: (n.id ?? n.nfseio_id ?? null) as string | null,
+    focus_ref: (n.id ?? n.nfseio_id ?? null) as string | null,
     numero: n.numero ? String(n.numero) : null,
     status: mapStatusEmitida(String(n.status ?? n.flowStatus ?? "")),
     competencia: (n.competencia ?? (n.issuedOn as string)?.substring(0, 7) ?? null) as string | null,
@@ -125,7 +125,7 @@ async function persistEmitidas(clienteId: string, notas: Record<string, unknown>
     pdf_url: (n.pdf_url ?? null) as string | null,
     erro_msg: (n.erro_msg ?? (n.flowStatus !== "Issued" ? n.flowMessage : null) ?? null) as string | null,
   }));
-  await supabase.from("nfse_emitida").upsert(rows, { onConflict: "nfseio_id", ignoreDuplicates: false });
+  await supabase.from("nfse_emitida").upsert(rows, { onConflict: "focus_ref", ignoreDuplicates: false });
 }
 
 async function persistRecebidas(clienteId: string, cnpjTomador: string, notas: Record<string, unknown>[]): Promise<void> {
@@ -166,7 +166,7 @@ export function useNfseEmitidas(clienteId?: string, competencia?: string) {
     if (!clienteId) return [];
     let q = supabase
       .from("nfse_emitida")
-      .select("id,cliente_id,numero,status,competencia,data_emissao,valor_servico,tomador_nome,tomador_cnpj_cpf,pdf_url,nfseio_id,created_at")
+      .select("id,cliente_id,numero,status,competencia,data_emissao,valor_servico,tomador_nome,tomador_cnpj_cpf,pdf_url,focus_ref,created_at")
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: false })
       .limit(500);

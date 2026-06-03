@@ -295,8 +295,8 @@ export type Database = {
           created_by: string | null
           has_procuracao: boolean
           id: string
-          nfseio_cert_id: string | null
-          nfseio_cert_uploaded_at: string | null
+          focus_cert_ref: string | null
+          focus_cert_enviado_em: string | null
           pfx_cnpj: string | null
           pfx_encrypted: string | null
           pfx_nome_razao: string | null
@@ -315,8 +315,8 @@ export type Database = {
           created_by?: string | null
           has_procuracao?: boolean
           id?: string
-          nfseio_cert_id?: string | null
-          nfseio_cert_uploaded_at?: string | null
+          focus_cert_ref?: string | null
+          focus_cert_enviado_em?: string | null
           pfx_cnpj?: string | null
           pfx_encrypted?: string | null
           pfx_nome_razao?: string | null
@@ -335,8 +335,8 @@ export type Database = {
           created_by?: string | null
           has_procuracao?: boolean
           id?: string
-          nfseio_cert_id?: string | null
-          nfseio_cert_uploaded_at?: string | null
+          focus_cert_ref?: string | null
+          focus_cert_enviado_em?: string | null
           pfx_cnpj?: string | null
           pfx_encrypted?: string | null
           pfx_nome_razao?: string | null
@@ -540,7 +540,7 @@ export type Database = {
           logradouro: string | null
           motivo_suspensao: string | null
           municipio: string | null
-          nfseio_emitente_id: string | null
+          focus_ambiente: string | null
           nome_fantasia: string | null
           numero: string | null
           observacoes: string | null
@@ -586,7 +586,7 @@ export type Database = {
           logradouro?: string | null
           motivo_suspensao?: string | null
           municipio?: string | null
-          nfseio_emitente_id?: string | null
+          focus_ambiente?: string | null
           nome_fantasia?: string | null
           numero?: string | null
           observacoes?: string | null
@@ -632,7 +632,7 @@ export type Database = {
           logradouro?: string | null
           motivo_suspensao?: string | null
           municipio?: string | null
-          nfseio_emitente_id?: string | null
+          focus_ambiente?: string | null
           nome_fantasia?: string | null
           numero?: string | null
           observacoes?: string | null
@@ -1284,9 +1284,9 @@ export type Database = {
           evolution_api_url: string | null
           id: string
           logotipo_url: string | null
-          nfeio_api_key: string | null
-          nfseio_ambiente: string | null
-          nfseio_emitente_id: string | null
+          focusnfe_api_token: string | null
+          
+          focus_ambiente: string | null
           nome_fantasia: string
           razao_social: string
           serpro_token: string | null
@@ -1309,9 +1309,9 @@ export type Database = {
           evolution_api_url?: string | null
           id?: string
           logotipo_url?: string | null
-          nfeio_api_key?: string | null
-          nfseio_ambiente?: string | null
-          nfseio_emitente_id?: string | null
+          focusnfe_api_token?: string | null
+          
+          focus_ambiente?: string | null
           nome_fantasia?: string
           razao_social?: string
           serpro_token?: string | null
@@ -1334,9 +1334,9 @@ export type Database = {
           evolution_api_url?: string | null
           id?: string
           logotipo_url?: string | null
-          nfeio_api_key?: string | null
-          nfseio_ambiente?: string | null
-          nfseio_emitente_id?: string | null
+          focusnfe_api_token?: string | null
+          
+          focus_ambiente?: string | null
           nome_fantasia?: string
           razao_social?: string
           serpro_token?: string | null
@@ -1645,7 +1645,7 @@ export type Database = {
           erro_msg: string | null
           id: string
           issretido: boolean | null
-          nfseio_id: string | null
+          focus_ref: string | null
           numero: string | null
           pdf_storage_path: string | null
           pdf_url: string | null
@@ -1675,7 +1675,7 @@ export type Database = {
           erro_msg?: string | null
           id?: string
           issretido?: boolean | null
-          nfseio_id?: string | null
+          focus_ref?: string | null
           numero?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
@@ -1705,7 +1705,7 @@ export type Database = {
           erro_msg?: string | null
           id?: string
           issretido?: boolean | null
-          nfseio_id?: string | null
+          focus_ref?: string | null
           numero?: string | null
           pdf_storage_path?: string | null
           pdf_url?: string | null
@@ -1871,7 +1871,7 @@ export type Database = {
           id: string
           importada_em: string | null
           issretido: boolean | null
-          nfseio_id: string | null
+          focus_ref: string | null
           numero: string | null
           pdf_url: string | null
           prestador_cnpj: string | null
@@ -1896,7 +1896,7 @@ export type Database = {
           id?: string
           importada_em?: string | null
           issretido?: boolean | null
-          nfseio_id?: string | null
+          focus_ref?: string | null
           numero?: string | null
           pdf_url?: string | null
           prestador_cnpj?: string | null
@@ -1921,7 +1921,7 @@ export type Database = {
           id?: string
           importada_em?: string | null
           issretido?: boolean | null
-          nfseio_id?: string | null
+          focus_ref?: string | null
           numero?: string | null
           pdf_url?: string | null
           prestador_cnpj?: string | null
@@ -1942,7 +1942,7 @@ export type Database = {
           },
         ]
       }
-      nfseio_log: {
+      focus_nfse_log_legacy: {
         Row: {
           cliente_id: string | null
           created_at: string
@@ -1950,7 +1950,7 @@ export type Database = {
           duracao_ms: number | null
           erro_msg: string | null
           id: string
-          nfseio_id: string | null
+          focus_ref: string | null
           operacao: string
           payload: Json | null
           resposta: Json | null
@@ -1963,7 +1963,7 @@ export type Database = {
           duracao_ms?: number | null
           erro_msg?: string | null
           id?: string
-          nfseio_id?: string | null
+          focus_ref?: string | null
           operacao: string
           payload?: Json | null
           resposta?: Json | null
@@ -1976,7 +1976,7 @@ export type Database = {
           duracao_ms?: number | null
           erro_msg?: string | null
           id?: string
-          nfseio_id?: string | null
+          focus_ref?: string | null
           operacao?: string
           payload?: Json | null
           resposta?: Json | null
@@ -1984,7 +1984,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "nfseio_log_cliente_id_fkey"
+            foreignKeyName: "focus_nfse_log_legacy_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"

@@ -1,6 +1,6 @@
 /**
  * Página /fiscal/nfse — NFS-e emitidas e recebidas
- * Integrada ao NFE.io via /api/nfse
+ * Integrada ao Focus NF-e via /api/nfse
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -123,7 +123,7 @@ function NfsePage() {
   }), [emitidas, recebidas]);
 
   async function handlePdf(nota: NfseEmitida) {
-    const b64 = await baixarPdf(nota.id, nota.nfseio_id);
+    const b64 = await baixarPdf(nota.id, nota.focus_ref);
     if (b64) downloadBlob(b64, `NFS-e_${nota.numero ?? nota.id}.pdf`, "application/pdf");
   }
 
@@ -196,7 +196,7 @@ function NfsePage() {
     { key: "data_emissao", header: "Emissão", width: 100, render: r => fmtDate(r.data_emissao) },
     { key: "valor_servico", header: "Valor", width: 120, render: r => fmtBRL(r.valor_servico) },
     { key: "fonte", header: "Fonte", width: 80, render: r => (
-      <InlineBadge color={(r as any).fonte === "nfeio" ? "blue" : "gray"}>{(r as any).fonte}</InlineBadge>
+      <InlineBadge color={(r as any).fonte === "focus" ? "blue" : "gray"}>{(r as any).fonte}</InlineBadge>
     )},
   ];
 

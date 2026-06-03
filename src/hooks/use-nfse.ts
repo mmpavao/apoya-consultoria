@@ -1,5 +1,5 @@
 /**
- * use-nfse — hook de NFS-e via NFE.io
+ * use-nfse — hook de NFS-e via Focus NF-e
  *
  * BUG-03 FIX: authHeader robusto
  * FIX-2026-05: REMOVIDO navigate() que causava redirect para dashboard
@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 // ── Tipos ──────────────────────────────────────────────────────────────────
 export interface NfseEmitida {
   id:               string;
-  nfseio_id?:       string;
+  focus_ref?:        string;
   empresa_id?:      string;
   numero?:          string;
   competencia?:     string;
@@ -190,7 +190,7 @@ export function useNfse() {
   }, [token]);
 
   // ── Baixar PDF ─────────────────────────────────────────────────────────
-  const baixarPdf = useCallback(async (notaId: string, nfseioId?: string): Promise<string | null> => {
+  const baixarPdf = useCallback(async (notaId: string, focusId?: string): Promise<string | null> => {
     if (!token) return null;
     const authHeader = buildAuthHeader(token);
     if (!authHeader) return null;

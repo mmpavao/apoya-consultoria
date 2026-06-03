@@ -45,7 +45,7 @@ function fromDb(row: Record<string, unknown>): Cliente {
     aliquotaIss:          row.aliquota_iss != null ? Number(row.aliquota_iss) : undefined,
     cpf:                  row.cpf as string | undefined,
     codigoMunicipioIbge:  row.codigo_municipio_ibge as string | undefined,
-    nfseioEmitenteId:     row.nfseio_emitente_id as string | undefined,
+    focusAmbiente:     row.focus_ambiente as string | undefined,
     // campos extras retornados mas não no tipo base — acessados via (cliente as any)
     ...(row.asaas_customer_id != null  ? { asaasId:         row.asaas_customer_id as string }  : {}),
     ...(row.tem_certificado    != null  ? { tem_certificado: Boolean(row.tem_certificado) }      : {}),
@@ -123,7 +123,7 @@ export function useClienteById(id: string) {
     }
     if (patch.aliquotaIss         !== undefined) dbPatch.aliquota_iss            = patch.aliquotaIss;
     if (patch.cpf                 !== undefined) dbPatch.cpf                     = patch.cpf;
-    if (patch.nfseioEmitenteId    !== undefined) dbPatch.nfseio_emitente_id      = patch.nfseioEmitenteId;
+    if (patch.focusAmbiente    !== undefined) dbPatch.focus_ambiente      = patch.focusAmbiente;
     if (patch.codigoMunicipioIbge !== undefined) dbPatch.codigo_municipio_ibge   = patch.codigoMunicipioIbge;
     if ((patch as any).tem_certificado !== undefined) dbPatch.tem_certificado = (patch as any).tem_certificado;
     if ((patch as any).tem_procuracao  !== undefined) dbPatch.tem_procuracao  = (patch as any).tem_procuracao;

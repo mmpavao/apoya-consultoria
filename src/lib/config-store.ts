@@ -11,7 +11,7 @@ export interface Usuario {
 }
 
 export interface Integracao {
-  id: "asaas" | "nfeio" | "evolution" | "serpro";
+  id: "asaas" | "focusnfe" | "evolution" | "serpro";
   nome: string;
   descricao: string;
   apiKey: string;
@@ -64,7 +64,7 @@ const SEED_USERS: Usuario[] = [
 
 const SEED_INT: Integracao[] = [
   { id: "asaas", nome: "Asaas", descricao: "Gateway de cobrança (PIX/boleto)", apiKey: "$aas_prod_••••••••••••3F8a", baseUrl: "https://api.asaas.com/v3", ativo: true, ultimaSync: "2026-05-20T08:14:00Z" },
-  { id: "nfeio", nome: "NFE.io", descricao: "Emissão de NFS-e", apiKey: "nfe_••••••••••••e21c", baseUrl: "https://api.nfe.io/v2", ativo: true, ultimaSync: "2026-05-20T07:55:00Z" },
+  { id: "focusnfe", nome: "Focus NF-e", descricao: "Emissão NFS-e, NF-e, NFC-e e documentos fiscais", apiKey: "••••••••••••", baseUrl: "https://api.focusnfe.com.br/v2", ativo: false, ultimaSync: null },
   { id: "evolution", nome: "Evolution API", descricao: "WhatsApp não-oficial", apiKey: "evo_••••••••••••91bd", baseUrl: "https://wa.apoya.com.br", ativo: true, ultimaSync: "2026-05-20T09:02:00Z" },
   { id: "serpro", nome: "SERPRO Gateway", descricao: "Consulta CNPJ + DAS Simples", apiKey: "srp_••••••••••••7c04", baseUrl: "https://serpro.apoya.com.br:4010", ativo: true, ultimaSync: "2026-05-20T09:10:00Z" },
 ];
