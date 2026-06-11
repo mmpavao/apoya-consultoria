@@ -19,8 +19,8 @@ import { TOOLS_WHATSAPP,   HANDLERS_WHATSAPP   } from "./tools/whatsapp.js";
 const MCP_PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = {
   name: "apoya-gestao-mcp",
-  version: "3.1.0",
-  description: "APOYA MCP Worker v3.1 (modular) — 80 tools, 10 domínios"
+  version: "3.1.1",
+  description: "APOYA MCP Worker v3.1.1 (modular) — 85 tools, F1.1 security fixes"
 };
 
 const CORS = {
@@ -152,7 +152,7 @@ export default {
           if (!handler)
             return mcpError(id, -32601, `Tool '${toolName}' não encontrada. Tools disponíveis: ${TOOLS.map(t => t.name).join(", ")}`);
           try {
-            const result = await handler(toolArgs, env);
+            const result = await handler(toolArgs, env, identity);
             return mcpResult(id, result);
           } catch (err) {
             return json({

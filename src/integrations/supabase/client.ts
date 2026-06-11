@@ -9,8 +9,11 @@ const SUPABASE_URL =
   "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined);
+
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error("[security] VITE_SUPABASE_PUBLISHABLE_KEY não configurado. Adicione ao .env (anon key do Supabase).");
+}
 
 function createSupabaseClient() {
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

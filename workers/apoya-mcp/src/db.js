@@ -1,24 +1,8 @@
-// src/db.js — Supabase REST helper + utils MCP
-// Fonte: worker.js v3.0 — extraído em refactor(mcp) 2026-06-11
-
-// APOYA MCP Worker v3.0 — Schema completo 2026-06-10
-// 83 tools | 32 tabelas | 8 Edge Functions | SERPRO + Focus + Asaas + Evolution
-const MCP_PROTOCOL_VERSION = "2024-11-05";
-const SERVER_INFO = {
-  name: "apoya-gestao-mcp",
-  version: "3.0.0",
-  description: "MCP APOYA Gestão — 83 tools, schema completo Jun/2026"
-};
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, mcp-session-id",
-  "Access-Control-Max-Age": "86400"
-};
+// src/db.js — Supabase REST helper + auth
+// security(F1.1) 2026-06-11 — validateApiKey retorna escopo_setores + ator_tipo derivado da chave
 
 const json = (data, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 
 const mcpError = (id, code, message) =>
   json({ jsonrpc: "2.0", id, error: { code, message } });
@@ -88,6 +72,22 @@ function sb(env) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
+// Retorna identity com campos derivados da API key — NUNCA do payload da chamada:
+// {
+//   agentName:      string  — nome do agente registrado (ex: "agente_fiscal")
+//   scopes:         string[] — escopos de tool (["*"] = master)
+//   escopo_setores: string[] — setores autorizados para escrita (["*"] = master)
+//   ator_tipo:      "agente" | "humano" — SEMPRE "agente" para chamadas MCP
+//   is_admin:       boolean — true só se scopes contém "admin"
+//   keyId:          string
+// }
+//
+// DECISÃO DE ARQUITETURA (F1.1):
+// Toda chamada via MCP é feita por um agente/serviço — portanto ator_tipo é
+// SEMPRE "agente", derivado da chave, nunca do payload. Aprovações humanas
+// em etapas requer_aprovacao=true são realizadas EXCLUSIVAMENTE pelo painel
+// web (sessão autenticada) ou por uma chave marcada com is_human_delegate=true
+// no cadastro da mcp_api_keys. Agentes não podem auto-declarar ator_tipo="humano".
 async function validateApiKey(authHeader, env) {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const raw = authHeader.slice(7).trim();
@@ -96,7 +96,7 @@ async function validateApiKey(authHeader, env) {
   const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
   const db = sb(env);
   const rows = await db.get("mcp_api_keys", {
-    select: "id,agent_name,scopes,is_active,expires_at",
+    select: "id,agent_name,scopes,is_active,expires_at,escopo_setores,is_human_delegate",
     key_hash: `eq.${hash}`
   });
   if (!Array.isArray(rows) || rows.length === 0) return null;
@@ -104,8 +104,24 @@ async function validateApiKey(authHeader, env) {
   if (!key.is_active) return null;
   if (key.expires_at && new Date(key.expires_at) < new Date()) return null;
   await db.patch("mcp_api_keys", `id=eq.${key.id}`, { last_used_at: new Date().toISOString() });
-  return { agentName: key.agent_name, scopes: key.scopes?.length ? key.scopes : ["*"], keyId: key.id };
-}
 
+  const scopes     = key.scopes?.length ? key.scopes : ["*"];
+  const escopoSet  = Array.isArray(key.escopo_setores) ? key.escopo_setores : ["*"];
+  // is_human_delegate: chave marcada explicitamente como representante de ação humana aprovada
+  // (ex: webhook de aprovação do painel web). Padrão = false.
+  const isHumanDelegate = key.is_human_delegate === true;
+
+  return {
+    agentName:       key.agent_name,
+    scopes,
+    escopo_setores:  escopoSet,
+    // ator_tipo derivado da chave — imutável pelo payload
+    ator_tipo:       isHumanDelegate ? "humano" : "agente",
+    // is_admin = scopes contém "admin" OU is_human_delegate (aprovação explícita)
+    is_admin:        scopes.includes("admin") || scopes.includes("*") && isHumanDelegate,
+    is_human_delegate: isHumanDelegate,
+    keyId:           key.id
+  };
+}
 
 export { sb, validateApiKey };

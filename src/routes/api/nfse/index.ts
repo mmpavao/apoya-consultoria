@@ -145,7 +145,7 @@ function err(msg: string, status = 400) {
 }
 
 async function getSupabaseUser(authHeader: string) {
-  const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+  const ANON = (typeof process !== "undefined" ? process.env?.SUPABASE_ANON_KEY : undefined) ?? (globalThis as any).__env__?.SUPABASE_ANON_KEY ?? (() => { throw new Error("[security] SUPABASE_ANON_KEY não configurado"); })();
   const token = authHeader.replace("Bearer ", "");
   const r = await fetch("https://ajaqbdsalxfgrwpjbtbn.supabase.co/auth/v1/user", {
     headers: { Authorization: `Bearer ${token}`, apikey: ANON },

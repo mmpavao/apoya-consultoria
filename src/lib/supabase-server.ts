@@ -3,7 +3,7 @@
  * 
  * No Cloudflare Workers com nodejs_compat_populate_process_env,
  * os secrets ficam disponíveis em process.env.
- * Fallback para a key hardcoded em caso de cold-start edge cases.
+ * NUNCA hardcode secrets. Configurar SUPABASE_SERVICE_ROLE_KEY no secret store.
  */
 
 const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
@@ -19,8 +19,10 @@ function getServiceRoleKey(): string {
   const fromGlobal = (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY;
   if (fromGlobal && fromGlobal.length > 20) return fromGlobal;
 
-  // 3. Fallback hardcoded (service_role key do projeto APOYA — só tem poder server-side)
-  return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTMwODMyMywiZXhwIjoyMDk0ODg0MzIzfQ.nCTertvc35fUqUYBWORTGFx5UT5MdpacW2tMP1jXYoI";
+  // 3. SEM FALLBACK HARDCODED — secret obrigatório no environment
+  // Configurar em: Cloudflare Workers → Settings → Variables & Secrets
+  // Chave: SUPABASE_SERVICE_ROLE_KEY
+  throw new Error("[security] SUPABASE_SERVICE_ROLE_KEY não configurado no environment. Configure o secret no Cloudflare Workers ou Supabase.");
 }
 
 export function getSupabaseServiceHeaders(): Record<string, string> {

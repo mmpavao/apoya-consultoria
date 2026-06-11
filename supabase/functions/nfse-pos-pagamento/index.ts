@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
 
   // Validar secret interno
   const secret = req.headers.get("x-apoya-secret");
-  if (secret !== (Deno.env.get("APOYA_INTERNAL_SECRET") ?? "apoya-nfse-2026")) {
+  if (secret !== (Deno.env.get("APOYA_INTERNAL_SECRET") ?? (() => { throw new Error("[security] APOYA_INTERNAL_SECRET não configurado. Configure o secret no Supabase Edge Functions."); })())) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
   }
 
