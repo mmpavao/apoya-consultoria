@@ -39,14 +39,24 @@ export const Route = createFileRoute("/api/wa/send")({
         catch { return json({ error: "Body inválido" }, 400); }
 
         const { instance_id, telefone, mensagem, cliente_id, tipo = "text" } = body;
-        if (!telefone || !mensagem) {
-          return json({ error: "telefone e mensagem são obrigatórios" }, 400);
+        if (!mensagem || (!telefone && !cliente_id)) {
+          return json({ error: "mensagem e (telefone ou cliente_id) são obrigatórios" }, 400);
         }
 
-        const phone = telefone.replace(/\D/g, "");
-        if (phone.length < 10) return json({ error: "Telefone inválido" }, 400);
-
         const db = supabaseAdmin as any;
+
+        // Resolve o telefone: usa o informado; se inválido e houver cliente_id,
+        // busca whatsapp/telefone do cadastro do cliente (anti "telefone=UUID").
+        let phone = (telefone ?? "").replace(/\D/g, "");
+        if (phone.length < 10 && cliente_id) {
+          const { data: cli } = await db.from("clientes")
+            .select("whatsapp,telefone").eq("id", cliente_id).maybeSingle();
+          const doCadastro = ((cli?.whatsapp || cli?.telefone) ?? "").replace(/\D/g, "");
+          if (doCadastro.length >= 10) phone = doCadastro;
+        }
+        if (phone.length < 10) {
+          return json({ error: "Telefone inválido ou cliente sem WhatsApp/telefone cadastrado" }, 400);
+        }
 
         // ── Buscar instância ativa ──────────────────────────────────────
         let instancia: { id: string; nome: string; evolution_apikey: string; status: string } | null = null;

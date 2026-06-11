@@ -85,14 +85,17 @@ function FinanceiroPage__Inner(){
   },[comp]);
   useEffect(()=>setSel(new Set()),[comp]);
 
+  // Aba "Cobranças" reflete o mês selecionado (competência). KPIs e a aba
+  // Inadimplência permanecem globais (visão acumulada de atraso/risco).
   const filtered = useMemo(()=>{
     const q=query.trim().toLowerCase();
     return items
+      .filter(c=>(c.competencia ?? "").startsWith(comp))
       .filter(c=>q?`${c.clienteNome} ${c.cnpj}`.toLowerCase().includes(q):true)
       .filter(c=>status==="todos"||c.status===status)
       .filter(c=>stage==="todos"||c.reguaStage===stage)
       .sort((a,b)=>b.diasAtraso-a.diasAtraso||a.clienteNome.localeCompare(b.clienteNome));
-  },[items,query,status,stage]);
+  },[items,query,status,stage,comp]);
 
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
@@ -161,7 +164,8 @@ function FinanceiroPage__Inner(){
         const res = await fetch("/api/wa/send", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-          body: JSON.stringify({ telefone: cob.clienteId, mensagem: msg, cliente_id: cob.clienteId }),
+          // telefone resolvido no backend a partir do cliente_id (cadastro)
+          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: cob.clienteId }),
         });
         const data = await res.json() as any;
         if (data.ok) enviadas++; else erros++;

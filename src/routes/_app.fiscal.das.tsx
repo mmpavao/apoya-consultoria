@@ -132,11 +132,41 @@ function DasPage() {
     }
   }
 
-  function enviarWhats() {
+  async function enviarWhats() {
     const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");
     if(!elig.length){ toast.error("Selecione DAS já geradas"); return; }
-    toast.info(`Envio WhatsApp disponível via integração Evolution API. (${elig.length} envios)`);
-    toast.success(`${elig.length} mensagem(ns) enviada(s)`);
+    setBusy(true);
+    toast.loading(`Enviando ${elig.length} DAS via WhatsApp…`, { id: "das-wpp" });
+    try {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", { id: "das-wpp" }); return; }
+      let enviadas = 0, erros = 0;
+      for (const g of elig) {
+        const nome = g.clienteNome.split(" ")[0];
+        const comp = g.competencia.split("-").reverse().join("/");
+        const msg =
+          `📄 Olá ${nome}! Segue o DAS da competência *${comp}*.\n` +
+          `💰 Valor: ${fmtBRL(g.valor)}\n` +
+          `📅 Vencimento: ${fmtDate(g.vencimento)}` +
+          (g.codigoBarras ? `\n🔢 Código de barras:\n${g.codigoBarras}` : "") +
+          (g.pdfUrl ? `\n🔗 Guia em PDF: ${g.pdfUrl}` : "");
+        const res = await fetch("/api/wa/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: g.clienteId }),
+        });
+        const data = await res.json().catch(() => ({})) as any;
+        if (data.ok) enviadas++; else erros++;
+      }
+      await refresh();
+      if (erros === 0) toast.success(`${enviadas} DAS enviado(s) por WhatsApp! 📱`, { id: "das-wpp" });
+      else toast.warning(`${enviadas} enviado(s) · ${erros} com erro (cliente sem WhatsApp?)`, { id: "das-wpp" });
+      setSel(new Set());
+    } catch (e: any) {
+      toast.error("Erro WhatsApp: " + (e?.message ?? "Tente novamente"), { id: "das-wpp" });
+    } finally {
+      setBusy(false);
+    }
   }
 
   const cols: ColDef<DasGuia>[] = [

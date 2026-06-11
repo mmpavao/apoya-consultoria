@@ -717,13 +717,16 @@ function ClienteDetailPage() {
               <Switch checked={form.temIncentivoFiscal ?? false} onCheckedChange={(v) => setForm(p => ({ ...p, temIncentivoFiscal: v }))} />
               <Label>Tem incentivo fiscal</Label>
             </div>
+            {/* Indicadores read-only: o valor real é derivado do upload do
+                certificado (aba Certificados) via trigger tg_sync_cert_flags.
+                Editar aqui não persiste — por isso desabilitado. */}
             <div className="flex items-center gap-3 pt-2">
-              <Switch checked={(form as any).tem_certificado ?? false} onCheckedChange={(v) => setForm((p: any) => ({ ...p, tem_certificado: v }))} />
-              <Label>Certificado Digital A1/A3</Label>
+              <Switch checked={(form as any).tem_certificado ?? false} disabled />
+              <Label className="text-muted-foreground">Certificado Digital A1/A3 <span className="text-xs">(gerenciado na aba Certificados)</span></Label>
             </div>
             <div className="flex items-center gap-3 pt-2">
-              <Switch checked={(form as any).tem_procuracao ?? false} onCheckedChange={(v) => setForm((p: any) => ({ ...p, tem_procuracao: v }))} />
-              <Label>Procuração eCAC cadastrada</Label>
+              <Switch checked={(form as any).tem_procuracao ?? false} disabled />
+              <Label className="text-muted-foreground">Procuração eCAC cadastrada <span className="text-xs">(gerenciado na aba Certificados)</span></Label>
             </div>
             <div className="space-y-1.5">
               <Label>Alíquota ISS (%)</Label>
