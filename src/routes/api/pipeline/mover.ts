@@ -20,6 +20,12 @@ function getMcpKey(): string {
   return g ?? "";
 }
 
+function getSvcKey(): string {
+  if (typeof process !== "undefined" && process.env?.SUPABASE_SERVICE_ROLE_KEY)
+    return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY ?? "";
+}
+
 const MCP_URL = "https://apoya-mcp.talkzzbot.workers.dev/mcp";
 const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
 
@@ -121,19 +127,30 @@ export const Route = createFileRoute("/api/pipeline/mover")({
         if (!tarefa_id) return json({ error: "tarefa_id obrigatorio" }, 400);
         if (!etapa_destino) return json({ error: "etapa_destino obrigatorio" }, 400);
 
-        // 2b. B2 isolamento (escrita) — o setor é lido da TAREFA REAL via MCP,
-        //     NUNCA do payload (anti-spoof). Sem isso, qualquer autenticado moveria
-        //     tarefa de qualquer setor. checkUserSetor: admin passa, senão precisa do setor.
-        try {
-          const tarefa = (await callMcp("tarefa_buscar", { id: tarefa_id })) as any;
-          const tSetor = Array.isArray(tarefa) ? tarefa[0]?.setor : tarefa?.setor;
-          if (tSetor && !(await checkUserSetor(userId, anonKey(), token, tSetor))) {
+        // 2b. B2 isolamento (escrita) — setor lido direto do Supabase (service role),
+        //     NUNCA do payload (anti-spoof). Fail-closed: qualquer falha → 403/50x.
+        {
+          const svcKey = getSvcKey();
+          let tSetor: string | undefined;
+          try {
+            const r = await fetch(
+              `${SUPA_URL}/rest/v1/tarefas?id=eq.${encodeURIComponent(tarefa_id)}&select=setor&limit=1`,
+              { headers: { apikey: svcKey, Authorization: `Bearer ${svcKey}` } }
+            );
+            if (!r.ok) return json({ error: "Falha ao validar tarefa" }, 502);
+            const rows = (await r.json()) as Array<{ setor?: string }>;
+            tSetor = rows[0]?.setor;
+          } catch (e) {
+            console.error("[/api/pipeline/mover supabase-setor]", e);
+            return json({ error: "Falha ao validar setor da tarefa" }, 502);
+          }
+          // Fail-closed: setor desconhecido (tarefa não existe) → negar
+          if (!tSetor) {
+            return json({ error: "Tarefa nao encontrada", code: "TAREFA_NAO_ENCONTRADA" }, 404);
+          }
+          if (!(await checkUserSetor(userId, anonKey(), token, tSetor))) {
             return json({ error: `Acesso negado ao setor: ${tSetor}`, code: "SETOR_NEGADO" }, 403);
           }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          console.error("[/api/pipeline/mover setor-check]", msg);
-          return json({ error: "Falha ao validar setor da tarefa" }, 502);
         }
 
         // 3. Chamar tarefa_mover_etapa no MCP com ator derivado da sessao
