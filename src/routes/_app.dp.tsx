@@ -31,11 +31,13 @@ function EmpresaRowStats({ empresaId }: { empresaId: string }) {
   );
 }
 
+// Chaveado pelos valores reais do enum Regime (use-clientes.ts)
 const REGIME_BADGE: Record<string, { label: string; cls: string }> = {
-  simples_nacional: { label: "Simples Nacional", cls: "bg-blue-100 text-blue-700" },
-  lucro_presumido:  { label: "Lucro Presumido",  cls: "bg-purple-100 text-purple-700" },
-  lucro_real:       { label: "Lucro Real",        cls: "bg-gray-100 text-gray-600" },
-  mei:              { label: "MEI",               cls: "bg-green-100 text-green-700" },
+  "Simples":          { label: "Simples Nacional", cls: "bg-blue-100 text-blue-700" },
+  "Lucro Presumido":  { label: "Lucro Presumido",  cls: "bg-purple-100 text-purple-700" },
+  "Lucro Real":       { label: "Lucro Real",        cls: "bg-gray-100 text-gray-600" },
+  "MEI":              { label: "MEI",               cls: "bg-green-100 text-green-700" },
+  "Doméstica":        { label: "Doméstica",         cls: "bg-pink-100 text-pink-700" },
 };
 
 function DpPage__Inner() {
@@ -135,7 +137,7 @@ function DpPage__Inner() {
                   <tr><td colSpan={6} className="text-center text-muted-foreground py-8 text-sm">Nenhuma empresa encontrada</td></tr>
                 )}
                 {empresasFiltradas.map(cliente => {
-                  const rb = REGIME_BADGE[cliente.regimeTributario ?? "simples_nacional"] ?? REGIME_BADGE["simples_nacional"];
+                  const rb = REGIME_BADGE[cliente.regime ?? "Simples"] ?? REGIME_BADGE["Simples"];
                   return (
                     <tr key={cliente.id}>
                       <td>

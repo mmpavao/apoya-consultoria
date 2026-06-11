@@ -111,7 +111,7 @@ export function useDashboard() {
         .from("das_guias")
         .select("status, vencimento")
         .in("status", ["pendente", "gerada", "enviada", "vencida"])
-        .throwOnError().then(r => r).catch(() => ({ data: [] })) as any;
+        .then(r => r, () => ({ data: [] })) as any;
 
       const dasArr       = (dasGuias ?? []) as any[];
       const dasEmAberto  = dasArr.filter(d => ["pendente","gerada","enviada"].includes(d.status)).length;
@@ -146,7 +146,7 @@ export function useDashboard() {
         .select("id", { count: "exact", head: true })
         .is("lida_em", null)
         .eq("direcao", "recebida")
-        .then(r => r).catch(() => ({ count: 0 }));
+        .then(r => r, () => ({ count: 0 }));
       const waNaoLidas = waNaoLidasResult.count;
 
       /* ── 6. NFS-e emitidas no mês ───────────────────────── */
@@ -155,7 +155,7 @@ export function useDashboard() {
         .select("id", { count: "exact", head: true })
         .eq("status", "emitida")
         .gte("created_at", `${mesAtual}-01`)
-        .then(r => r).catch(() => ({ count: 0 }));
+        .then(r => r, () => ({ count: 0 }));
       const nfseCount = nfseResult.count;
 
       /* ── 7. Honorários por mês (últimos 6) ──────────────── */
@@ -180,10 +180,10 @@ export function useDashboard() {
         .eq("ativo", true)
         .order("dia_vencimento", { ascending: true })
         .limit(5)
-        .then(r => r).catch(() => ({ data: [] }));
+        .then(r => r, () => ({ data: [] as any[] }));
       const calItems = calFiscalResult.data;
 
-      const calFiscal: CalFiscalItem[] = (calItems ?? []).map(item => {
+      const calFiscal: CalFiscalItem[] = (calItems ?? []).map((item: any) => {
         const mesRef  = item.mes_vencimento ?? (month + 1);
         const mesAbrev = MESES_ABREV[(mesRef - 1) % 12];
         const diaStr  = String(item.dia_vencimento ?? 20).padStart(2, "0");

@@ -5,9 +5,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
-  AlertCircle, CheckCircle2, Download, FileText, Loader2,
+  Download, FileText, Loader2,
   Plus, RefreshCw, Search, XCircle, FileCode2, Receipt,
-  Send, Trash2, ChevronDown,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,12 @@ function downloadText(content: string, filename: string) {
 function NfsePage() {
   const now = new Date();
   const { clientes } = useClientes();
-  const { loading, listarEmitidas, listarRecebidas, cancelar, baixarPdf, baixarXml, sincronizarRecebidas } = useNfse();
+  const { loading, listarEmitidas, listarRecebidas, cancelar, obterPdf, obterXml } = useNfse();
+
+  // ❄️ Focus NF-e CONGELADA (prefeitura de Caçapava, Erro 11). Emissão e
+  // sincronização de recebidas passam pela Focus → bloqueadas. Consulta,
+  // PDF e XML de notas já existentes continuam liberados. Reativar = false.
+  const FOCUS_CONGELADA = true;
 
   const [sub, setSub] = useState<"emitidas" | "recebidas">("emitidas");
   const [ano, setAno] = useState(now.getFullYear());
@@ -124,13 +129,14 @@ function NfsePage() {
 
   async function handlePdf(nota: NfseEmitida) {
     const pdfUrl = await obterPdf(nota.id);
-        if (pdfUrl) { window.open(pdfUrl, '_blank'); return; }
-    if (b64) downloadBlob(b64, `NFS-e_${nota.numero ?? nota.id}.pdf`, "application/pdf");
+    if (pdfUrl) window.open(pdfUrl, "_blank");
+    else toast.error("PDF indisponível para esta nota");
   }
 
   async function handleXml(nota: NfseEmitida) {
-    const xml = await baixarXml(nota.id);
+    const xml = await obterXml(nota.id);
     if (xml) downloadText(xml, `NFS-e_${nota.numero ?? nota.id}.xml`);
+    else toast.error("XML indisponível para esta nota");
   }
 
   async function handleCancelar(nota: NfseEmitida) {
@@ -139,15 +145,9 @@ function NfsePage() {
     if (ok) load();
   }
 
-  async function handleSincronizar() {
-    if (clienteFilter === "todos") {
-      toast.error("Selecione um cliente para sincronizar notas recebidas");
-      return;
-    }
-    const cli = clientes.find(c => c.id === clienteFilter);
-    if (!cli?.cnpj) { toast.error("Cliente sem CNPJ cadastrado"); return; }
-    await sincronizarRecebidas(clienteFilter, cli.cnpj);
-    load();
+  function handleSincronizar() {
+    // Sincronização de recebidas passa pela Focus NF-e (congelada).
+    toast.error("Sincronização via Focus NF-e temporariamente indisponível (pendência na prefeitura de Caçapava).");
   }
 
   // Colunas emitidas
@@ -205,7 +205,7 @@ function NfsePage() {
     <div className="space-y-5">
       <PageHeader
         title="NFS-e"
-        subtitle="Emissão e controle de Notas Fiscais de Serviço"
+        subtitle="Consulta e controle de Notas Fiscais de Serviço"
         actions={
           <div className="flex gap-2">
             <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={load} disabled={fetching}>
@@ -213,7 +213,10 @@ function NfsePage() {
               Atualizar
             </Button>
             <Button size="sm" className="h-8 gap-1.5"
+              disabled={FOCUS_CONGELADA}
+              title={FOCUS_CONGELADA ? "Emissão suspensa — Focus NF-e congelada (Caçapava)" : undefined}
               onClick={() => {
+                if (FOCUS_CONGELADA) return;
                 const cli = clienteFilter !== "todos" ? clientes.find(c => c.id === clienteFilter) ?? null : null;
                 setClienteSel(cli);
                 setDialogEmitir(true);
@@ -224,6 +227,13 @@ function NfsePage() {
           </div>
         }
       />
+
+      {FOCUS_CONGELADA && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center gap-2 text-sm text-amber-700">
+          <ShieldAlert className="h-4 w-4 shrink-0" />
+          Emissão e sincronização de NFS-e temporariamente suspensas (pendência junto à prefeitura de Caçapava). Consulta, PDF e XML de notas já emitidas continuam disponíveis.
+        </div>
+      )}
 
       {/* KPIs */}
       <KpiGrid cols={4}>
@@ -304,9 +314,11 @@ function NfsePage() {
               <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                 <FileText className="h-8 w-8 opacity-30" />
                 <p className="text-sm">Nenhuma NFS-e emitida em {MESES[mes - 1]}/{ano}</p>
-                <Button size="sm" className="mt-1" onClick={() => setDialogEmitir(true)}>
-                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Emitir primeira nota
-                </Button>
+                {!FOCUS_CONGELADA && (
+                  <Button size="sm" className="mt-1" onClick={() => setDialogEmitir(true)}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Emitir primeira nota
+                  </Button>
+                )}
               </div>
             }
           />

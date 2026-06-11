@@ -13,7 +13,7 @@ import {
   Calendar, CheckCircle2, Clock, CreditCard, DollarSign,
   Hash, Loader2, Search, TrendingUp, User, XCircle, ReceiptText,
   ArrowDownRight, ArrowUpRight, AlertCircle, Landmark, Wifi, WifiOff,
-  RefreshCw, Link,
+  RefreshCw, Link, FileText,
 } from "lucide-react";
 import { OpenFinanceDialog } from "@/components/open-finance";
 import { supabase } from "@/integrations/supabase/client";

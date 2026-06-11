@@ -230,7 +230,8 @@ function ModalServico({ servico, onClose }: { servico?: ServicoCatalogo; onClose
 
 /* ── Linha da tabela ────────────────────────────────────────────────────── */
 function ServicoRow({ s }: { s: ServicoCatalogo }) {
-  const { excluir, toggleAtivo } = useServicoCatalogo();
+  const { excluir, atualizar } = useServicoCatalogo();
+  const toggleAtivo = (id: string, ativo: boolean) => atualizar(id, { ativo });
   const [editing, setEditing] = useState(false);
 
   const catCls = CAT_CLS[s.categoria] ?? CAT_CLS.mensal;

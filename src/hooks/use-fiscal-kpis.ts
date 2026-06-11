@@ -40,6 +40,8 @@ export function useFiscalKpis() {
       const iso30d  = em30d.toISOString().split("T")[0];
 
       // Consultas em paralelo
+      // NB: nomes reais do schema — obrigacoes.vencimento (não data_vencimento),
+      // tabela das_guias (não das), validade em cliente_certificado.pfx_validade.
       const [
         { count: vencidas },
         { count: aVencer },
@@ -48,24 +50,25 @@ export function useFiscalKpis() {
       ] = await Promise.all([
         db.from("obrigacoes")
           .select("id", { count: "exact", head: true })
-          .lt("data_vencimento", iso)
+          .lt("vencimento", iso)
           .not("status", "in", '("concluida","cancelada")'),
 
         db.from("obrigacoes")
           .select("id", { count: "exact", head: true })
-          .gte("data_vencimento", iso)
-          .lte("data_vencimento", iso7d)
+          .gte("vencimento", iso)
+          .lte("vencimento", iso7d)
           .not("status", "in", '("concluida","cancelada")'),
 
-        db.from("das")
+        db.from("das_guias")
           .select("id", { count: "exact", head: true })
           .eq("status", "pendente"),
 
-        db.from("clientes")
+        // Certificados expirando nos próximos 30 dias (ainda válidos hoje)
+        db.from("cliente_certificado")
           .select("id", { count: "exact", head: true })
-          .not("certificado_vencimento", "is", null)
-          .lte("certificado_vencimento", iso30d)
-          .eq("ativo", true),
+          .not("pfx_validade", "is", null)
+          .gte("pfx_validade", iso)
+          .lte("pfx_validade", iso30d),
       ]);
 
       setKpis({

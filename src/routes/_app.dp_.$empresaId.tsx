@@ -35,11 +35,13 @@ const STATUS_BADGE: Record<StatusFunc, { label: string; cls: string }> = {
   demitido:  { label:"Demitido",  cls:"bg-red-100 text-red-700" },
 };
 
+// Chaveado pelos valores reais do enum Regime (use-clientes.ts)
 const REGIME_BADGE: Record<string, { label: string; cls: string }> = {
-  simples_nacional: { label:"Simples Nacional", cls:"bg-blue-100 text-blue-700" },
-  lucro_presumido:  { label:"Lucro Presumido",  cls:"bg-purple-100 text-purple-700" },
-  lucro_real:       { label:"Lucro Real",       cls:"bg-gray-100 text-gray-600" },
-  mei:              { label:"MEI",              cls:"bg-green-100 text-green-700" },
+  "Simples":          { label:"Simples Nacional", cls:"bg-blue-100 text-blue-700" },
+  "Lucro Presumido":  { label:"Lucro Presumido",  cls:"bg-purple-100 text-purple-700" },
+  "Lucro Real":       { label:"Lucro Real",       cls:"bg-gray-100 text-gray-600" },
+  "MEI":              { label:"MEI",              cls:"bg-green-100 text-green-700" },
+  "Doméstica":        { label:"Doméstica",        cls:"bg-pink-100 text-pink-700" },
 };
 
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
@@ -49,7 +51,7 @@ const maskCpf = (cpf: string) => cpf ? "***.***.***-**" : "—";
 function FuncionariosTab({
   empresaId, tab, setTab,
 }: { empresaId: string; tab: DpTab; setTab: (t: DpTab) => void }) {
-  const { funcionarios, loading, refetch } = useFuncionarios(empresaId);
+  const { funcionarios, loading, refresh } = useFuncionarios(empresaId);
   const [query, setQuery]       = useState("");
   const [filtro, setFiltro]     = useState<StatusFunc | "todos">("todos");
   const [formOpen, setFormOpen] = useState(false);
@@ -160,14 +162,14 @@ function FuncionariosTab({
       <FuncionarioFormDialog
         open={formOpen} onClose={handleFecharForm}
         empresaId={empresaId} funcionario={editFuncionario}
-        onSaved={refetch}
+        onSaved={refresh}
       />
       {demissaoFuncionario && (
         <DemissaoDialog
           open={!!demissaoFuncionario}
           onClose={() => setDemissaoFuncionario(null)}
           funcionario={demissaoFuncionario}
-          onDemitido={() => { refetch(); setTab("rescisoes"); }}
+          onDemitido={() => { refresh(); setTab("rescisoes"); }}
         />
       )}
     </div>
@@ -182,7 +184,7 @@ function DpEmpresaPage() {
   const [activeTab, setActiveTab] = useState<DpTab>("funcionarios");
 
   const cliente = clientes.find(c => c.id === empresaId);
-  const rb = REGIME_BADGE[cliente?.regimeTributario ?? "simples_nacional"] ?? REGIME_BADGE["simples_nacional"];
+  const rb = REGIME_BADGE[cliente?.regime ?? "Simples"] ?? REGIME_BADGE["Simples"];
 
   return (
     <div className="space-y-5 animate-fade-up p-6">
