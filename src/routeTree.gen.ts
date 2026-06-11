@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as LoginDevRouteImport } from './routes/login-dev'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
@@ -57,6 +58,11 @@ import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
 import { Route as ApiWebhooksPluggyIndexRouteImport } from './routes/api/webhooks/pluggy/index'
 import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
 
+const UnauthorizedRoute = UnauthorizedRouteImport.update({
+  id: '/unauthorized',
+  path: '/unauthorized',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginDevRoute = LoginDevRouteImport.update({
   id: '/login-dev',
   path: '/login-dev',
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/administracao': typeof AppAdministracaoRoute
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
@@ -346,6 +353,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/administracao': typeof AppAdministracaoRoute
   '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
@@ -396,6 +404,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/login-dev': typeof LoginDevRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/_app/administracao': typeof AppAdministracaoRoute
   '/_app/automacoes': typeof AppAutomacoesRoute
   '/_app/clientes': typeof AppClientesRoute
@@ -447,6 +456,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/login-dev'
+    | '/unauthorized'
     | '/administracao'
     | '/automacoes'
     | '/clientes'
@@ -494,6 +504,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/login-dev'
+    | '/unauthorized'
     | '/administracao'
     | '/automacoes'
     | '/clientes'
@@ -543,6 +554,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/login-dev'
+    | '/unauthorized'
     | '/_app/administracao'
     | '/_app/automacoes'
     | '/_app/clientes'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   LoginDevRoute: typeof LoginDevRoute
+  UnauthorizedRoute: typeof UnauthorizedRoute
   CheckoutIdRoute: typeof CheckoutIdRoute
   ApiAdminBloquearClienteRoute: typeof ApiAdminBloquearClienteRoute
   ApiAdminReguaConfigRoute: typeof ApiAdminReguaConfigRoute
@@ -620,6 +633,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unauthorized': {
+      id: '/unauthorized'
+      path: '/unauthorized'
+      fullPath: '/unauthorized'
+      preLoaderRoute: typeof UnauthorizedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login-dev': {
       id: '/login-dev'
       path: '/login-dev'
@@ -1006,6 +1026,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   LoginDevRoute: LoginDevRoute,
+  UnauthorizedRoute: UnauthorizedRoute,
   CheckoutIdRoute: CheckoutIdRoute,
   ApiAdminBloquearClienteRoute: ApiAdminBloquearClienteRoute,
   ApiAdminReguaConfigRoute: ApiAdminReguaConfigRoute,

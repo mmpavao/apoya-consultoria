@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectorGuard } from "@/components/SectorGuard";
 import { useState, useMemo } from "react";
 import { Plus, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ const fmtData = (iso?:string|null) => {
   return `${d}/${m}/${y}`;
 };
 
-function SocietarioPage() {
+function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
@@ -188,5 +189,13 @@ function SocietarioPage() {
       <NovoProcessoForm open={showNovo} onClose={()=>setShowNovo(false)}
         onSalvar={async(data)=>{await criarProcesso(data);}}/>
     </div>
+  );
+}
+
+function SocietarioPage() {
+  return (
+    <SectorGuard setor="societario">
+      <SocietarioPage__Inner />
+    </SectorGuard>
   );
 }

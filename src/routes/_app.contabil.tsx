@@ -4,6 +4,7 @@
  * Escopo: Simples Nacional apenas
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { SectorGuard } from "@/components/SectorGuard";
 import { useState, useEffect } from "react";
 import { BookOpen, AlertTriangle, CheckCircle2, Clock, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +38,7 @@ function mesAtual() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function ContabilPage() {
+function ContabilPage__Inner() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<ClienteContabil[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,5 +238,13 @@ function ContabilPage() {
         />
       )}
     </div>
+  );
+}
+
+function ContabilPage() {
+  return (
+    <SectorGuard setor="contabil">
+      <ContabilPage__Inner />
+    </SectorGuard>
   );
 }

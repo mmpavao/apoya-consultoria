@@ -1,4 +1,5 @@
 import { useCobrancas, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/hooks/use-cobrancas";
+import { SectorGuard } from "@/components/SectorGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -28,7 +29,7 @@ const RG_L: Record<ReguaStage, string>         = { ok:"Em dia", lembrete:"Lembre
 
 const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
-function FinanceiroPage(){
+function FinanceiroPage__Inner(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
@@ -541,5 +542,13 @@ function FinanceiroPage(){
         onSaved={() => { void refresh(); }}
       />
     </div>
+  );
+}
+
+function FinanceiroPage() {
+  return (
+    <SectorGuard setor="financeiro">
+      <FinanceiroPage__Inner />
+    </SectorGuard>
   );
 }

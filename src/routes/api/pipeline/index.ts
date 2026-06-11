@@ -69,6 +69,38 @@ async function callMcp(tool: string, args: unknown): Promise<unknown> {
   try { return JSON.parse(text.text); } catch { return text.text; }
 }
 
+
+/**
+ * Verifica se o usuário tem acesso ao setor pedido.
+ * Admin (role=admin) → sempre true.
+ * Outros → verifica user_setores.
+ */
+async function checkUserSetor(
+  userId: string,
+  anonKey: string,
+  userToken: string,
+  setor: string
+): Promise<boolean> {
+  // Verificar role admin
+  const roleResp = await fetch(
+    `${SUPA_URL}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=role&limit=1`,
+    { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
+  );
+  if (roleResp.ok) {
+    const roles = await roleResp.json() as Array<{ role: string }>;
+    if (roles.length > 0) return true; // é admin
+  }
+
+  // Verificar user_setores
+  const setorResp = await fetch(
+    `${SUPA_URL}/rest/v1/user_setores?user_id=eq.${userId}&setor_slug=eq.${setor}&select=setor_slug&limit=1`,
+    { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
+  );
+  if (!setorResp.ok) return false;
+  const rows = await setorResp.json() as Array<{ setor_slug: string }>;
+  return rows.length > 0;
+}
+
 export const Route = createFileRoute("/api/pipeline/")({
   server: {
     handlers: {
@@ -79,6 +111,17 @@ export const Route = createFileRoute("/api/pipeline/")({
         const url = new URL(request.url);
         const setor = url.searchParams.get("setor") ?? "fiscal";
         const clienteId = url.searchParams.get("cliente_id");
+
+        // B2: Guard — 403 se o usuário não tem o setor pedido
+        const anonKey =
+          (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+          (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+        const userToken = request.headers.get("authorization")!.slice(7).trim();
+        const hasSetor = await checkUserSetor(auth.userId, anonKey, userToken, setor);
+        if (!hasSetor) {
+          return json({ error: "Acesso negado ao setor: " + setor, code: "SETOR_NEGADO" }, 403);
+        }
 
         try {
           const args: Record<string, string> = { setor };

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { SectorGuard } from "@/components/SectorGuard";
 import { useState, useMemo } from "react";
 import { Plus, Users, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ const REGIME_BADGE: Record<string, { label: string; cls: string }> = {
   mei:              { label:"MEI",              cls:"bg-green-100 text-green-700" },
 };
 
-function DpPage() {
+function DpPage__Inner() {
   const navigate  = useNavigate();
   const { clientes, loading } = useClientes();
   const { funcionarios: todosFuncionarios } = useFuncionarios();
@@ -169,5 +170,13 @@ function DpPage() {
         />
       )}
     </div>
+  );
+}
+
+function DpPage() {
+  return (
+    <SectorGuard setor="dp">
+      <DpPage__Inner />
+    </SectorGuard>
   );
 }

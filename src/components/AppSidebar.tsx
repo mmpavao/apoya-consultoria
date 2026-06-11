@@ -1,3 +1,10 @@
+/**
+ * AppSidebar.tsx
+ *
+ * B2: itens de DEPARTAMENTOS filtrados pelos setores do usuário logado.
+ * Se o usuário não tem o setor → item some do menu.
+ * Dashboard, Workflows e ítens de GESTÃO/FERRAMENTAS são visíveis a todos.
+ */
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Shield,
@@ -18,46 +25,55 @@ import {
   Bot,
   UserRoundSearch,
   Landmark,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUserSetores } from "@/hooks/use-user-setores";
 
 type NavItem =
-  | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; separator?: never; group?: never }
-  | { separator: true; to?: never; label?: never; icon?: never; exact?: never; group?: never }
-  | { group: string; to?: never; label?: never; icon?: never; exact?: never; separator?: never };
+  | { to: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; exact?: boolean; setor?: string; separator?: never; group?: never }
+  | { separator: true; to?: never; label?: never; icon?: never; exact?: never; setor?: never; group?: never }
+  | { group: string; to?: never; label?: never; icon?: never; exact?: never; setor?: never; separator?: never };
 
-const items: NavItem[] = [
+// ─── Itens SEMPRE visíveis (sem setor) ────────────────────────────────────────
+const GESTAO_ITEMS: NavItem[] = [
   { group: "GESTÃO" },
   { to: "/",           label: "Dashboard",    icon: LayoutDashboard, exact: true },
-  { to: "/clientes",   label: "Clientes",     icon: Building2 },
-  { to: "/crm",        label: "CRM",          icon: UserRoundSearch },
+  { to: "/clientes",   label: "Clientes",     icon: Building2,       setor: "clientes" },
+  { to: "/crm",        label: "CRM",          icon: UserRoundSearch, setor: "clientes" },
+];
 
+const OPERACIONAL_ITEMS: NavItem[] = [
   { group: "OPERACIONAL" },
-  { to: "/obrigacoes", label: "Obrigações",   icon: Calendar },
-  { to: "/workflows",  label: "Workflows",    icon: Workflow },
-  { to: "/societario", label: "Societário",   icon: Landmark },
+  { to: "/obrigacoes", label: "Obrigações",   icon: Calendar,        setor: "obrigacoes" },
+  { to: "/workflows",  label: "Workflows",    icon: Workflow },   // sempre visível (B2 spec)
+  { to: "/societario", label: "Societário",   icon: Landmark,        setor: "societario" },
+];
 
+// ─── DEPARTAMENTOS: cada item tem setor obrigatório ───────────────────────────
+const DEPT_ITEMS: NavItem[] = [
   { group: "DEPARTAMENTOS" },
-  { to: "/fiscal", label: "Fiscal",       icon: Receipt },
-  { to: "/dp",         label: "Dep. Pessoal", icon: Users2 },
-  { to: "/contabil",   label: "Contábil",     icon: BookOpen },
-  { to: "/financeiro", label: "Financeiro",   icon: DollarSign },
+  { to: "/fiscal",     label: "Fiscal",       icon: Receipt,     setor: "fiscal" },
+  { to: "/dp",         label: "Dep. Pessoal", icon: Users2,      setor: "dp" },
+  { to: "/contabil",   label: "Contábil",     icon: BookOpen,    setor: "contabil" },
+  { to: "/financeiro", label: "Financeiro",   icon: DollarSign,  setor: "financeiro" },
+];
 
+const FERRAMENTAS_ITEMS: NavItem[] = [
   { group: "FERRAMENTAS" },
   { to: "/documentos", label: "Documentos",   icon: FolderOpen },
-  { to: "/whatsapp",   label: "WhatsApp",     icon: MessageSquare },
+  { to: "/whatsapp",   label: "WhatsApp",     icon: MessageSquare, setor: "whatsapp" },
   { to: "/automacoes", label: "Automações",   icon: Bot },
 ];
 
-const bottom: NavItem[] = [
-  { to: "/administracao", label: "Administração",  icon: Shield },
+const BOTTOM_ITEMS: NavItem[] = [
+  { to: "/administracao", label: "Administração", icon: Shield },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {
   if (item.separator || "group" in item) return false;
   if (item.exact) return pathname === item.to;
-  
   return pathname.startsWith(item.to);
 }
 
@@ -99,6 +115,68 @@ function NavLine({
   );
 }
 
+function renderSection(
+  items: NavItem[],
+  pathname: string,
+  collapsed: boolean,
+  onNavigate?: () => void,
+  inSetor?: (slug: string) => boolean,
+  firstGroup?: boolean
+): React.ReactNode[] {
+  const rendered: React.ReactNode[] = [];
+  let isFirst = firstGroup ?? true;
+
+  // Calcular se a seção tem algum item visível (além do group header)
+  const visibleItems = items.filter((it) => {
+    if ("group" in it || it.separator) return false;
+    if ("setor" in it && it.setor && inSetor) return inSetor(it.setor);
+    return true;
+  });
+
+  for (const it of items) {
+    if ("group" in it && it.group) {
+      // Não renderizar o header do grupo se não há itens visíveis no grupo
+      if (visibleItems.length === 0) continue;
+
+      if (!collapsed) {
+        rendered.push(
+          <p
+            key={`grp-${it.group}`}
+            className={cn(
+              "px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/35 mb-1",
+              isFirst ? "mt-0" : "mt-4"
+            )}
+          >
+            {it.group}
+          </p>
+        );
+      } else {
+        if (!isFirst) {
+          rendered.push(
+            <div key={`grp-sep-${it.group}`} className="my-2 h-px w-6 bg-sidebar-foreground/10 mx-auto" />
+          );
+        }
+      }
+      isFirst = false;
+    } else if ("to" in it) {
+      // Filtrar por setor se necessário
+      if ("setor" in it && it.setor && inSetor && !inSetor(it.setor)) continue;
+
+      rendered.push(
+        <NavLine
+          key={it.to}
+          item={it as Extract<NavItem, { to: string }>}
+          active={isActive(pathname, it)}
+          collapsed={collapsed}
+          onClick={onNavigate}
+        />
+      );
+    }
+  }
+
+  return rendered;
+}
+
 export function AppSidebar({
   collapsed = false,
   onToggleCollapse,
@@ -111,48 +189,14 @@ export function AppSidebar({
   onLogout?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { loading, inSetor } = useUserSetores();
 
-  function renderNav(): React.ReactNode[] {
-    const rendered: React.ReactNode[] = [];
-    let firstGroup = true;
-
-    for (const it of items) {
-      if ("group" in it && it.group) {
-        if (!collapsed) {
-          rendered.push(
-            <p
-              key={`grp-${it.group}`}
-              className={cn(
-                "px-3 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/35 mb-1",
-                firstGroup ? "mt-0" : "mt-4"
-              )}
-            >
-              {it.group}
-            </p>
-          );
-        } else {
-          if (!firstGroup) {
-            rendered.push(
-              <div key={`grp-sep-${it.group}`} className="my-2 h-px w-6 bg-sidebar-foreground/10 mx-auto" />
-            );
-          }
-        }
-        firstGroup = false;
-      } else if ("to" in it) {
-        rendered.push(
-          <NavLine
-            key={it.to}
-            item={it as Extract<NavItem, { to: string }>}
-            active={isActive(pathname, it)}
-            collapsed={collapsed}
-            onClick={onNavigate}
-          />
-        );
-      }
-    }
-
-    return rendered;
-  }
+  const allSections = [
+    ...GESTAO_ITEMS,
+    ...OPERACIONAL_ITEMS,
+    ...DEPT_ITEMS,
+    ...FERRAMENTAS_ITEMS,
+  ];
 
   return (
     <div
@@ -203,27 +247,49 @@ export function AppSidebar({
         )}
       </div>
 
-      {/* Nav scrollável — min-h-0 é crítico para overflow funcionar em flex */}
+      {/* Nav scrollável */}
       <nav
         className={cn(
           "sidebar-nav flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5",
           collapsed ? "items-center" : "items-stretch"
         )}
       >
-        {renderNav()}
+        {loading ? (
+          /* Skeleton enquanto carrega permissões */
+          <div className="flex flex-col gap-1.5 px-2 pt-1">
+            {[...Array(7)].map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-9 rounded-xl bg-sidebar-foreground/10 animate-pulse",
+                  collapsed ? "w-9" : "w-full"
+                )}
+              />
+            ))}
+          </div>
+        ) : (
+          renderSection(
+            allSections,
+            pathname,
+            collapsed,
+            onNavigate,
+            inSetor,
+            true
+          )
+        )}
       </nav>
 
-      {/* Footer fixo — nunca é cortado */}
+      {/* Footer fixo */}
       <div
         className={cn(
           "mt-3 shrink-0 flex flex-col gap-1 border-t border-sidebar-foreground/10 pt-3",
           collapsed ? "items-center" : "items-stretch"
         )}
       >
-        {bottom.map((it) => (
+        {BOTTOM_ITEMS.map((it) => (
           <NavLine
             key={it.to}
-            item={it}
+            item={it as Extract<NavItem, { to: string }>}
             active={isActive(pathname, it)}
             collapsed={collapsed}
             onClick={onNavigate}

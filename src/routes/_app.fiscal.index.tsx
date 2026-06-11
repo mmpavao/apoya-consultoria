@@ -10,6 +10,7 @@
  * B2: isolamento de permissao (user_setor_permissoes) sera aplicado aqui.
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SectorGuard } from "@/components/SectorGuard";
 import { useState } from "react";
 import {
   AlertTriangle, Calendar, FileText, ShieldAlert,
@@ -122,7 +123,7 @@ function TabLink({ to, label, icon: Icon, desc }: { to: string; label: string; i
 
 // ── Modulo Principal ──────────────────────────────────────────────────────────
 
-function FiscalModulo() {
+function FiscalModulo__Inner() {
   const { roles } = useAuth();
   const { kpis, loading: kpisLoading, error: kpisError, refetch } = useFiscalKpis();
 
@@ -250,5 +251,13 @@ function FiscalModulo() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function FiscalModulo() {
+  return (
+    <SectorGuard setor="fiscal">
+      <FiscalModulo__Inner />
+    </SectorGuard>
   );
 }
