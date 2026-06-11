@@ -1,5 +1,7 @@
 // tools/admin.js — Admin, usuários, configurações, auditoria, MCP keys
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_ADMIN = [
   {
@@ -115,102 +117,96 @@ export const TOOLS_ADMIN = [
 ];
 
 export const HANDLERS_ADMIN = {
+
   async usuario_buscar(args, env) {
-    const db = sb(env);
-    const isEmail = args.identificador.includes("@");
-    const filter = isEmail ? { email: `eq.${args.identificador}` } : { id: `eq.${args.identificador}` };
-    const rows = await db.get("profiles", { select: "*", ...filter });
-    return Array.isArray(rows) ? rows[0] || { error: "Usuário não encontrado" } : rows;
-  },
+      const db = sb(env);
+      const isEmail = args.identificador.includes("@");
+      const filter = isEmail ? { email: `eq.${args.identificador}` } : { id: `eq.${args.identificador}` };
+      const rows = await db.get("profiles", { select: "*", ...filter });
+      return Array.isArray(rows) ? rows[0] || { error: "Usuário não encontrado" } : rows;
+    },
 
   async usuarios_listar(args, env) {
-    return sb(env).get("profiles", { select: "id,nome,email,avatar_url,cliente_id,created_at", limit: args.limit || 50 });
-  },
+      return sb(env).get("profiles", { select: "id,nome,email,avatar_url,cliente_id,created_at", limit: args.limit || 50 });
+    },
 
   async usuario_role_atualizar(args, env) {
-    const existing = await sb(env).get("user_roles", { user_id: `eq.${args.user_id}` });
-    if (Array.isArray(existing) && existing.length > 0) {
-      return sb(env).patch("user_roles", `user_id=eq.${args.user_id}`, { role: args.role });
-    }
-    return sb(env).post("user_roles", { user_id: args.user_id, role: args.role });
-  },
+      const existing = await sb(env).get("user_roles", { user_id: `eq.${args.user_id}` });
+      if (Array.isArray(existing) && existing.length > 0) {
+        return sb(env).patch("user_roles", `user_id=eq.${args.user_id}`, { role: args.role });
+      }
+      return sb(env).post("user_roles", { user_id: args.user_id, role: args.role });
+    },
 
   async permissoes_listar(args, env) {
-    return sb(env).get("permissoes", { select: "*", order: "slug.asc" });
-  },
-
-  // TAREFAS,
+      return sb(env).get("permissoes", { select: "*", order: "slug.asc" });
+    },
 
   async convites_listar(args, env) {
-    return sb(env).get("convites", { select: "*", order: "criado_em.desc", limit: args.limit || 50 });
-  },
+      return sb(env).get("convites", { select: "*", order: "criado_em.desc", limit: args.limit || 50 });
+    },
 
   async mcp_api_key_criar(args, env) {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(args.raw_key));
-    const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-    return sb(env).post("mcp_api_keys", {
-      agent_name: args.agent_name,
-      key_hash: hash,
-      description: args.description || "",
-      scopes: args.scopes || ["*"],
-      is_active: true,
-      expires_at: args.expires_at || null,
-      created_at: new Date().toISOString()
-    });
-  },
-
-  // UTILITÁRIOS,
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(args.raw_key));
+      const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+      return sb(env).post("mcp_api_keys", {
+        agent_name: args.agent_name,
+        key_hash: hash,
+        description: args.description || "",
+        scopes: args.scopes || ["*"],
+        is_active: true,
+        expires_at: args.expires_at || null,
+        created_at: new Date().toISOString()
+      });
+    },
 
   async mcp_api_keys_listar(args, env) {
-    return sb(env).get("mcp_api_keys", { select: "id,agent_name,description,scopes,is_active,last_used_at,created_at,expires_at", order: "created_at.desc" });
-  },
+      return sb(env).get("mcp_api_keys", { select: "id,agent_name,description,scopes,is_active,last_used_at,created_at,expires_at", order: "created_at.desc" });
+    },
 
   async audit_log_listar(args, env) {
-    const p = { select: "*", order: "created_at.desc", limit: args.limit || 100 };
-    if (args.entidade) p["entidade"] = `eq.${args.entidade}`;
-    if (args.user_id) p["user_id"] = `eq.${args.user_id}`;
-    return sb(env).get("audit_log", p);
-  },
+      const p = { select: "*", order: "created_at.desc", limit: args.limit || 100 };
+      if (args.entidade) p["entidade"] = `eq.${args.entidade}`;
+      if (args.user_id) p["user_id"] = `eq.${args.user_id}`;
+      return sb(env).get("audit_log", p);
+    },
 
   async automacoes_listar(args, env) {
-    const p = { select: "id,nome,descricao,tipo_gatilho,status,ultima_execucao,proxima_execucao,total_execucoes,created_at", order: "nome.asc", limit: args.limit || 50 };
-    if (args.status) p["status"] = `eq.${args.status}`;
-    return sb(env).get("automacoes_config", p);
-  },
+      const p = { select: "id,nome,descricao,tipo_gatilho,status,ultima_execucao,proxima_execucao,total_execucoes,created_at", order: "nome.asc", limit: args.limit || 50 };
+      if (args.status) p["status"] = `eq.${args.status}`;
+      return sb(env).get("automacoes_config", p);
+    },
 
   async escritorio_config_buscar(args, env) {
-    const rows = await sb(env).get("escritorio_config", { select: "id,razao_social,nome_fantasia,cnpj,crc,email,telefone,whatsapp,dias_suspensao,dia_cobranca,template_wa_das,template_wa_nfse,template_wa_cobranca,municipio,uf,inscricao_municipal,focus_ambiente", limit: 1 });
-    return Array.isArray(rows) ? rows[0] || {} : rows;
-  },
+      const rows = await sb(env).get("escritorio_config", { select: "id,razao_social,nome_fantasia,cnpj,crc,email,telefone,whatsapp,dias_suspensao,dia_cobranca,template_wa_das,template_wa_nfse,template_wa_cobranca,municipio,uf,inscricao_municipal,focus_ambiente", limit: 1 });
+      return Array.isArray(rows) ? rows[0] || {} : rows;
+    },
 
   async escritorio_config_atualizar(args, env) {
-    const { id, ...data } = args;
-    return sb(env).patch("escritorio_config", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
-  },
+      const { id, ...data } = args;
+      return sb(env).patch("escritorio_config", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    },
 
   async integracao_config_listar(args, env) {
-    return sb(env).get("integracao_config", { select: "id,tipo,ativa,updated_at" });
-  },
+      return sb(env).get("integracao_config", { select: "id,tipo,ativa,updated_at" });
+    },
 
   async sistema_saude(args, env) {
-    const db = sb(env);
-    const [clientes, obrigVencidas, cobrancasAtraso, tarefasCriticas] = await Promise.all([
-      db.get("clientes", { select: "id", status: "eq.ativo" }),
-      db.get("obrigacoes", { select: "id", status: "eq.pendente", vencimento: `lt.${new Date().toISOString().slice(0, 10)}` }),
-      db.get("cobrancas", { select: "id,valor", status: "eq.atrasado" }),
-      db.get("tarefas", { select: "id", sla_status: "eq.atrasado" })
-    ]);
-    return {
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      clientes_ativos: Array.isArray(clientes) ? clientes.length : "?",
-      obrigacoes_vencidas: Array.isArray(obrigVencidas) ? obrigVencidas.length : "?",
-      cobrancas_atrasadas: Array.isArray(cobrancasAtraso) ? cobrancasAtraso.length : "?",
-      tarefas_sla_atrasado: Array.isArray(tarefasCriticas) ? tarefasCriticas.length : "?"
-    };
-  }
-};
-
-// ── FETCH HANDLER ─────────────────────────────────────────────────────────────,
+      const db = sb(env);
+      const [clientes, obrigVencidas, cobrancasAtraso, tarefasCriticas] = await Promise.all([
+        db.get("clientes", { select: "id", status: "eq.ativo" }),
+        db.get("obrigacoes", { select: "id", status: "eq.pendente", vencimento: `lt.${new Date().toISOString().slice(0, 10)}` }),
+        db.get("cobrancas", { select: "id,valor", status: "eq.atrasado" }),
+        db.get("tarefas", { select: "id", sla_status: "eq.atrasado" })
+      ]);
+      return {
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        clientes_ativos: Array.isArray(clientes) ? clientes.length : "?",
+        obrigacoes_vencidas: Array.isArray(obrigVencidas) ? obrigVencidas.length : "?",
+        cobrancas_atrasadas: Array.isArray(cobrancasAtraso) ? cobrancasAtraso.length : "?",
+        tarefas_sla_atrasado: Array.isArray(tarefasCriticas) ? tarefasCriticas.length : "?"
+      };
+    },
 
 };

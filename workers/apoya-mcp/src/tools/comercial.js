@@ -1,5 +1,7 @@
 // tools/comercial.js — Leads, processos societários
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_COMERCIAL = [
   {
@@ -91,38 +93,35 @@ export const TOOLS_COMERCIAL = [
 ];
 
 export const HANDLERS_COMERCIAL = {
+
   async lead_criar(args, env) {
-    return sb(env).post("leads_crm", { ...args, created_at: new Date().toISOString() });
-  },
+      return sb(env).post("leads_crm", { ...args, created_at: new Date().toISOString() });
+    },
 
   async lead_atualizar(args, env) {
-    const { id, ...data } = args;
-    return sb(env).patch("leads_crm", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
-  },
-
-  // AUTOMAÇÕES / LOGS,
+      const { id, ...data } = args;
+      return sb(env).patch("leads_crm", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    },
 
   async leads_listar(args, env) {
-    const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.etapa) p["etapa"] = `eq.${args.etapa}`;
-    if (args.temperatura) p["temperatura"] = `eq.${args.temperatura}`;
-    if (args.responsavel) p["responsavel"] = `eq.${args.responsavel}`;
-    return sb(env).get("leads_crm", p);
-  },
+      const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.etapa) p["etapa"] = `eq.${args.etapa}`;
+      if (args.temperatura) p["temperatura"] = `eq.${args.temperatura}`;
+      if (args.responsavel) p["responsavel"] = `eq.${args.responsavel}`;
+      return sb(env).get("leads_crm", p);
+    },
 
   async processo_societario_criar(args, env) {
-    return sb(env).post("processos_societarios", { ...args, status: "ativo", created_at: new Date().toISOString() });
-  },
-
-  // CRM,
+      return sb(env).post("processos_societarios", { ...args, status: "ativo", created_at: new Date().toISOString() });
+    },
 
   async processos_societarios_listar(args, env) {
-    const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.fase) p["fase"] = `eq.${args.fase}`;
-    if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    return sb(env).get("processos_societarios", p);
-  },
+      const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.fase) p["fase"] = `eq.${args.fase}`;
+      if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      return sb(env).get("processos_societarios", p);
+    },
 
 };

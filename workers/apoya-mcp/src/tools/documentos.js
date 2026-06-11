@@ -1,5 +1,7 @@
 // tools/documentos.js — Documentos, pastas, arquivos
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_DOCUMENTOS = [
   {
@@ -39,22 +41,21 @@ export const TOOLS_DOCUMENTOS = [
 ];
 
 export const HANDLERS_DOCUMENTOS = {
+
   async documentos_listar(args, env) {
-    const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.cliente_id) p["client_id"] = `eq.${args.cliente_id}`;
-    if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    return sb(env).get("documentos", p);
-  },
+      const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.cliente_id) p["client_id"] = `eq.${args.cliente_id}`;
+      if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      return sb(env).get("documentos", p);
+    },
 
   async documento_pastas_listar(args, env) {
-    return sb(env).get("documento_pasta", { cliente_id: `eq.${args.cliente_id}`, select: "*", order: "ordem.asc" });
-  },
+      return sb(env).get("documento_pasta", { cliente_id: `eq.${args.cliente_id}`, select: "*", order: "ordem.asc" });
+    },
 
   async documento_arquivos_listar(args, env) {
-    return sb(env).get("documento_arquivo", { pasta_id: `eq.${args.pasta_id}`, select: "*", order: "created_at.desc", limit: args.limit || 50 });
-  },
-
-  // CONTRATOS,
+      return sb(env).get("documento_arquivo", { pasta_id: `eq.${args.pasta_id}`, select: "*", order: "created_at.desc", limit: args.limit || 50 });
+    },
 
 };

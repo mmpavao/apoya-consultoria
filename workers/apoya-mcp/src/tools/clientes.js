@@ -1,5 +1,7 @@
 // tools/clientes.js — Clientes, contratos, sócios, setores
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_CLIENTES = [
   {
@@ -175,77 +177,74 @@ export const TOOLS_CLIENTES = [
 ];
 
 export const HANDLERS_CLIENTES = {
+
   async cliente_buscar(args, env) {
-    const db = sb(env);
-    const id = args.identificador.replace(/\D/g, "");
-    const isCNPJ = id.length === 14;
-    const filter = isCNPJ ? { cnpj: `eq.${id}` } : { id: `eq.${args.identificador}` };
-    const rows = await db.get("clientes", { select: "*", ...filter });
-    return Array.isArray(rows) ? rows[0] || { error: "Cliente não encontrado" } : rows;
-  },
+      const db = sb(env);
+      const id = args.identificador.replace(/\D/g, "");
+      const isCNPJ = id.length === 14;
+      const filter = isCNPJ ? { cnpj: `eq.${id}` } : { id: `eq.${args.identificador}` };
+      const rows = await db.get("clientes", { select: "*", ...filter });
+      return Array.isArray(rows) ? rows[0] || { error: "Cliente não encontrado" } : rows;
+    },
 
   async cliente_criar(args, env) {
-    const db = sb(env);
-    const cnpj = args.cnpj.replace(/\D/g, "");
-    return db.post("clientes", { ...args, cnpj, created_at: new Date().toISOString() });
-  },
+      const db = sb(env);
+      const cnpj = args.cnpj.replace(/\D/g, "");
+      return db.post("clientes", { ...args, cnpj, created_at: new Date().toISOString() });
+    },
 
   async cliente_atualizar(args, env) {
-    const db = sb(env);
-    const { id, ...data } = args;
-    return db.patch("clientes", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
-  },
+      const db = sb(env);
+      const { id, ...data } = args;
+      return db.patch("clientes", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    },
 
   async clientes_listar(args, env) {
-    const db = sb(env);
-    const p = { select: "id,razao_social,nome_fantasia,cnpj,regime,status,responsavel,email,telefone,whatsapp,valor_honorario,dia_vencimento,tem_certificado,bloqueado,asaas_customer_id,created_at", order: "razao_social.asc", limit: args.limit || 20, offset: args.offset || 0 };
-    if (args.regime) p["regime"] = `eq.${args.regime}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    if (args.responsavel_id) p["responsavel_id"] = `eq.${args.responsavel_id}`;
-    if (args.bloqueado !== undefined) p["bloqueado"] = `eq.${args.bloqueado}`;
-    if (args.search) p["razao_social"] = `ilike.*${args.search}*`;
-    return db.get("clientes", p);
-  },
+      const db = sb(env);
+      const p = { select: "id,razao_social,nome_fantasia,cnpj,regime,status,responsavel,email,telefone,whatsapp,valor_honorario,dia_vencimento,tem_certificado,bloqueado,asaas_customer_id,created_at", order: "razao_social.asc", limit: args.limit || 20, offset: args.offset || 0 };
+      if (args.regime) p["regime"] = `eq.${args.regime}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      if (args.responsavel_id) p["responsavel_id"] = `eq.${args.responsavel_id}`;
+      if (args.bloqueado !== undefined) p["bloqueado"] = `eq.${args.bloqueado}`;
+      if (args.search) p["razao_social"] = `ilike.*${args.search}*`;
+      return db.get("clientes", p);
+    },
 
   async cliente_socios_listar(args, env) {
-    return sb(env).get("cliente_socio", { cliente_id: `eq.${args.cliente_id}`, order: "created_at.asc" });
-  },
+      return sb(env).get("cliente_socio", { cliente_id: `eq.${args.cliente_id}`, order: "created_at.asc" });
+    },
 
   async cliente_socio_criar(args, env) {
-    return sb(env).post("cliente_socio", { ...args, created_at: new Date().toISOString() });
-  },
+      return sb(env).post("cliente_socio", { ...args, created_at: new Date().toISOString() });
+    },
 
   async cliente_servicos_listar(args, env) {
-    return sb(env).get("cliente_servico", { cliente_id: `eq.${args.cliente_id}`, select: "*", order: "created_at.desc" });
-  },
+      return sb(env).get("cliente_servico", { cliente_id: `eq.${args.cliente_id}`, select: "*", order: "created_at.desc" });
+    },
 
   async cliente_bloqueios_listar(args, env) {
-    return sb(env).get("cliente_bloqueio", { cliente_id: `eq.${args.cliente_id}`, order: "created_at.desc" });
-  },
-
-  // USUÁRIOS,
+      return sb(env).get("cliente_bloqueio", { cliente_id: `eq.${args.cliente_id}`, order: "created_at.desc" });
+    },
 
   async cliente_certificado_buscar(args, env) {
-    const rows = await sb(env).get("cliente_certificado", { cliente_id: `eq.${args.cliente_id}`, select: "id,tipo,pfx_validade,pfx_nome_razao,pfx_cnpj,pfx_serial,has_procuracao,procuracao_validade,focus_cert_ref,focus_cert_enviado_em" });
-    return Array.isArray(rows) ? rows[0] || { error: "Certificado não encontrado" } : rows;
-  },
+      const rows = await sb(env).get("cliente_certificado", { cliente_id: `eq.${args.cliente_id}`, select: "id,tipo,pfx_validade,pfx_nome_razao,pfx_cnpj,pfx_serial,has_procuracao,procuracao_validade,focus_cert_ref,focus_cert_enviado_em" });
+      return Array.isArray(rows) ? rows[0] || { error: "Certificado não encontrado" } : rows;
+    },
 
   async contrato_buscar(args, env) {
-    const rows = await sb(env).get("contrato_cliente", { id: `eq.${args.id}`, select: "*" });
-    return Array.isArray(rows) ? rows[0] || { error: "Contrato não encontrado" } : rows;
-  },
-
-  // DP,
+      const rows = await sb(env).get("contrato_cliente", { id: `eq.${args.id}`, select: "*" });
+      return Array.isArray(rows) ? rows[0] || { error: "Contrato não encontrado" } : rows;
+    },
 
   async contratos_listar(args, env) {
-    const p = { select: "id,cliente_id,numero,titulo,tipo,status,valor_total,data_inicio,clicksign_status,clicksign_sign_url_cliente,assinado_em,created_at", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    return sb(env).get("contrato_cliente", p);
-  },
+      const p = { select: "id,cliente_id,numero,titulo,tipo,status,valor_total,data_inicio,clicksign_status,clicksign_sign_url_cliente,assinado_em,created_at", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      return sb(env).get("contrato_cliente", p);
+    },
 
   async setores_listar(args, env) {
-    return sb(env).get("setores", { select: "*", order: "ordem.asc" });
-  },
+      return sb(env).get("setores", { select: "*", order: "ordem.asc" });
+    },
 
 };

@@ -1,5 +1,7 @@
 // tools/tarefas.js — Tarefas, agente logs
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_TAREFAS = [
   {
@@ -132,101 +134,98 @@ export const TOOLS_TAREFAS = [
 ];
 
 export const HANDLERS_TAREFAS = {
+
   async tarefa_criar(args, env) {
-    const slaMap = { fiscal_urgente: 4, dp: 24, comercial: 48 };
-    const sla = slaMap[args.tipo] || 72;
-    const agora = new Date();
-    const prazo = new Date(agora.getTime() + sla * 3600000).toISOString();
-    return sb(env).post("tarefas", {
-      titulo: args.titulo,
-      tipo: args.tipo,
-      descricao: args.descricao || "",
-      status: "aberta",
-      prioridade: args.prioridade || "normal",
-      responsavel: args.responsavel,
-      responsavel_tipo: args.responsavel_tipo || "humano",
-      criado_por: args.criado_por,
-      criado_por_tipo: args.criado_por_tipo || "agente",
-      cliente_id: args.cliente_id || null,
-      sla_horas: sla,
-      sla_status: "no_prazo",
-      data_prazo: args.data_prazo || prazo,
-      metadados: args.metadados || {},
-      historico: [{ ts: agora.toISOString(), autor: args.criado_por, acao: "criada", descricao: `Tarefa criada por ${args.criado_por}` }],
-      created_at: agora.toISOString()
-    });
-  },
+      const slaMap = { fiscal_urgente: 4, dp: 24, comercial: 48 };
+      const sla = slaMap[args.tipo] || 72;
+      const agora = new Date();
+      const prazo = new Date(agora.getTime() + sla * 3600000).toISOString();
+      return sb(env).post("tarefas", {
+        titulo: args.titulo,
+        tipo: args.tipo,
+        descricao: args.descricao || "",
+        status: "aberta",
+        prioridade: args.prioridade || "normal",
+        responsavel: args.responsavel,
+        responsavel_tipo: args.responsavel_tipo || "humano",
+        criado_por: args.criado_por,
+        criado_por_tipo: args.criado_por_tipo || "agente",
+        cliente_id: args.cliente_id || null,
+        sla_horas: sla,
+        sla_status: "no_prazo",
+        data_prazo: args.data_prazo || prazo,
+        metadados: args.metadados || {},
+        historico: [{ ts: agora.toISOString(), autor: args.criado_por, acao: "criada", descricao: `Tarefa criada por ${args.criado_por}` }],
+        created_at: agora.toISOString()
+      });
+    },
 
   async tarefa_buscar(args, env) {
-    const rows = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "*" });
-    return Array.isArray(rows) ? rows[0] || { error: "Tarefa não encontrada" } : rows;
-  },
+      const rows = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "*" });
+      return Array.isArray(rows) ? rows[0] || { error: "Tarefa não encontrada" } : rows;
+    },
 
   async tarefa_atualizar(args, env) {
-    const { id, _por, ...data } = args;
-    const tarefa = await sb(env).get("tarefas", { id: `eq.${id}`, select: "historico" });
-    const hist = Array.isArray(tarefa) && tarefa[0]?.historico ? tarefa[0].historico : [];
-    hist.push({ ts: new Date().toISOString(), autor: _por || "agente", acao: "atualizada", descricao: JSON.stringify(data) });
-    return sb(env).patch("tarefas", `id=eq.${id}`, { ...data, historico: hist, updated_at: new Date().toISOString() });
-  },
+      const { id, _por, ...data } = args;
+      const tarefa = await sb(env).get("tarefas", { id: `eq.${id}`, select: "historico" });
+      const hist = Array.isArray(tarefa) && tarefa[0]?.historico ? tarefa[0].historico : [];
+      hist.push({ ts: new Date().toISOString(), autor: _por || "agente", acao: "atualizada", descricao: JSON.stringify(data) });
+      return sb(env).patch("tarefas", `id=eq.${id}`, { ...data, historico: hist, updated_at: new Date().toISOString() });
+    },
 
   async tarefa_comentar(args, env) {
-    const tarefa = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "comentarios" });
-    const comentarios = Array.isArray(tarefa) && tarefa[0]?.comentarios ? tarefa[0].comentarios : [];
-    comentarios.push({ ts: new Date().toISOString(), autor: args.autor, autor_tipo: args.autor_tipo || "agente", texto: args.texto });
-    return sb(env).patch("tarefas", `id=eq.${args.id}`, { comentarios, updated_at: new Date().toISOString() });
-  },
+      const tarefa = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "comentarios" });
+      const comentarios = Array.isArray(tarefa) && tarefa[0]?.comentarios ? tarefa[0].comentarios : [];
+      comentarios.push({ ts: new Date().toISOString(), autor: args.autor, autor_tipo: args.autor_tipo || "agente", texto: args.texto });
+      return sb(env).patch("tarefas", `id=eq.${args.id}`, { comentarios, updated_at: new Date().toISOString() });
+    },
 
   async tarefa_concluir(args, env) {
-    const rows = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "metadados,status" });
-    if (!Array.isArray(rows) || rows.length === 0) return { error: "Tarefa não encontrada" };
-    const t = rows[0];
-    const subs = t.metadados?.subtarefas || [];
-    const abertas = subs.filter(s => s.status !== "concluida");
-    if (abertas.length > 0) return { error: `Existem ${abertas.length} subtarefas ainda abertas`, subtarefas_abertas: abertas };
-    return sb(env).patch("tarefas", `id=eq.${args.id}`, { status: "concluida", sla_status: "concluido", concluida_em: new Date().toISOString(), updated_at: new Date().toISOString() });
-  },
+      const rows = await sb(env).get("tarefas", { id: `eq.${args.id}`, select: "metadados,status" });
+      if (!Array.isArray(rows) || rows.length === 0) return { error: "Tarefa não encontrada" };
+      const t = rows[0];
+      const subs = t.metadados?.subtarefas || [];
+      const abertas = subs.filter(s => s.status !== "concluida");
+      if (abertas.length > 0) return { error: `Existem ${abertas.length} subtarefas ainda abertas`, subtarefas_abertas: abertas };
+      return sb(env).patch("tarefas", `id=eq.${args.id}`, { status: "concluida", sla_status: "concluido", concluida_em: new Date().toISOString(), updated_at: new Date().toISOString() });
+    },
 
   async tarefas_listar(args, env) {
-    const p = { select: "id,titulo,tipo,status,prioridade,sla_status,responsavel,cliente_id,cliente_nome,data_prazo,sla_horas,subtarefas_total,subtarefas_concluidas,criado_por,created_at,updated_at", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.status) p["status"] = `eq.${args.status}`;
-    if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
-    if (args.responsavel) p["responsavel"] = `ilike.*${args.responsavel}*`;
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.prioridade) p["prioridade"] = `eq.${args.prioridade}`;
-    if (args.sla_status) p["sla_status"] = `eq.${args.sla_status}`;
-    return sb(env).get("tarefas", p);
-  },
+      const p = { select: "id,titulo,tipo,status,prioridade,sla_status,responsavel,cliente_id,cliente_nome,data_prazo,sla_horas,subtarefas_total,subtarefas_concluidas,criado_por,created_at,updated_at", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.status) p["status"] = `eq.${args.status}`;
+      if (args.tipo) p["tipo"] = `eq.${args.tipo}`;
+      if (args.responsavel) p["responsavel"] = `ilike.*${args.responsavel}*`;
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.prioridade) p["prioridade"] = `eq.${args.prioridade}`;
+      if (args.sla_status) p["sla_status"] = `eq.${args.sla_status}`;
+      return sb(env).get("tarefas", p);
+    },
 
   async tarefas_agente_listar(args, env) {
-    const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
-    if (args.status) p["status"] = `eq.${args.status}`;
-    if (args.agente) p["agente"] = `eq.${args.agente}`;
-    if (args.client_id) p["client_id"] = `eq.${args.client_id}`;
-    return sb(env).get("tarefas_agente", p);
-  },
-
-  // OBRIGAÇÕES,
+      const p = { select: "*", order: "created_at.desc", limit: args.limit || 50 };
+      if (args.status) p["status"] = `eq.${args.status}`;
+      if (args.agente) p["agente"] = `eq.${args.agente}`;
+      if (args.client_id) p["client_id"] = `eq.${args.client_id}`;
+      return sb(env).get("tarefas_agente", p);
+    },
 
   async agente_log_criar(args, env) {
-    return sb(env).post("agente_logs", {
-      agente: args.agente,
-      acao: args.acao,
-      resultado: args.resultado,
-      cliente_id: args.cliente_id || null,
-      detalhes: args.detalhes || {},
-      erro_mensagem: args.erro_mensagem || null,
-      executado_em: new Date().toISOString()
-    }, "return=minimal");
-  },
-
-  // EDGE FUNCTIONS,
+      return sb(env).post("agente_logs", {
+        agente: args.agente,
+        acao: args.acao,
+        resultado: args.resultado,
+        cliente_id: args.cliente_id || null,
+        detalhes: args.detalhes || {},
+        erro_mensagem: args.erro_mensagem || null,
+        executado_em: new Date().toISOString()
+      }, "return=minimal");
+    },
 
   async agente_logs_listar(args, env) {
-    const p = { select: "*", order: "executado_em.desc", limit: args.limit || 100 };
-    if (args.agente) p["agente"] = `eq.${args.agente}`;
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    return sb(env).get("agente_logs", p);
-  },
+      const p = { select: "*", order: "executado_em.desc", limit: args.limit || 100 };
+      if (args.agente) p["agente"] = `eq.${args.agente}`;
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      return sb(env).get("agente_logs", p);
+    },
 
 };

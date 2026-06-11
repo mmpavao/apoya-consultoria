@@ -1,5 +1,7 @@
 // tools/whatsapp.js — WhatsApp: envio, instâncias, conversas, mensagens
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_WHATSAPP = [
   {
@@ -53,41 +55,40 @@ export const TOOLS_WHATSAPP = [
 ];
 
 export const HANDLERS_WHATSAPP = {
+
   async whatsapp_enviar(args, env) {
-    const instRows = await sb(env).get("wa_instance", { select: "nome,numero,status,evolution_apikey", limit: 1 });
-    const inst = Array.isArray(instRows) ? instRows[0] : null;
-    if (!inst) return { error: "Nenhuma instância WA configurada" };
-    const instName = args.instancia || inst.nome;
-    const apiKey = inst.evolution_apikey || env.EVOLUTION_API_KEY;
-    const apiUrl = env.EVOLUTION_API_URL;
-    const resp = await fetch(`${apiUrl}/message/sendText/${instName}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({ number: args.destinatario, text: args.mensagem })
-    });
-    return resp.json();
-  },
+      const instRows = await sb(env).get("wa_instance", { select: "nome,numero,status,evolution_apikey", limit: 1 });
+      const inst = Array.isArray(instRows) ? instRows[0] : null;
+      if (!inst) return { error: "Nenhuma instância WA configurada" };
+      const instName = args.instancia || inst.nome;
+      const apiKey = inst.evolution_apikey || env.EVOLUTION_API_KEY;
+      const apiUrl = env.EVOLUTION_API_URL;
+      const resp = await fetch(`${apiUrl}/message/sendText/${instName}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: apiKey },
+        body: JSON.stringify({ number: args.destinatario, text: args.mensagem })
+      });
+      return resp.json();
+    },
 
   async whatsapp_instancias(args, env) {
-    return sb(env).get("wa_instance", { select: "id,nome,display_name,numero,status,departamentos,last_connected_at", order: "created_at.asc" });
-  },
+      return sb(env).get("wa_instance", { select: "id,nome,display_name,numero,status,departamentos,last_connected_at", order: "created_at.asc" });
+    },
 
   async whatsapp_conversas_listar(args, env) {
-    const p = { select: "id,instance_id,cliente_id,telefone,nome_contato,ultima_mensagem,ultima_em,nao_lidas,assigned_to,departamento,archived", order: "ultima_em.desc", limit: args.limit || 20 };
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.departamento) p["departamento"] = `eq.${args.departamento}`;
-    if (args.assigned_to) p["assigned_to"] = `eq.${args.assigned_to}`;
-    return sb(env).get("wa_conversa", p);
-  },
+      const p = { select: "id,instance_id,cliente_id,telefone,nome_contato,ultima_mensagem,ultima_em,nao_lidas,assigned_to,departamento,archived", order: "ultima_em.desc", limit: args.limit || 20 };
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.departamento) p["departamento"] = `eq.${args.departamento}`;
+      if (args.assigned_to) p["assigned_to"] = `eq.${args.assigned_to}`;
+      return sb(env).get("wa_conversa", p);
+    },
 
   async whatsapp_mensagens_listar(args, env) {
-    return sb(env).get("mensagem_whatsapp", { conversa_id: `eq.${args.conversa_id}`, select: "*", order: "created_at.asc", limit: args.limit || 50 });
-  },
+      return sb(env).get("mensagem_whatsapp", { conversa_id: `eq.${args.conversa_id}`, select: "*", order: "created_at.asc", limit: args.limit || 50 });
+    },
 
   async whatsapp_sessoes_listar(args, env) {
-    return sb(env).get("whatsapp_sessions", { select: "id,phone_number,client_id,last_agent,modo_humano,humano_desde,updated_at", order: "updated_at.desc", limit: args.limit || 50 });
-  },
-
-  // DOCUMENTOS,
+      return sb(env).get("whatsapp_sessions", { select: "id,phone_number,client_id,last_agent,modo_humano,humano_desde,updated_at", order: "updated_at.desc", limit: args.limit || 50 });
+    },
 
 };

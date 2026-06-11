@@ -1,5 +1,7 @@
 // tools/cobrancas.js — Cobranças, pagamentos, régua de cobrança
-// Auto-gerado em refactor(mcp) 2026-06-11 — NÃO EDITAR MANUALMENTE
+// refactor(mcp) 2026-06-11
+
+import { sb } from "../db.js";
 
 export const TOOLS_COBRANCAS = [
   {
@@ -66,35 +68,34 @@ export const TOOLS_COBRANCAS = [
 ];
 
 export const HANDLERS_COBRANCAS = {
+
   async cobranca_criar(args, env) {
-    return sb(env).post("cobrancas", { ...args, status: "pendente", created_at: new Date().toISOString() });
-  },
+      return sb(env).post("cobrancas", { ...args, status: "pendente", created_at: new Date().toISOString() });
+    },
 
   async cobranca_atualizar(args, env) {
-    const { id, ...data } = args;
-    return sb(env).patch("cobrancas", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
-  },
+      const { id, ...data } = args;
+      return sb(env).patch("cobrancas", `id=eq.${id}`, { ...data, updated_at: new Date().toISOString() });
+    },
 
   async cobrancas_listar(args, env) {
-    const p = { select: "id,cliente_id,cliente_nome,cnpj,valor,vencimento,competencia,status,dias_atraso,regua_stage,regua_stage_nome,pix_copia_cola,boleto_url,nfse_status,asaas_payment_id,created_at", order: "vencimento.desc", limit: args.limit || 50 };
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    if (args.regua_stage) p["regua_stage"] = `eq.${args.regua_stage}`;
-    return sb(env).get("cobrancas", p);
-  },
+      const p = { select: "id,cliente_id,cliente_nome,cnpj,valor,vencimento,competencia,status,dias_atraso,regua_stage,regua_stage_nome,pix_copia_cola,boleto_url,nfse_status,asaas_payment_id,created_at", order: "vencimento.desc", limit: args.limit || 50 };
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      if (args.regua_stage) p["regua_stage"] = `eq.${args.regua_stage}`;
+      return sb(env).get("cobrancas", p);
+    },
 
   async regua_cobranca_config_buscar(args, env) {
-    const rows = await sb(env).get("regua_cobranca_config", { select: "*", limit: 1 });
-    return Array.isArray(rows) ? rows[0] || {} : rows;
-  },
+      const rows = await sb(env).get("regua_cobranca_config", { select: "*", limit: 1 });
+      return Array.isArray(rows) ? rows[0] || {} : rows;
+    },
 
   async servico_pagamentos_listar(args, env) {
-    const p = { select: "*", order: "data_vencimento.desc", limit: args.limit || 50 };
-    if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
-    if (args.status) p["status"] = `eq.${args.status}`;
-    return sb(env).get("servico_pagamento", p);
-  },
-
-  // APURAÇÕES / CONTABILIDADE,
+      const p = { select: "*", order: "data_vencimento.desc", limit: args.limit || 50 };
+      if (args.cliente_id) p["cliente_id"] = `eq.${args.cliente_id}`;
+      if (args.status) p["status"] = `eq.${args.status}`;
+      return sb(env).get("servico_pagamento", p);
+    },
 
 };
