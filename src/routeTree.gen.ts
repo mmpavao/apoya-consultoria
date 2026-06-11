@@ -27,6 +27,7 @@ import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoe
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
 import { Route as AppAdministracaoRouteImport } from './routes/_app.administracao'
+import { Route as ApiPipelineIndexRouteImport } from './routes/api/pipeline/index'
 import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
@@ -35,6 +36,7 @@ import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/c
 import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
 import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
 import { Route as ApiPluggyConnectTokenRouteImport } from './routes/api/pluggy/connect-token'
+import { Route as ApiPipelineMoverRouteImport } from './routes/api/pipeline/mover'
 import { Route as ApiNfseEmitirCobrancaRouteImport } from './routes/api/nfse/emitir-cobranca'
 import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
 import { Route as ApiCobrancaWebhookRouteImport } from './routes/api/cobranca/webhook'
@@ -144,6 +146,11 @@ const AppAdministracaoRoute = AppAdministracaoRouteImport.update({
   path: '/administracao',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPipelineIndexRoute = ApiPipelineIndexRouteImport.update({
+  id: '/api/pipeline/',
+  path: '/api/pipeline/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNfseIndexRoute = ApiNfseIndexRouteImport.update({
   id: '/api/nfse/',
   path: '/api/nfse/',
@@ -182,6 +189,11 @@ const ApiSerproCallRoute = ApiSerproCallRouteImport.update({
 const ApiPluggyConnectTokenRoute = ApiPluggyConnectTokenRouteImport.update({
   id: '/api/pluggy/connect-token',
   path: '/api/pluggy/connect-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPipelineMoverRoute = ApiPipelineMoverRouteImport.update({
+  id: '/api/pipeline/mover',
+  path: '/api/pipeline/mover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNfseEmitirCobrancaRoute = ApiNfseEmitirCobrancaRouteImport.update({
@@ -318,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
@@ -326,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
+  '/api/pipeline/': typeof ApiPipelineIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
   '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
@@ -364,6 +378,7 @@ export interface FileRoutesByTo {
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
@@ -372,6 +387,7 @@ export interface FileRoutesByTo {
   '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal': typeof AppFiscalIndexRoute
   '/api/nfse': typeof ApiNfseIndexRoute
+  '/api/pipeline': typeof ApiPipelineIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
   '/api/webhooks/pluggy': typeof ApiWebhooksPluggyIndexRoute
 }
@@ -412,6 +428,7 @@ export interface FileRoutesById {
   '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
   '/api/das/gerar': typeof ApiDasGerarRoute
   '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
+  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
   '/api/serpro/call': typeof ApiSerproCallRoute
   '/api/serpro/status': typeof ApiSerproStatusRoute
@@ -420,6 +437,7 @@ export interface FileRoutesById {
   '/api/wa/send': typeof ApiWaSendRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
   '/api/nfse/': typeof ApiNfseIndexRoute
+  '/api/pipeline/': typeof ApiPipelineIndexRoute
   '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
   '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
@@ -460,6 +478,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/nfse/emitir-cobranca'
+    | '/api/pipeline/mover'
     | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
@@ -468,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/wa/send'
     | '/fiscal/'
     | '/api/nfse/'
+    | '/api/pipeline/'
     | '/api/public/evolution-webhook/$instance'
     | '/api/webhooks/pluggy/'
   fileRoutesByTo: FileRoutesByTo
@@ -506,6 +526,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/nfse/emitir-cobranca'
+    | '/api/pipeline/mover'
     | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
@@ -514,6 +535,7 @@ export interface FileRouteTypes {
     | '/api/wa/send'
     | '/fiscal'
     | '/api/nfse'
+    | '/api/pipeline'
     | '/api/public/evolution-webhook/$instance'
     | '/api/webhooks/pluggy'
   id:
@@ -553,6 +575,7 @@ export interface FileRouteTypes {
     | '/api/cobranca/webhook'
     | '/api/das/gerar'
     | '/api/nfse/emitir-cobranca'
+    | '/api/pipeline/mover'
     | '/api/pluggy/connect-token'
     | '/api/serpro/call'
     | '/api/serpro/status'
@@ -561,6 +584,7 @@ export interface FileRouteTypes {
     | '/api/wa/send'
     | '/_app/fiscal/'
     | '/api/nfse/'
+    | '/api/pipeline/'
     | '/api/public/evolution-webhook/$instance'
     | '/api/webhooks/pluggy/'
   fileRoutesById: FileRoutesById
@@ -581,6 +605,7 @@ export interface RootRouteChildren {
   ApiCobrancaWebhookRoute: typeof ApiCobrancaWebhookRoute
   ApiDasGerarRoute: typeof ApiDasGerarRoute
   ApiNfseEmitirCobrancaRoute: typeof ApiNfseEmitirCobrancaRoute
+  ApiPipelineMoverRoute: typeof ApiPipelineMoverRoute
   ApiPluggyConnectTokenRoute: typeof ApiPluggyConnectTokenRoute
   ApiSerproCallRoute: typeof ApiSerproCallRoute
   ApiSerproStatusRoute: typeof ApiSerproStatusRoute
@@ -588,6 +613,7 @@ export interface RootRouteChildren {
   ApiWaInstancesRoute: typeof ApiWaInstancesRoute
   ApiWaSendRoute: typeof ApiWaSendRoute
   ApiNfseIndexRoute: typeof ApiNfseIndexRoute
+  ApiPipelineIndexRoute: typeof ApiPipelineIndexRoute
   ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
   ApiWebhooksPluggyIndexRoute: typeof ApiWebhooksPluggyIndexRoute
 }
@@ -720,6 +746,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdministracaoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/pipeline/': {
+      id: '/api/pipeline/'
+      path: '/api/pipeline'
+      fullPath: '/api/pipeline/'
+      preLoaderRoute: typeof ApiPipelineIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nfse/': {
       id: '/api/nfse/'
       path: '/api/nfse'
@@ -774,6 +807,13 @@ declare module '@tanstack/react-router' {
       path: '/api/pluggy/connect-token'
       fullPath: '/api/pluggy/connect-token'
       preLoaderRoute: typeof ApiPluggyConnectTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pipeline/mover': {
+      id: '/api/pipeline/mover'
+      path: '/api/pipeline/mover'
+      fullPath: '/api/pipeline/mover'
+      preLoaderRoute: typeof ApiPipelineMoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nfse/emitir-cobranca': {
@@ -978,6 +1018,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCobrancaWebhookRoute: ApiCobrancaWebhookRoute,
   ApiDasGerarRoute: ApiDasGerarRoute,
   ApiNfseEmitirCobrancaRoute: ApiNfseEmitirCobrancaRoute,
+  ApiPipelineMoverRoute: ApiPipelineMoverRoute,
   ApiPluggyConnectTokenRoute: ApiPluggyConnectTokenRoute,
   ApiSerproCallRoute: ApiSerproCallRoute,
   ApiSerproStatusRoute: ApiSerproStatusRoute,
@@ -985,6 +1026,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWaInstancesRoute: ApiWaInstancesRoute,
   ApiWaSendRoute: ApiWaSendRoute,
   ApiNfseIndexRoute: ApiNfseIndexRoute,
+  ApiPipelineIndexRoute: ApiPipelineIndexRoute,
   ApiPublicEvolutionWebhookInstanceRoute:
     ApiPublicEvolutionWebhookInstanceRoute,
   ApiWebhooksPluggyIndexRoute: ApiWebhooksPluggyIndexRoute,

@@ -38,7 +38,7 @@ const items: NavItem[] = [
   { to: "/societario", label: "Societário",   icon: Landmark },
 
   { group: "DEPARTAMENTOS" },
-  { to: "/fiscal/das", label: "Fiscal",       icon: Receipt },
+  { to: "/fiscal", label: "Fiscal",       icon: Receipt },
   { to: "/dp",         label: "Dep. Pessoal", icon: Users2 },
   { to: "/contabil",   label: "Contábil",     icon: BookOpen },
   { to: "/financeiro", label: "Financeiro",   icon: DollarSign },
@@ -57,7 +57,7 @@ const bottom: NavItem[] = [
 function isActive(pathname: string, item: NavItem): boolean {
   if (item.separator || "group" in item) return false;
   if (item.exact) return pathname === item.to;
-  if (item.to === "/fiscal/das") return pathname.startsWith("/fiscal");
+  
   return pathname.startsWith(item.to);
 }
 
