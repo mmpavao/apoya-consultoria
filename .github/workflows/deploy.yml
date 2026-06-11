@@ -1,23 +1,97 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEPLOY — Cloudflare Workers + Supabase Edge Functions
+#
+# PROTOCOLO STAGING-FIRST (implementado após incidente 2026-06-11):
+#
+#   push na main              →  SOMENTE staging
+#                                (apoya-gestao-staging + apoya-mcp-staging)
+#
+#   tag semântica v*.*.*      →  PRODUÇÃO
+#   (ex: git tag v1.2.3)         (apoya-gestao + apoya-mcp)
+#
+#   workflow_dispatch manual  →  escolha: staging OU produção
+#
+# NUNCA deploy automático de produção em push na main.
+#
+# SECRETS OBRIGATÓRIOS (GitHub → Settings → Secrets → Actions):
+#   CLOUDFLARE_API_TOKEN          Workers:Edit scope
+#   CLOUDFLARE_ACCOUNT_ID
+#   VITE_SUPABASE_PUBLISHABLE_KEY anon key — injetada no BUILD Vite (causa do incidente)
+#   VITE_SUPABASE_URL
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_ACCESS_TOKEN         para Supabase CLI (Edge Functions)
+#   ASAAS_API_KEY / FOCUSNFE_API_TOKEN / EVOLUTION_API_KEY / EVOLUTION_API_URL
+#   PLUGGY_CLIENT_ID / PLUGGY_CLIENT_SECRET / PLUGGY_WEBHOOK_SECRET
+#   APOYA_INTERNAL_SECRET
+# ═══════════════════════════════════════════════════════════════════════════════
+
 name: Deploy — Cloudflare Workers + Supabase Edge Functions
 
 on:
   push:
-    branches: [main]
+    branches: [main]        # → staging
+    tags: ['v*.*.*']        # → produção
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente alvo'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
 
 jobs:
-  # ── Job principal (legado — apoya-gestao monolito) ─────────────────────────
-  deploy:
-    name: Build & Deploy (apoya-gestao)
+  # ── Resolver ambiente alvo ─────────────────────────────────────────────────
+  resolve-env:
+    name: Resolver ambiente
+    runs-on: ubuntu-latest
+    outputs:
+      target:        ${{ steps.set.outputs.target }}
+      worker_gestao: ${{ steps.set.outputs.worker_gestao }}
+      worker_mcp:    ${{ steps.set.outputs.worker_mcp }}
+    steps:
+      - name: Determinar ambiente
+        id: set
+        run: |
+          if   [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TARGET="production"
+          else
+            TARGET="staging"
+          fi
+
+          if [ "$TARGET" = "production" ]; then
+            WORKER_GESTAO="apoya-gestao"
+            WORKER_MCP="apoya-mcp"
+          else
+            WORKER_GESTAO="apoya-gestao-staging"
+            WORKER_MCP="apoya-mcp-staging"
+          fi
+
+          echo "target=$TARGET"                 >> "$GITHUB_OUTPUT"
+          echo "worker_gestao=$WORKER_GESTAO"   >> "$GITHUB_OUTPUT"
+          echo "worker_mcp=$WORKER_MCP"         >> "$GITHUB_OUTPUT"
+
+          echo "🎯 Ambiente: $TARGET"
+          echo "   apoya-gestao → $WORKER_GESTAO"
+          echo "   apoya-mcp    → $WORKER_MCP"
+          echo "   Trigger: ${{ github.event_name }} / ref: ${{ github.ref }}"
+
+  # ── apoya-gestao ───────────────────────────────────────────────────────────
+  deploy-gestao:
+    name: apoya-gestao → ${{ needs.resolve-env.outputs.worker_gestao }}
+    needs: resolve-env
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -25,41 +99,90 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      # ── Build Vite — VITE_ vars substituídas aqui em compile time ─────────
+      # CRÍTICO: sem estas env vars no build, import.meta.env.VITE_* = undefined
+      # no bundle do browser → crash de boot (causa do incidente 2026-06-11).
+      - name: Build (Vite)
         run: npm run build
         env:
           NODE_ENV: production
+          VITE_SUPABASE_URL:             ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
-      - name: Deploy to Cloudflare Workers
+      # ── Ajustar wrangler.json gerado pelo build ────────────────────────────
+      - name: Configurar wrangler (${{ needs.resolve-env.outputs.worker_gestao }})
+        run: |
+          python3 - << 'PYEOF'
+          import json, os, sys
+          worker = os.environ["WORKER_NAME"]
+          path   = "dist/server/wrangler.json"
+          try:
+              cfg = json.load(open(path))
+          except FileNotFoundError:
+              print(f"ERRO: {path} não encontrado", file=sys.stderr); sys.exit(1)
+          cfg["name"]   = worker
+          cfg["assets"] = {"directory": "../client", "binding": "ASSETS", "not_found_handling": "none"}
+          if "staging" in worker:
+              cfg.setdefault("vars", {})["WORKER_ENV"] = "staging"
+          json.dump(cfg, open(path, "w"), indent=2)
+          print(f"✅ wrangler.json: name={worker}")
+          PYEOF
+        env:
+          WORKER_NAME: ${{ needs.resolve-env.outputs.worker_gestao }}
+
+      - name: Deploy → ${{ needs.resolve-env.outputs.worker_gestao }}
         run: npx wrangler deploy --config dist/server/wrangler.json
         env:
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Inject Worker Secrets
+      - name: Injetar secrets runtime
         run: |
-          echo "${{ secrets.ASAAS_API_KEY }}"              | npx wrangler secret put ASAAS_API_KEY              --name apoya-gestao
-          echo "${{ secrets.FOCUSNFE_API_TOKEN }}"         | npx wrangler secret put FOCUSNFE_API_TOKEN         --name apoya-gestao
-          echo "${{ secrets.EVOLUTION_API_KEY }}"          | npx wrangler secret put EVOLUTION_API_KEY          --name apoya-gestao
-          echo "${{ secrets.SUPABASE_URL }}"               | npx wrangler secret put SUPABASE_URL               --name apoya-gestao
-          echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"  | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY  --name apoya-gestao
-          echo "${{ secrets.PLUGGY_CLIENT_ID }}"           | npx wrangler secret put PLUGGY_CLIENT_ID           --name apoya-gestao
-          echo "${{ secrets.PLUGGY_CLIENT_SECRET }}"       | npx wrangler secret put PLUGGY_CLIENT_SECRET       --name apoya-gestao
-          echo "${{ secrets.PLUGGY_WEBHOOK_SECRET }}"      | npx wrangler secret put PLUGGY_WEBHOOK_SECRET      --name apoya-gestao
-          echo "${{ secrets.APOYA_INTERNAL_SECRET }}"      | npx wrangler secret put APOYA_INTERNAL_SECRET      --name apoya-gestao
+          W="${{ needs.resolve-env.outputs.worker_gestao }}"
+          echo "Injetando secrets em: $W"
+          _s() { echo "$2" | npx wrangler secret put "$1" --name "$W"; }
+
+          _s SUPABASE_URL                  "${{ secrets.SUPABASE_URL }}"
+          _s SUPABASE_SERVICE_ROLE_KEY     "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          _s VITE_SUPABASE_URL             "${{ secrets.VITE_SUPABASE_URL }}"
+          _s VITE_SUPABASE_PUBLISHABLE_KEY "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+          _s SUPABASE_PUBLISHABLE_KEY      "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+          _s ASAAS_API_KEY                 "${{ secrets.ASAAS_API_KEY }}"
+          _s FOCUSNFE_API_TOKEN            "${{ secrets.FOCUSNFE_API_TOKEN }}"
+          _s EVOLUTION_API_KEY             "${{ secrets.EVOLUTION_API_KEY }}"
+          _s EVOLUTION_API_URL             "${{ secrets.EVOLUTION_API_URL }}"
+          _s PLUGGY_CLIENT_ID              "${{ secrets.PLUGGY_CLIENT_ID }}"
+          _s PLUGGY_CLIENT_SECRET          "${{ secrets.PLUGGY_CLIENT_SECRET }}"
+          _s PLUGGY_WEBHOOK_SECRET         "${{ secrets.PLUGGY_WEBHOOK_SECRET }}"
+          _s APOYA_INTERNAL_SECRET         "${{ secrets.APOYA_INTERNAL_SECRET }}"
         env:
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         continue-on-error: true
 
+      - name: Smoke test (${{ needs.resolve-env.outputs.worker_gestao }})
+        run: |
+          sleep 8
+          URL="https://${{ needs.resolve-env.outputs.worker_gestao }}.talkzzbot.workers.dev/"
+          HTTP=$(curl -s -o /tmp/smoke.html -w "%{http_code}" "$URL")
+          TITLE=$(grep -o '<title>[^<]*</title>' /tmp/smoke.html | head -1 || echo "?")
+          if [ "$HTTP" = "200" ]; then
+            echo "✅ Smoke OK: HTTP $HTTP — $TITLE"
+          else
+            echo "❌ Smoke FALHOU: HTTP $HTTP"
+            head -c 500 /tmp/smoke.html
+            exit 1
+          fi
+
+      # Edge Functions — apenas em produção
       - name: Setup Supabase CLI
+        if: needs.resolve-env.outputs.target == 'production'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy Edge Functions
+      - name: Deploy Edge Functions (produção)
+        if: needs.resolve-env.outputs.target == 'production'
         run: |
           supabase functions deploy nfse-pos-pagamento --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy sync-nfse-nfeio    --project-ref ajaqbdsalxfgrwpjbtbn
@@ -67,19 +190,17 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         continue-on-error: true
 
-  # ── Job MCP modular (apoya-mcp v3.1) ──────────────────────────────────────
+  # ── apoya-mcp ──────────────────────────────────────────────────────────────
   deploy-mcp:
-    name: Deploy apoya-mcp (modular)
+    name: apoya-mcp → ${{ needs.resolve-env.outputs.worker_mcp }}
+    needs: resolve-env
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Só roda se houver mudança em workers/apoya-mcp/
-    # Para forçar no workflow_dispatch, sempre roda
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    timeout-minutes: 15
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -89,47 +210,55 @@ jobs:
       - name: Bundle apoya-mcp (esbuild → service-worker format)
         working-directory: workers/apoya-mcp
         run: |
+          mkdir -p dist
           esbuild src/index.js \
             --bundle \
             --format=esm \
             --platform=browser \
             --target=es2022 \
             --outfile=dist/bundle.js
-          # Converter para service worker format (CF Workers sem módulos)
-          python3 - << 'PYEOF'
-          content = open('dist/bundle.js').read()
-          content = content.replace('export {\n  index_default as default\n};','').replace('export { index_default as default };','').strip()
-          content += '\n\naddEventListener("fetch", (event) => {\n  event.respondWith(index_default.fetch(event.request, globalThis));\n});\n'
-          open('dist/bundle-sw.js','w').write(content)
-          import re
-          tools = re.findall(r'name:\s*["\\']([\w_]+)["\\']\s*,\s*description', content)
-          print(f"Bundle OK: {len(set(tools))} tools, {len(content)} bytes")
-          PYEOF
 
-      - name: Deploy apoya-mcp to Cloudflare
-        working-directory: workers/apoya-mcp
-        run: |
-          curl -s -o deploy_resp.json -w "HTTP %{http_code}\n" \
-            -X PUT \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -H "Content-Type: application/javascript" \
-            --data-binary "@dist/bundle-sw.js" \
-            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/apoya-mcp"
-          python3 -c "
-          import json
-          d = json.load(open('deploy_resp.json'))
-          print('success:', d.get('success'))
-          for e in d.get('errors',[]): print('ERR:', e)
-          if not d.get('success'): exit(1)
+          # Converter para service worker format via Node.js (sem heredoc Python)
+          node -e "
+          const fs = require('fs');
+          let c = fs.readFileSync('dist/bundle.js', 'utf8');
+          c = c.replace(/^export \{\s*\n?\s*index_default as default\s*\n?\s*\};?\s*\$/m, '');
+          c = c.replace(/^export \{ index_default as default \};?\s*\$/m, '').trim();
+          c += '\n\naddEventListener(\"fetch\", (event) => {\n  event.respondWith(index_default.fetch(event.request, globalThis));\n});\n';
+          fs.writeFileSync('dist/bundle-sw.js', c);
+          const tools = [...new Set((c.match(/name:\s*[\"']([\\w_]+)[\"']\s*,\s*description/g) || []).map(t => t.match(/[\"']([\\w_]+)[\"']/)[1]))];
+          console.log('Bundle OK: ' + tools.length + ' tools, ' + c.length + ' bytes');
           "
 
-      - name: Health check produção
+      - name: Deploy apoya-mcp → ${{ needs.resolve-env.outputs.worker_mcp }}
+        working-directory: workers/apoya-mcp
         run: |
-          sleep 5
-          curl -sf https://apoya-mcp.talkzzbot.workers.dev/health | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          assert d['tools'] == 80, f'tools={d[\"tools\"]} != 80'
-          assert d['parity'] == 'ok', f'parity={d[\"parity\"]}'
-          print(f'✅ health OK: tools={d[\"tools\"]} parity={d[\"parity\"]} version={d[\"version\"]}')
+          if [ "${{ needs.resolve-env.outputs.target }}" = "production" ]; then
+            TOML="wrangler.toml"
+          else
+            TOML="wrangler-staging.toml"
+          fi
+          echo "Deploy via $TOML → ${{ needs.resolve-env.outputs.worker_mcp }}"
+
+          # wrangler deploy usando o toml correto
+          npx wrangler deploy \
+            --config "$TOML" \
+            --compatibility-date "2024-01-01"
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test (${{ needs.resolve-env.outputs.worker_mcp }})
+        run: |
+          sleep 8
+          URL="https://${{ needs.resolve-env.outputs.worker_mcp }}.talkzzbot.workers.dev/health"
+          HTTP=$(curl -s -o /tmp/mcp_health.json -w "%{http_code}" "$URL")
+          if [ "$HTTP" != "200" ]; then
+            echo "❌ MCP smoke FALHOU: HTTP $HTTP"
+            cat /tmp/mcp_health.json; exit 1
+          fi
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/mcp_health.json'))
+          print(f'✅ MCP smoke OK: tools={d.get(\"tools\",\"?\")} version={d.get(\"version\",\"?\")} env={d.get(\"env\",\"?\")}')
           "

@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apoya-gestao-staging",
+  "account_id": "6a1f63a05cfee45db8eae23a69d916c5",
+  "compatibility_date": "2025-09-24",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "main": "src/server.ts",
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "WORKER_ENV": "staging"
+  }
+}
