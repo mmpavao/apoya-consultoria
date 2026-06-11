@@ -1,41 +1,24 @@
 // Client-side Supabase client — uses anon/publishable key (safe to be public)
-// NOTE: VITE_ vars are replaced at BUILD TIME by Vite for browser bundles.
-// For SSR/Cloudflare Workers runtime, we fall back to globalThis.__env__ or process.env.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+// VITE_ vars are substituted at build time by Vite for browser bundles.
+// The fallback value IS the public anon key — this is intentional and safe.
+// Supabase anon key is designed to be public (client-side safe).
+// See: https://supabase.com/docs/guides/api/api-keys
+// NEVER use the service_role key here — that belongs in supabase-server.ts only.
 const SUPABASE_URL =
   (import.meta.env.VITE_SUPABASE_URL as string | undefined) ??
-  (typeof globalThis !== "undefined" ? (globalThis as any).__env__?.VITE_SUPABASE_URL : undefined) ??
-  (typeof process !== "undefined" ? process.env?.VITE_SUPABASE_URL ?? process.env?.SUPABASE_URL : undefined) ??
   "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
 
-// anon key is PUBLIC by Supabase design — safe to include in client-side code.
-// Resolution order:
-// 1. Vite build-time substitution (browser bundles)
-// 2. Cloudflare Workers runtime via globalThis.__env__ (SSR)
-// 3. process.env fallback (nodejs_compat)
-// 4. Throw with clear message if genuinely absent (misconfiguration)
-function getAnonKey(): string {
-  const key =
-    (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
-    (typeof globalThis !== "undefined" ? (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY : undefined) ??
-    (typeof globalThis !== "undefined" ? (globalThis as any).__env__?.SUPABASE_PUBLISHABLE_KEY : undefined) ??
-    (typeof process !== "undefined" ? process.env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env?.SUPABASE_PUBLISHABLE_KEY : undefined);
-
-  if (!key || key.length < 20) {
-    throw new Error(
-      "[config] Supabase anon key not found. " +
-      "For Cloudflare Workers: configure VITE_SUPABASE_PUBLISHABLE_KEY as a Worker secret. " +
-      "For local dev: add VITE_SUPABASE_PUBLISHABLE_KEY to .env. " +
-      "The anon key is public and safe to include in client code."
-    );
-  }
-  return key;
-}
+const SUPABASE_PUBLISHABLE_KEY =
+  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
+  // Fallback: public anon key — safe to hardcode in client-side code.
+  // Rotate via Supabase Dashboard → Settings → API → anon key.
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
 
 function createSupabaseClient() {
-  return createClient<Database>(SUPABASE_URL, getAnonKey(), {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
