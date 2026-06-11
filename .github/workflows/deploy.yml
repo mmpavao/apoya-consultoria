@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Job principal (legado — apoya-gestao monolito) ─────────────────────────
   deploy:
-    name: Build & Deploy
+    name: Build & Deploy (apoya-gestao)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -36,25 +37,23 @@ jobs:
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # ── Injetar secrets no Worker (wrangler secret put) ─────────────────
       - name: Inject Worker Secrets
         run: |
-          echo "${{ secrets.ASAAS_API_KEY }}"          | npx wrangler secret put ASAAS_API_KEY          --name apoya-gestao
-          echo "${{ secrets.FOCUSNFE_API_TOKEN }}"     | npx wrangler secret put FOCUSNFE_API_TOKEN     --name apoya-gestao
-          echo "${{ secrets.EVOLUTION_API_KEY }}"      | npx wrangler secret put EVOLUTION_API_KEY      --name apoya-gestao
-          echo "${{ secrets.SUPABASE_URL }}"           | npx wrangler secret put SUPABASE_URL           --name apoya-gestao
-          echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --name apoya-gestao
-          echo "${{ secrets.PLUGGY_CLIENT_ID }}"        | npx wrangler secret put PLUGGY_CLIENT_ID        --name apoya-gestao
-          echo "${{ secrets.PLUGGY_CLIENT_SECRET }}"     | npx wrangler secret put PLUGGY_CLIENT_SECRET     --name apoya-gestao
-          echo "${{ secrets.PLUGGY_WEBHOOK_SECRET }}"    | npx wrangler secret put PLUGGY_WEBHOOK_SECRET    --name apoya-gestao
-          echo "${{ secrets.APOYA_INTERNAL_SECRET }}"  | npx wrangler secret put APOYA_INTERNAL_SECRET  --name apoya-gestao
+          echo "${{ secrets.ASAAS_API_KEY }}"              | npx wrangler secret put ASAAS_API_KEY              --name apoya-gestao
+          echo "${{ secrets.FOCUSNFE_API_TOKEN }}"         | npx wrangler secret put FOCUSNFE_API_TOKEN         --name apoya-gestao
+          echo "${{ secrets.EVOLUTION_API_KEY }}"          | npx wrangler secret put EVOLUTION_API_KEY          --name apoya-gestao
+          echo "${{ secrets.SUPABASE_URL }}"               | npx wrangler secret put SUPABASE_URL               --name apoya-gestao
+          echo "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"  | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY  --name apoya-gestao
+          echo "${{ secrets.PLUGGY_CLIENT_ID }}"           | npx wrangler secret put PLUGGY_CLIENT_ID           --name apoya-gestao
+          echo "${{ secrets.PLUGGY_CLIENT_SECRET }}"       | npx wrangler secret put PLUGGY_CLIENT_SECRET       --name apoya-gestao
+          echo "${{ secrets.PLUGGY_WEBHOOK_SECRET }}"      | npx wrangler secret put PLUGGY_WEBHOOK_SECRET      --name apoya-gestao
+          echo "${{ secrets.APOYA_INTERNAL_SECRET }}"      | npx wrangler secret put APOYA_INTERNAL_SECRET      --name apoya-gestao
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         continue-on-error: true
 
-      # ── Deploy Supabase Edge Functions ────────────────────────────────────
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
@@ -67,3 +66,70 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         continue-on-error: true
+
+  # ── Job MCP modular (apoya-mcp v3.1) ──────────────────────────────────────
+  deploy-mcp:
+    name: Deploy apoya-mcp (modular)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Só roda se houver mudança em workers/apoya-mcp/
+    # Para forçar no workflow_dispatch, sempre roda
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install esbuild
+        run: npm install -g esbuild
+
+      - name: Bundle apoya-mcp (esbuild → service-worker format)
+        working-directory: workers/apoya-mcp
+        run: |
+          esbuild src/index.js \
+            --bundle \
+            --format=esm \
+            --platform=browser \
+            --target=es2022 \
+            --outfile=dist/bundle.js
+          # Converter para service worker format (CF Workers sem módulos)
+          python3 - << 'PYEOF'
+          content = open('dist/bundle.js').read()
+          content = content.replace('export {\n  index_default as default\n};','').replace('export { index_default as default };','').strip()
+          content += '\n\naddEventListener("fetch", (event) => {\n  event.respondWith(index_default.fetch(event.request, globalThis));\n});\n'
+          open('dist/bundle-sw.js','w').write(content)
+          import re
+          tools = re.findall(r'name:\s*["\\']([\w_]+)["\\']\s*,\s*description', content)
+          print(f"Bundle OK: {len(set(tools))} tools, {len(content)} bytes")
+          PYEOF
+
+      - name: Deploy apoya-mcp to Cloudflare
+        working-directory: workers/apoya-mcp
+        run: |
+          curl -s -o deploy_resp.json -w "HTTP %{http_code}\n" \
+            -X PUT \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/javascript" \
+            --data-binary "@dist/bundle-sw.js" \
+            "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/apoya-mcp"
+          python3 -c "
+          import json
+          d = json.load(open('deploy_resp.json'))
+          print('success:', d.get('success'))
+          for e in d.get('errors',[]): print('ERR:', e)
+          if not d.get('success'): exit(1)
+          "
+
+      - name: Health check produção
+        run: |
+          sleep 5
+          curl -sf https://apoya-mcp.talkzzbot.workers.dev/health | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          assert d['tools'] == 80, f'tools={d[\"tools\"]} != 80'
+          assert d['parity'] == 'ok', f'parity={d[\"parity\"]}'
+          print(f'✅ health OK: tools={d[\"tools\"]} parity={d[\"parity\"]} version={d[\"version\"]}')
+          "
