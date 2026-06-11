@@ -30,25 +30,28 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+function anonKey(): string {
+  return (
+    (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+    (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM"
+  );
+}
+
 async function autenticarSessao(
   request: Request
-): Promise<{ userId: string; email: string; atorTipo: "humano" } | Response> {
+): Promise<{ userId: string; email: string; atorTipo: "humano"; token: string } | Response> {
   const authHeader = request.headers.get("authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) return json({ error: "Nao autenticado" }, 401);
   const token = authHeader.slice(7).trim();
 
-  const anonKey =
-    (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-    (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
-
   const resp = await fetch(`${SUPA_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: anonKey },
+    headers: { Authorization: `Bearer ${token}`, apikey: anonKey() },
   });
   if (!resp.ok) return json({ error: "Sessao invalida" }, 401);
   const user = (await resp.json()) as { id?: string; email?: string };
   if (!user?.id) return json({ error: "Usuario nao encontrado" }, 401);
-  return { userId: user.id, email: user.email ?? "", atorTipo: "humano" };
+  return { userId: user.id, email: user.email ?? "", atorTipo: "humano", token };
 }
 
 async function callMcp(tool: string, args: unknown): Promise<unknown> {
@@ -106,16 +109,7 @@ export const Route = createFileRoute("/api/pipeline/mover")({
         // 1. Autenticar sessao — ator_tipo = "humano" garantido pelo servidor
         const auth = await autenticarSessao(request);
         if (auth instanceof Response) return auth;
-        const { userId, email, atorTipo } = auth;
-
-        // B2: Verificar setor da tarefa — buscar setor_slug da tarefa para validar
-        // Para não adicionar latência extra, verificamos o setor 'fiscal' por default
-        // e após buscar a tarefa confirmamos. Por simplicidade B2: verificar via body.setor
-        const userToken = request.headers.get("authorization")!.slice(7).trim();
-        const anonKey =
-          (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-          (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+        const { userId, email, atorTipo, token } = auth;
 
         // 2. Parsear body
         let body: any;
@@ -123,9 +117,24 @@ export const Route = createFileRoute("/api/pipeline/mover")({
           return json({ error: "JSON invalido" }, 400);
         }
 
-        const { tarefa_id, etapa_destino, motivo, setor } = body ?? {};
+        const { tarefa_id, etapa_destino, motivo } = body ?? {};
         if (!tarefa_id) return json({ error: "tarefa_id obrigatorio" }, 400);
         if (!etapa_destino) return json({ error: "etapa_destino obrigatorio" }, 400);
+
+        // 2b. B2 isolamento (escrita) — o setor é lido da TAREFA REAL via MCP,
+        //     NUNCA do payload (anti-spoof). Sem isso, qualquer autenticado moveria
+        //     tarefa de qualquer setor. checkUserSetor: admin passa, senão precisa do setor.
+        try {
+          const tarefa = (await callMcp("tarefa_buscar", { id: tarefa_id })) as any;
+          const tSetor = Array.isArray(tarefa) ? tarefa[0]?.setor : tarefa?.setor;
+          if (tSetor && !(await checkUserSetor(userId, anonKey(), token, tSetor))) {
+            return json({ error: `Acesso negado ao setor: ${tSetor}`, code: "SETOR_NEGADO" }, 403);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[/api/pipeline/mover setor-check]", msg);
+          return json({ error: "Falha ao validar setor da tarefa" }, 502);
+        }
 
         // 3. Chamar tarefa_mover_etapa no MCP com ator derivado da sessao
         //    NUNCA aceitar ator_tipo do payload — F1.1 compliance

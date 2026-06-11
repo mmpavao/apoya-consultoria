@@ -48,9 +48,12 @@ export function PermissionGuard({
   const { can, inSetor, isAdmin, loading } = useMinhasPermissoes();
   const navigate = useNavigate();
 
+  // Admin sempre passa. Caso contrário, TODA condição exigida (slug e/ou setor)
+  // precisa ser satisfeita — daí o AND. Com OR, passar só `setor` deixava a rota
+  // sempre liberada (o ramo `slug ? ... : true` vira true). Bug latente corrigido.
   const authorized = isAdmin
-    || (slug  ? can(slug)      : true)
-    || (setor ? inSetor(setor) : true);
+    || ((slug  ? can(slug)      : true)
+     && (setor ? inSetor(setor) : true));
 
   useEffect(() => {
     if (!loading && !authorized && fallback === undefined && !showDenied) {
