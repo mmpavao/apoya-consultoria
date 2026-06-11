@@ -5,7 +5,10 @@ import { Plus, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PipelineKanban } from "@/components/PipelineKanban";
 import { PageHeader } from "@/components/PagePlaceholder";
+import { useAuth } from "@/hooks/use-auth";
 import {
   useSocietario, ProcessoSocietario, FaseProcesso, TipoProcesso,
   FASE_LABEL, FASE_COR, TIPO_LABEL, PRIORIDADE_COR, PRIORIDADE_LABEL, STATUS_LABEL,
@@ -31,8 +34,10 @@ const fmtData = (iso?:string|null) => {
 
 function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
+  const { roles } = useAuth();
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
+  const podeAprovar = roles.includes("admin") || roles.includes("contador");
   const [filtroTipo,setFiltroTipo] = useState<"todos"|TipoProcesso>("todos");
   const [filtroResp,setFiltroResp] = useState("todos");
   const [modalProcesso,setModalProcesso] = useState<ProcessoSocietario|null>(null);
@@ -66,10 +71,48 @@ function SocietarioPage__Inner() {
       <PageHeader
         eyebrow="Gestão"
         title="Societário"
-        subtitle="Pipeline de processos societários — abertura, alteração, encerramento e outros"
+        subtitle="Abertura, alteração, encerramento e transformação de empresas"
         actions={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center border rounded-lg overflow-hidden">
+          <Button size="sm" onClick={()=>setShowNovo(true)} className="gap-1.5">
+            <Plus className="h-4 w-4"/>Novo Processo
+          </Button>
+        }
+      />
+
+      <Tabs defaultValue="pipeline" className="space-y-4">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="pipeline">Pipeline de Tarefas</TabsTrigger>
+          <TabsTrigger value="processos">Processos Societários</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pipeline" className="mt-0">
+          <PipelineKanban setor="societario" podeAprovar={podeAprovar} />
+        </TabsContent>
+
+        <TabsContent value="processos" className="mt-0 space-y-4">
+          {/* Filtros + toggle vista */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-48 max-w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"/>
+              <Input placeholder="Buscar empresa ou CNPJ..." className="pl-8 h-8 text-sm" value={query} onChange={e=>setQuery(e.target.value)}/>
+            </div>
+            <Select value={filtroTipo} onValueChange={v=>setFiltroTipo(v as typeof filtroTipo)}>
+              <SelectTrigger className="w-40 h-8 text-sm"><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                {TIPOS.map(t=><SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {responsaveis.length>0 && (
+              <Select value={filtroResp} onValueChange={setFiltroResp}>
+                <SelectTrigger className="w-44 h-8 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos responsáveis</SelectItem>
+                  {responsaveis.map(r=><SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex items-center border rounded-lg overflow-hidden ml-auto">
               <button className={`px-2.5 py-1.5 flex items-center gap-1 text-xs transition-colors ${view==="kanban"?"bg-primary text-primary-foreground":"hover:bg-muted"}`} onClick={()=>setView("kanban")}>
                 <LayoutGrid className="h-3.5 w-3.5"/>Kanban
               </button>
@@ -77,39 +120,10 @@ function SocietarioPage__Inner() {
                 <List className="h-3.5 w-3.5"/>Lista
               </button>
             </div>
-            <Button size="sm" onClick={()=>setShowNovo(true)} className="gap-1.5">
-              <Plus className="h-4 w-4"/>Novo Processo
-            </Button>
+            <span className="text-xs text-muted-foreground">{filtrados.length} de {processos.length} processo{processos.length!==1?"s":""}</span>
           </div>
-        }
-      />
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-48 max-w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"/>
-          <Input placeholder="Buscar empresa ou CNPJ..." className="pl-8 h-8 text-sm" value={query} onChange={e=>setQuery(e.target.value)}/>
-        </div>
-        <Select value={filtroTipo} onValueChange={v=>setFiltroTipo(v as typeof filtroTipo)}>
-          <SelectTrigger className="w-40 h-8 text-sm"><SelectValue/></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os tipos</SelectItem>
-            {TIPOS.map(t=><SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {responsaveis.length>0 && (
-          <Select value={filtroResp} onValueChange={setFiltroResp}>
-            <SelectTrigger className="w-44 h-8 text-sm"><SelectValue/></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos responsáveis</SelectItem>
-              {responsaveis.map(r=><SelectItem key={r} value={r}>{r}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-        <span className="text-xs text-muted-foreground ml-auto">{filtrados.length} de {processos.length} processo{processos.length!==1?"s":""}</span>
-      </div>
-
-      {loading && <div className="text-center py-16 text-muted-foreground">Carregando processos...</div>}
+          {loading && <div className="text-center py-16 text-muted-foreground">Carregando processos...</div>}
 
       {/* KANBAN */}
       {!loading&&view==="kanban"&&(
@@ -184,8 +198,11 @@ function SocietarioPage__Inner() {
         </div>
       )}
 
-      <ProcessoModal processo={modalProcesso} open={!!modalProcesso} onClose={()=>setModalProcesso(null)}
-        onMoverFase={handleMover} onComentario={adicionarComentario} onAtualizar={atualizarProcesso} autorPadrao="Gestor"/>
+          <ProcessoModal processo={modalProcesso} open={!!modalProcesso} onClose={()=>setModalProcesso(null)}
+            onMoverFase={handleMover} onComentario={adicionarComentario} onAtualizar={atualizarProcesso} autorPadrao="Gestor"/>
+        </TabsContent>
+      </Tabs>
+
       <NovoProcessoForm open={showNovo} onClose={()=>setShowNovo(false)}
         onSalvar={async(data)=>{await criarProcesso(data);}}/>
     </div>

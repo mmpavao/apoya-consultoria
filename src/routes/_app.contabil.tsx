@@ -1,7 +1,6 @@
 /**
  * Rota: /contabil — Contabilidade (visão consolidada)
- * KPIs + tabela de todos os clientes com períodos contábeis
- * Escopo: Simples Nacional apenas
+ * Pipeline de tarefas + KPIs + tabela de períodos contábeis por cliente
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SectorGuard } from "@/components/SectorGuard";
@@ -15,7 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageHeader, KpiGrid, KpiCard } from "@/components/PagePlaceholder";
 import { DataTable, InlineBadge, type ColDef } from "@/components/DataTable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PipelineKanban } from "@/components/PipelineKanban";
 import { useAbrirPeriodo } from "@/hooks/use-contabil";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/contabil")({
@@ -40,6 +42,7 @@ function mesAtual() {
 
 function ContabilPage__Inner() {
   const navigate = useNavigate();
+  const { roles } = useAuth();
   const [clientes, setClientes] = useState<ClienteContabil[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAbrirPeriodo, setShowAbrirPeriodo] = useState(false);
@@ -49,6 +52,7 @@ function ContabilPage__Inner() {
     competencia: new Date().toISOString().slice(0, 7),
   });
   const competencia = mesAtual();
+  const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   useEffect(() => {
     (async () => {
@@ -67,7 +71,6 @@ function ContabilPage__Inner() {
 
         const ids = clientesData.map((c: { id: string }) => c.id);
 
-        // Períodos do mês atual
         const { data: periodosData } = await db
           .from("periodos_contabeis")
           .select("empresa_id, status, fechado_em")
@@ -79,7 +82,6 @@ function ContabilPage__Inner() {
           periodoMap[p.empresa_id] = { status: p.status, fechado_em: p.fechado_em };
         }
 
-        // Lançamentos do mês atual
         const { data: lancData } = await db
           .from("lancamentos_contabeis")
           .select("empresa_id")
@@ -167,7 +169,7 @@ function ContabilPage__Inner() {
       <PageHeader
         eyebrow="Gestão"
         title="Contabilidade"
-        subtitle="Visão consolidada de períodos contábeis de todos os clientes"
+        subtitle={`Lançamentos, períodos e fechamento mensal · competência ${competencia.split("-").reverse().join("/")}`}
         actions={
           <Button size="sm" onClick={() => setShowAbrirPeriodo(true)} className="rounded-xl gap-1.5">
             <Plus className="h-4 w-4" /> Abrir Período
@@ -175,7 +177,6 @@ function ContabilPage__Inner() {
         }
       />
 
-      {/* Dialog — Abrir Período */}
       <Dialog open={showAbrirPeriodo} onOpenChange={setShowAbrirPeriodo}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -226,17 +227,30 @@ function ContabilPage__Inner() {
         <KpiCard icon={AlertTriangle} label="Com Divergência"        value={comDivergencia}   tone={comDivergencia > 0 ? "danger" : "neutral"} />
       </KpiGrid>
 
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Carregando clientes...</div>
-      ) : (
-        <DataTable
-          cols={cols}
-          rows={clientes}
-          emptyText="Nenhum cliente encontrado."
-          getKey={(r) => r.id}
-          onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
-        />
-      )}
+      <Tabs defaultValue="pipeline" className="space-y-4">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="periodos">Períodos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pipeline" className="mt-0">
+          <PipelineKanban setor="contabil" podeAprovar={podeAprovar} />
+        </TabsContent>
+
+        <TabsContent value="periodos" className="mt-0">
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground">Carregando clientes...</div>
+          ) : (
+            <DataTable
+              cols={cols}
+              rows={clientes}
+              emptyText="Nenhum cliente encontrado."
+              getKey={(r) => r.id}
+              onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

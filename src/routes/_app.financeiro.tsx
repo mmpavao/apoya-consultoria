@@ -2,6 +2,8 @@ import { useCobrancas, type Cobranca, type CobrancaStatus, type ReguaStage } fro
 import { SectorGuard } from "@/components/SectorGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { PipelineKanban } from "@/components/PipelineKanban";
+import { useAuth } from "@/hooks/use-auth";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
   Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
@@ -63,7 +65,9 @@ function FinanceiroPage__Inner(){
     }
   };
 
-  type FinView = "cobrancas" | "inadimplencia";
+  const { roles } = useAuth();
+  const podeAprovar = roles.includes("admin") || roles.includes("contador");
+  type FinView = "pipeline" | "cobrancas" | "inadimplencia";
   const [finView, setFinView]          = useState<FinView>("cobrancas");
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
   const [executandoRegua, setExecRegua] = useState(false);
@@ -387,6 +391,11 @@ function FinanceiroPage__Inner(){
       {/* ── Tabs de view ── */}
       <div className="flex items-center gap-1 border-b">
         <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${finView==="pipeline"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={()=>setFinView("pipeline")}>
+          Pipeline
+        </button>
+        <button
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${finView==="cobrancas"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
           onClick={()=>setFinView("cobrancas")}>
           Cobranças
@@ -398,6 +407,10 @@ function FinanceiroPage__Inner(){
           {inadimplentes.length>0&&<span className="bg-rose-100 text-rose-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">{inadimplentes.length}</span>}
         </button>
       </div>
+
+      {finView==="pipeline"&&(
+        <PipelineKanban setor="financeiro" podeAprovar={podeAprovar} />
+      )}
 
       {/* ── VIEW: INADIMPLÊNCIA ── */}
       {finView==="inadimplencia"&&(
