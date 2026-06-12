@@ -239,7 +239,46 @@ function ContabilPage__Inner() {
 
         <TabsContent value="periodos" className="mt-0">
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">Carregando clientes...</div>
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Carregando clientes...</p>
+            </div>
+          ) : clientes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                <BookOpen className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Nenhum cliente cadastrado</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                  Cadastre clientes em <strong>Clientes</strong> para que apareçam aqui com seus períodos contábeis.
+                </p>
+              </div>
+            </div>
+          ) : semPeriodo === clientes.length ? (
+            <div className="mb-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    Nenhum período aberto para {competencia.split("-").reverse().join("/")}
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Clique em <strong>+ Abrir Período</strong> para iniciar o mês contábil de cada cliente.
+                    Sem período aberto, não é possível registrar lançamentos.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <DataTable
+                  cols={cols}
+                  rows={clientes}
+                  emptyText="Nenhum cliente encontrado."
+                  getKey={(r) => r.id}
+                  onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
+                />
+              </div>
+            </div>
           ) : (
             <DataTable
               cols={cols}

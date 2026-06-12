@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SectorGuard } from "@/components/SectorGuard";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Users, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,29 @@ function DpPage__Inner() {
   const [novoFuncEmpresa, setNovoFuncEmpresa] = useState("");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
+  /* ── Agente RH — KPIs dinâmicos ─────────────────────────── */
+  const [rhKpis, setRhKpis] = useState<{
+    folhas_abertas: number;
+    ferias_proximas_30d: number;
+  }>({ folhas_abertas: 0, ferias_proximas_30d: 0 });
+
+  useEffect(() => {
+    fetch(
+      "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-rh",
+      { method: "POST" }
+    )
+      .then(r => r.json())
+      .then((d: { success?: boolean; resumo?: { folhas_abertas: number; ferias_proximas_30d: number } }) => {
+        if (d.success && d.resumo) {
+          setRhKpis({
+            folhas_abertas:     d.resumo.folhas_abertas,
+            ferias_proximas_30d: d.resumo.ferias_proximas_30d,
+          });
+        }
+      })
+      .catch(() => { /* silencioso */ });
+  }, []);
+
   const totalAtivos = useMemo(
     () => todosFuncionarios.filter(f => f.status === "ativo").length,
     [todosFuncionarios]
@@ -87,8 +110,8 @@ function DpPage__Inner() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Funcionários Ativos",  val: totalAtivos,    cls: "text-foreground" },
-          { label: "Folhas Abertas",        val: 0,              cls: "text-amber-600" },
-          { label: "Férias Vencendo (30d)", val: 0,              cls: "text-amber-600" },
+          { label: "Folhas Abertas",        val: rhKpis.folhas_abertas,      cls: "text-amber-600" },
+          { label: "Férias Vencendo (30d)", val: rhKpis.ferias_proximas_30d, cls: "text-amber-600" },
           { label: "Rescisões do Mês",      val: totalDemitidos, cls: "text-red-600" },
         ].map(k => (
           <div key={k.label} className="surface-card px-4 py-3 flex items-center gap-3">
