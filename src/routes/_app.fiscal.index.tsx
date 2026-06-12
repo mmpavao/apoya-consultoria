@@ -784,6 +784,163 @@ function AutomacoesTab() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// TAB — DASHBOARD FISCAL
+// ════════════════════════════════════════════════════════════════
+function DashboardTab() {
+  const { kpis, loading: kpiLoading, refetch } = useFiscalKpis();
+  const [obrigacoes, setObrigacoes] = useState<any[]>([]);
+  const [agenteLog, setAgenteLog]   = useState<any[]>([]);
+  const [loadingOb, setLoadingOb]   = useState(true);
+  const [loadingLog, setLoadingLog] = useState(true);
+
+  useEffect(() => {
+    // Carregar obrigações recentes
+    (supabase as any)
+      .from("obrigacoes")
+      .select("id,tipo,cliente_nome,vencimento,status,valor_estimado")
+      .order("vencimento", { ascending: true })
+      .limit(8)
+      .then(({ data }: any) => { setObrigacoes(data ?? []); setLoadingOb(false); });
+
+    // Carregar logs dos agentes
+    (supabase as any)
+      .from("agente_logs")
+      .select("id,agente,acao,resultado,erro_mensagem,executado_em")
+      .order("executado_em", { ascending: false })
+      .limit(6)
+      .then(({ data }: any) => { setAgenteLog(data ?? []); setLoadingLog(false); });
+  }, []);
+
+  const hoje = new Date().toISOString().split("T")[0];
+  const vencidas   = obrigacoes.filter(o => o.vencimento < hoje && !["concluida","cancelada"].includes(o.status));
+  const aVencer    = obrigacoes.filter(o => o.vencimento >= hoje && !["concluida","cancelada"].includes(o.status));
+  const concluidas = obrigacoes.filter(o => o.status === "concluida");
+
+  const fmtDate = (d: string) => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+  const fmtTs   = (ts: string) => ts ? new Date(ts).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
+
+  const statusColor: Record<string, string> = {
+    pendente:     "text-blue-600 bg-blue-50 border-blue-200",
+    em_andamento: "text-amber-600 bg-amber-50 border-amber-200",
+    concluida:    "text-emerald-600 bg-emerald-50 border-emerald-200",
+    atrasada:     "text-red-600 bg-red-50 border-red-200",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <FKpiCard label="Obrigações Vencidas" value={kpis?.obrigacoes_vencidas ?? 0}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpiLoading} />
+        <FKpiCard label="A vencer (7 dias)"   value={kpis?.obrigacoes_a_vencer_7d ?? 0} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpiLoading} />
+        <FKpiCard label="DAS Pendentes"        value={kpis?.das_pendentes ?? 0}           icon={Receipt}       variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}          loading={kpiLoading} />
+        <FKpiCard label="Certificados < 30d"   value={kpis?.certificados_expirando ?? 0}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpiLoading} />
+      </div>
+
+      {/* Duas colunas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Coluna 1 — Obrigações próximas */}
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b">
+            <div>
+              <h3 className="text-sm font-semibold">Obrigações próximas</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Ordenadas por vencimento</p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={refetch} disabled={kpiLoading}>
+              <RefreshCw className={cn("h-3 w-3", kpiLoading && "animate-spin")} />
+            </Button>
+          </div>
+          {loadingOb ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : obrigacoes.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+              <p className="text-sm">Nenhuma obrigação pendente</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/40">
+              {obrigacoes.slice(0, 7).map(ob => {
+                const atrasado = ob.vencimento < hoje && !["concluida","cancelada"].includes(ob.status);
+                return (
+                  <div key={ob.id} className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors">
+                    <div className={cn("shrink-0 h-2 w-2 rounded-full", atrasado ? "bg-red-500" : ob.status === "concluida" ? "bg-emerald-500" : "bg-blue-500")} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{ob.tipo}</p>
+                      <p className="text-xs text-muted-foreground truncate">{ob.cliente_nome ?? "—"}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={cn("text-xs font-semibold tabular-nums", atrasado ? "text-red-600" : "text-foreground")}>
+                        {fmtDate(ob.vencimento)}
+                      </p>
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", statusColor[ob.status] ?? "text-muted-foreground bg-muted border-border")}>
+                        {ob.status?.replace("_", " ")}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Coluna 2 — Atividade dos Agentes */}
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b">
+            <h3 className="text-sm font-semibold">Atividade dos Agentes</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Últimas execuções automáticas</p>
+          </div>
+          {loadingLog ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : agenteLog.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+              <Activity className="h-8 w-8 opacity-30" />
+              <p className="text-sm">Nenhuma execução registrada</p>
+              <p className="text-xs opacity-60">Execute um agente na aba Automações</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/40">
+              {agenteLog.map(log => (
+                <div key={log.id} className="px-5 py-3 flex items-start gap-3 hover:bg-muted/20 transition-colors">
+                  <div className={cn("mt-0.5 shrink-0 h-2 w-2 rounded-full", log.resultado === "ok" ? "bg-emerald-500" : log.resultado === "erro" ? "bg-red-500" : "bg-yellow-500")} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{log.acao?.replace(/_/g, " ")}</p>
+                      <span className="text-[10px] font-mono text-muted-foreground">{log.agente}</span>
+                    </div>
+                    {log.erro_mensagem && <p className="text-xs text-red-500 truncate mt-0.5">{log.erro_mensagem}</p>}
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{fmtTs(log.executado_em)}</p>
+                  </div>
+                  <span className={cn("shrink-0 text-[10px] px-1.5 py-0.5 rounded border font-semibold", log.resultado === "ok" ? "text-emerald-600 bg-emerald-50 border-emerald-200" : log.resultado === "erro" ? "text-red-600 bg-red-50 border-red-200" : "text-yellow-600 bg-yellow-50 border-yellow-200")}>
+                    {log.resultado ?? "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Resumo de status */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border bg-card p-4 text-center">
+          <p className="text-3xl font-bold text-red-600 tabular-nums">{vencidas.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">Vencidas</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 text-center">
+          <p className="text-3xl font-bold text-amber-600 tabular-nums">{aVencer.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">A vencer</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 text-center">
+          <p className="text-3xl font-bold text-emerald-600 tabular-nums">{concluidas.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">Concluídas</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ════════════════════════════════════════════════════════════════
 // TAB — CONFIGURAÇÕES
 // ════════════════════════════════════════════════════════════════
 function ConfiguracoesTab() {
@@ -804,7 +961,7 @@ function ConfiguracoesTab() {
   }
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4">
       <div className="rounded-lg border bg-card p-5 space-y-4">
         <div><h3 className="text-sm font-semibold">Gateway SERPRO</h3><p className="text-xs text-muted-foreground mt-0.5">Conexão com mcp.zapro.tech para consultas na Receita Federal</p></div>
         <div className="flex items-center gap-3">
@@ -876,6 +1033,7 @@ function FiscalModuloInner() {
 
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="das">DAS</TabsTrigger>
           <TabsTrigger value="nfse">NFS-e</TabsTrigger>
@@ -885,6 +1043,9 @@ function FiscalModuloInner() {
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="dashboard" className="mt-0">
+          <DashboardTab />
+        </TabsContent>
         <TabsContent value="pipeline" className="mt-0">
           <PipelineKanban setor="fiscal" podeAprovar={podeAprovar} />
         </TabsContent>
