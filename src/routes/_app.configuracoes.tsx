@@ -15,7 +15,7 @@ import {
   Copy, Eye, EyeOff, KeyRound, Mail, MessageSquare,
   Network, Package, Plug, Plus, RefreshCw, Save,
   Shield, Trash2, UserPlus, Users, XCircle, Zap,
-} from "lucide-react";
+, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import { PageHeader } from "@/components/PagePlaceholder";
 import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 import { PermissoesTab } from "@/components/PermissoesTab";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TS, APP_SPRINT, VERSION_HISTORY } from "@/lib/version";
 
 export const Route = createFileRoute("/_app/configuracoes")({
   component: ConfiguracoesPage,
@@ -71,6 +72,9 @@ function ConfiguracoesPage() {
           </TabsTrigger>
           <TabsTrigger value="mcp" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <Network className="h-4 w-4" />MCP / API
+          </TabsTrigger>
+          <TabsTrigger value="sistema" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <Info className="h-4 w-4" /> Sistema
           </TabsTrigger>
         </TabsList>
 
@@ -748,7 +752,58 @@ function McpSection() {
         </div>
       </div>
 
-      {/* Modal nova key */}
+
+        <TabsContent value="sistema" className="space-y-6">
+          {/* Versão atual */}
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">APOYA CONTABILIDADE</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{APP_SPRINT}</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-mono font-semibold text-emerald-700">
+                v{APP_VERSION}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <p className="text-muted-foreground">Data do deploy</p>
+                <p className="font-medium text-foreground mt-0.5">{APP_BUILD_DATE}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Timestamp</p>
+                <p className="font-medium text-foreground mt-0.5 font-mono">{APP_BUILD_TS}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Histórico de versões */}
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Histórico de versões</h3>
+            <div className="space-y-4">
+              {VERSION_HISTORY.map((v) => (
+                <div key={v.version} className="border-l-2 border-border pl-4 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-semibold text-foreground">v{v.version}</span>
+                    <span className="text-xs text-muted-foreground">{v.date}</span>
+                    <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{v.sha}</span>
+                    <span className="text-xs text-muted-foreground">{v.sprint}</span>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {v.changes.map((c, i) => (
+                      <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <span className="text-emerald-500 mt-0.5">✓</span>
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+      {/* Modal nova key */
       <Dialog open={modalOpen} onOpenChange={v => !v && closeModal()}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/>Nova API Key</DialogTitle></DialogHeader>
