@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
@@ -483,26 +485,39 @@ function ContabilPageInner() {
         <Button size="sm" variant="outline" className="gap-1"><RefreshCw className="h-4 w-4" /> Atualizar</Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <CKpiCard icon={Clock}         label="Períodos Abertos"  value={abertos}   loading={pLoad} variant={abertos > 0 ? "warning" : "default"} />
-        <CKpiCard icon={CheckCircle2}  label="Períodos Fechados" value={fechados}  loading={pLoad} />
-        <CKpiCard icon={BookOpen}      label="Sem Período"       value={semPeriodo} loading={pLoad} variant={semPeriodo > 0 ? "danger" : "default"} />
-        <CKpiCard icon={AlertTriangle} label="Com Divergência"   value={0}         loading={pLoad} />
-      </div>
 
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="periodos">Períodos</TabsTrigger>
           <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
           <TabsTrigger value="plano_contas">Plano de Contas</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
+        <TabsContent value="dashboard" className="mt-0">
+          <ModuleDashboard
+            kpis={[
+              { label: "Períodos Abertos",  value: abertos,    icon: Clock,         variant: abertos > 0 ? "warning" : "default" },
+              { label: "Períodos Fechados", value: fechados,   icon: CheckCircle2,  variant: "default" },
+              { label: "Sem Período",       value: semPeriodo, icon: BookOpen,      variant: semPeriodo > 0 ? "danger" : "default" },
+              { label: "Com Divergência",   value: 0,          icon: AlertTriangle, variant: "default" },
+            ]}
+            kpisLoading={pLoad}
+            agente={{ nome: "Agente Financeiro", edge_fn: "agente-financeiro" }}
+            quickActions={[
+              { label: "Novo Lançamento", icon: BookOpen,      onClick: () => {}, variant: "outline" },
+              { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => {}, variant: "outline" },
+            ]}
+          />
+        </TabsContent>
         <TabsContent value="pipeline"     className="mt-0"><PipelineKanban setor="contabil" podeAprovar={podeAprovar} /></TabsContent>
         <TabsContent value="periodos"     className="mt-0"><PeriodosTab /></TabsContent>
         <TabsContent value="lancamentos"  className="mt-0"><LancamentosTab /></TabsContent>
         <TabsContent value="plano_contas" className="mt-0"><PlanoContasTab /></TabsContent>
+        <TabsContent value="documentos"   className="mt-0"><ModuleDocumentosTab modulo="contabil" /></TabsContent>
         <TabsContent value="automacoes"   className="mt-0"><AutomacoesContabil /></TabsContent>
         <TabsContent value="config"       className="mt-0"><ConfigContabil /></TabsContent>
       </Tabs>

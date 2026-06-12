@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
@@ -383,26 +385,38 @@ function FinanceiroPage__Inner(){
         }
       />
 
-      <KpiGrid cols={4}>
-        <KpiCard icon={Wallet}        tone="neutral" label="Total previsto" value={fmtBRL(kpi.total)}   hint={`${kpi.count} clientes`} />
-        <KpiCard icon={CheckCircle2}  tone="success" label="Recebido"       value={fmtBRL(kpi.pago)}    hint={`${Math.round(kpi.pago/(kpi.total||1)*100)}%`} />
-        <KpiCard icon={AlertTriangle} tone="danger"  label="Em atraso"      value={fmtBRL(kpi.vencido)} hint={`${items.filter(c=>c.status==="vencida").length} cobranças`} />
-        <KpiCard icon={ShieldAlert}   tone="warning" label="Risco alto"     value={kpi.inad}            hint="negativação/suspensão" />
-      </KpiGrid>
 
 
 
-      <Tabs defaultValue="cobrancas" className="space-y-4">
+
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
           <TabsTrigger value="inadimplencia">
             Inadimplência{inadimplentes.length > 0 && <span className="ml-1.5 text-[10px] font-bold bg-red-100 text-red-600 px-1.5 rounded-full">{inadimplentes.length}</span>}
           </TabsTrigger>
           <TabsTrigger value="gateway">Gateway</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="mt-0">
+          <ModuleDashboard
+            kpis={[
+              { label: "Total previsto", value: fmtBRL(kpi.total),   icon: Wallet,        variant: "default", hint: `${kpi.count} clientes` },
+              { label: "Recebido",       value: fmtBRL(kpi.pago),    icon: CheckCircle2,  variant: "success", hint: `${Math.round(kpi.pago/(kpi.total||1)*100)}%` },
+              { label: "Em atraso",      value: fmtBRL(kpi.vencido), icon: AlertTriangle, variant: "danger",  hint: `${items.filter(c=>c.status==="vencida").length} cobranças` },
+              { label: "Risco alto",     value: kpi.inad,             icon: ShieldAlert,   variant: "warning", hint: "negativação/suspensão" },
+            ]}
+            agente={{ nome: "Agente Financeiro", edge_fn: "agente-financeiro" }}
+            quickActions={[
+              { label: "Nova Cobrança", icon: Plus,       onClick: () => setDialogCob(true), variant: "outline" },
+            ]}
+          />
+        </TabsContent>
 
         <TabsContent value="pipeline" className="mt-0">
           <PipelineKanban setor="financeiro" podeAprovar={podeAprovar} />
@@ -603,6 +617,7 @@ function FinanceiroPage__Inner(){
           </div>
         </div>
         </TabsContent>
+        <TabsContent value="documentos" className="mt-0"><ModuleDocumentosTab modulo="financeiro" /></TabsContent>
         </Tabs>
 
       <CobrancaFormDialog

@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
@@ -532,28 +534,41 @@ function DpPageInner() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <DKpiCard icon={Users}         label="Funcionários Ativos"   value={ativos}     loading={funcLoading} />
-        <DKpiCard icon={Calendar}      label="Férias Vencendo (30d)" value={feriasVenc} loading={funcLoading} variant={feriasVenc > 0 ? "warning" : "default"} />
-        <DKpiCard icon={FileText}      label="Rescisões do Mês"      value={demitidos}  loading={funcLoading} variant={demitidos > 0 ? "danger" : "default"} />
-        <DKpiCard icon={CheckCircle2}  label="eSocial Pendentes"     value={ESOCIAL_EVENTOS.filter(e => e.status === "pendente").length} variant="warning" />
-      </div>
 
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="empresas">Empresas</TabsTrigger>
           <TabsTrigger value="folha">Folha</TabsTrigger>
           <TabsTrigger value="ferias">Férias</TabsTrigger>
           <TabsTrigger value="esocial">eSocial</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
+        <TabsContent value="dashboard" className="mt-0">
+          <ModuleDashboard
+            kpis={[
+              { label: "Funcionários Ativos",   value: ativos,      icon: Users,         variant: "default" },
+              { label: "Férias Vencendo (30d)", value: feriasVenc,  icon: Calendar,      variant: feriasVenc > 0 ? "warning" : "default" },
+              { label: "Rescisões do Mês",      value: demitidos,   icon: FileText,      variant: demitidos > 0 ? "danger" : "default" },
+              { label: "eSocial Pendentes",     value: ESOCIAL_EVENTOS.filter(e => e.status === "pendente").length, icon: CheckCircle2, variant: "warning" },
+            ]}
+            kpisLoading={funcLoading}
+            agente={{ nome: "Agente RH/DP", edge_fn: "agente-rh" }}
+            quickActions={[
+              { label: "Nova Folha", icon: FileText, onClick: () => {}, variant: "outline" },
+              { label: "Registrar Férias", icon: Calendar, onClick: () => {}, variant: "outline" },
+            ]}
+          />
+        </TabsContent>
         <TabsContent value="pipeline" className="mt-0"><PipelineKanban setor="dp" podeAprovar={podeAprovar} /></TabsContent>
         <TabsContent value="empresas" className="mt-0"><EmpresasTab /></TabsContent>
         <TabsContent value="folha"    className="mt-0"><FolhaTab /></TabsContent>
         <TabsContent value="ferias"   className="mt-0"><FeriasTab /></TabsContent>
         <TabsContent value="esocial"  className="mt-0"><EsocialTab /></TabsContent>
+        <TabsContent value="documentos" className="mt-0"><ModuleDocumentosTab modulo="dp" /></TabsContent>
         <TabsContent value="automacoes" className="mt-0"><AutomacoesDP /></TabsContent>
         <TabsContent value="config"   className="mt-0"><ConfigDP /></TabsContent>
       </Tabs>

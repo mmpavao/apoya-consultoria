@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
+import { FileText, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { PageHeader } from "@/components/PagePlaceholder";
 import { useAuth } from "@/hooks/use-auth";
@@ -79,14 +82,29 @@ function SocietarioPage__Inner() {
         }
       />
 
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
-          <TabsTrigger value="pipeline">Pipeline de Tarefas</TabsTrigger>
-          <TabsTrigger value="processos">Processos Societários</TabsTrigger>
-        
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="processos">Processos</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
-          <TabsTrigger value="config">Config</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="mt-0">
+          <ModuleDashboard
+            kpis={[
+              { label: "Total Processos",   value: processos.length,                                                           icon: FileText,      variant: "default" },
+              { label: "Em Andamento",      value: processos.filter(p => p.fase !== "concluido").length, icon: CheckCircle2, variant: "info" },
+              { label: "Concluídos",        value: processos.filter(p => p.fase === "concluido").length,                       icon: CheckCircle2,  variant: "success" },
+              { label: "Atrasados",         value: processos.filter(p => p.prazo && p.prazo < hoje && p.fase !== "concluido").length, icon: AlertTriangle, variant: "danger" },
+            ]}
+            quickActions={[
+              { label: "Novo Processo", icon: FileText, onClick: () => setShowNovo(true), variant: "outline" },
+            ]}
+          />
+        </TabsContent>
 
         <TabsContent value="pipeline" className="mt-0">
           <PipelineKanban setor="societario" podeAprovar={podeAprovar} />

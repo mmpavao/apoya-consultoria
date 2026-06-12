@@ -2,14 +2,14 @@
  * Versão do sistema APOYA CONTABILIDADE
  * Atualizado automaticamente pelo DEV APOYA a cada deploy.
  */
-export const APP_VERSION    = "1.8.0";
+export const APP_VERSION    = "1.9.0";
 export const APP_BUILD_DATE = "2026-06-12";
-export const APP_BUILD_TS   = "2026-06-12T20:30:00-03:00";
-export const APP_SPRINT     = "v1.8.0 — SPRINT-A · Sidebar + QuickSearch";
+export const APP_BUILD_TS   = "2026-06-12T21:00:00-03:00";
+export const APP_SPRINT     = "v1.9.0 — Padronização módulos Dashboard+Docs";
 
 export const VERSION_HISTORY = [
   {
-    version: "1.8.0",
+    version: "1.9.0",
     date: "2026-06-12",
     sha: "pending",
     sprint: "Sprint 2 — Cron + Módulos",
