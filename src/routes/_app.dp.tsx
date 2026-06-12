@@ -103,7 +103,7 @@ function DpPage__Inner() {
         ))}
       </div>
 
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="empresas" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="empresas">Empresas</TabsTrigger>
