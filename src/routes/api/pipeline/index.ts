@@ -10,10 +10,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 function getMcpKey(): string {
+  // fallback hardcoded — token server-side apenas, não exposto no bundle browser
+  const FALLBACK = "apoya-gestao-worker-44993fcc52d20535c97de6be366ad1f0";
   if (typeof process !== "undefined" && process.env?.APOYA_SERVICE_TOKEN)
     return process.env.APOYA_SERVICE_TOKEN;
   const g = (globalThis as any).__env__?.APOYA_SERVICE_TOKEN;
-  return g ?? "";
+  return g ?? FALLBACK;
 }
 
 const MCP_URL = "https://apoya-mcp.talkzzbot.workers.dev/mcp";
