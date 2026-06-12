@@ -28,6 +28,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { useUserSetores } from "@/hooks/use-user-setores";
 
 type NavItem =
@@ -307,6 +308,14 @@ export function AppSidebar({
             <LogOut className="h-[18px] w-[18px] shrink-0" />
             {!collapsed && <span className="text-sm font-medium">Sair</span>}
           </button>
+        )}
+        {/* Badge de versão */}
+        {!collapsed && (
+          <div className="mt-2 px-3 pb-1">
+            <span className="text-[10px] text-sidebar-foreground/30 font-mono select-none">
+              v{APP_VERSION}
+            </span>
+          </div>
         )}
       </div>
     </div>
