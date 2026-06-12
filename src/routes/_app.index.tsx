@@ -15,17 +15,40 @@ import { useDashboard, type AlertaDash } from "@/hooks/use-dashboard";
 import { Button } from "@/components/ui/button";
 
 
-/* ── Agente Fiscal ────────────────────────────────────────── */
-interface AgenteStatus {
-  vencidas:    number;
-  urgentes:    number;
-  no_prazo:    number;
-  total:       number;
+/* ── Agentes Autônomos ────────────────────────────────────── */
+interface AgenteMini {
+  nome:         string;
+  icone:        string;
+  alertas:      number;
+  total:        number;
   executado_em: string;
-  loading:     boolean;
-  error:       string | null;
+  loading:      boolean;
+  error:        string | null;
+  href:         string;
 }
 
+interface AgentesState {
+  fiscal:      AgenteMini;
+  rh:          AgenteMini;
+  financeiro:  AgenteMini;
+  orquestrador:{ loading: boolean; ultimo: string; alertas_total: number };
+}
+
+const mkAgente = (nome: string, icone: string, href: string): AgenteMini =>
+  ({ nome, icone, alertas: 0, total: 0, executado_em: "", loading: false, error: null, href });
+
+const AGENTES_DEFAULT: AgentesState = {
+  fiscal:       mkAgente("Fiscal",     "🧾", "/fiscal"),
+  rh:           mkAgente("RH / DP",    "👥", "/dp"),
+  financeiro:   mkAgente("Financeiro", "💰", "/financeiro"),
+  orquestrador: { loading: false, ultimo: "", alertas_total: 0 },
+};
+
+// interface legacy (mantido para AgenteCard)
+interface AgenteStatus {
+  vencidas: number; urgentes: number; no_prazo: number;
+  total: number; executado_em: string; loading: boolean; error: string | null;
+}
 const AGENTE_DEFAULT: AgenteStatus = {
   vencidas: 0, urgentes: 0, no_prazo: 0, total: 0,
   executado_em: "", loading: false, error: null,
@@ -39,13 +62,27 @@ async function fetchAgenteFiscal(): Promise<AgenteStatus> {
   const result = await resp.json();
   if (!result.success) throw new Error(result.error ?? "Erro no agente");
   return {
-    vencidas:    result.resumo.vencidas,
-    urgentes:    result.resumo.urgentes,
-    no_prazo:    result.resumo.no_prazo,
-    total:       result.resumo.total,
-    executado_em: result.executado_em ?? "",
+    vencidas:    result.resumo?.vencidas    ?? 0,
+    urgentes:    result.resumo?.urgentes    ?? 0,
+    no_prazo:    result.resumo?.no_prazo    ?? 0,
+    total:       result.resumo?.total       ?? 0,
+    executado_em: result.executado_em       ?? "",
     loading:     false,
     error:       null,
+  };
+}
+
+async function fetchOrquestrador(): Promise<{ fiscal: number; rh: number; financeiro: number; ts: string }> {
+  const resp = await fetch(
+    "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-orquestrador",
+    { method: "POST" }
+  );
+  const r = await resp.json();
+  return {
+    fiscal:     r.resultados?.fiscal?.alertas_gerados     ?? 0,
+    rh:         r.resultados?.rh?.alertas_gerados         ?? 0,
+    financeiro: r.resultados?.financeiro?.alertas_gerados ?? 0,
+    ts:         r.executado_em ?? new Date().toISOString(),
   };
 }
 
@@ -230,15 +267,30 @@ function Dashboard() {
   const { profile, user } = useAuth();
   const { data, loading, error, refetch } = useDashboard();
   const [agenteStatus, setAgenteStatus] = React.useState<AgenteStatus>(AGENTE_DEFAULT);
+  const [agentesState, setAgentesState] = React.useState<AgentesState>(AGENTES_DEFAULT);
 
   const runAgente = React.useCallback(async () => {
     setAgenteStatus(prev => ({ ...prev, loading: true, error: null }));
+    setAgentesState(prev => ({
+      ...prev,
+      orquestrador: { ...prev.orquestrador, loading: true },
+    }));
     try {
-      const result = await fetchAgenteFiscal();
-      setAgenteStatus(result);
+      const [fiscal, orch] = await Promise.all([
+        fetchAgenteFiscal(),
+        fetchOrquestrador(),
+      ]);
+      setAgenteStatus(fiscal);
+      setAgentesState(prev => ({
+        fiscal:      { ...prev.fiscal,     alertas: orch.fiscal,     total: fiscal.total, executado_em: orch.ts, loading: false, error: null },
+        rh:          { ...prev.rh,         alertas: orch.rh,         total: 0,            executado_em: orch.ts, loading: false, error: null },
+        financeiro:  { ...prev.financeiro, alertas: orch.financeiro, total: 0,            executado_em: orch.ts, loading: false, error: null },
+        orquestrador:{ loading: false, ultimo: orch.ts, alertas_total: orch.fiscal + orch.rh + orch.financeiro },
+      }));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro desconhecido";
       setAgenteStatus(prev => ({ ...prev, loading: false, error: msg }));
+      setAgentesState(prev => ({ ...prev, orquestrador: { ...prev.orquestrador, loading: false } }));
     }
   }, []);
 
@@ -475,8 +527,77 @@ function Dashboard() {
       </div>
 
 
-      {/* ── Agente Fiscal ────────────────────────────────── */}
-      <AgenteCard status={agenteStatus} onExecute={runAgente} />
+      {/* ── Agentes Autônomos ─────────────────────────────── */}
+      <section className="surface-card">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-primary">
+              <Zap className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-base font-semibold">Agentes Autônomos</h2>
+            {agentesState.orquestrador.loading && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {agentesState.orquestrador.alertas_total > 0 && (
+              <span className="pill bg-destructive/10 text-destructive text-[11px]">
+                {agentesState.orquestrador.alertas_total} alerta{agentesState.orquestrador.alertas_total > 1 ? "s" : ""}
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={runAgente}
+              disabled={agentesState.orquestrador.loading} className="h-8 rounded-full text-xs">
+              {agentesState.orquestrador.loading
+                ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                : <RefreshCw className="h-3 w-3 mr-1" />}
+              Executar todos
+            </Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
+          {([
+            { key: "fiscal",     cor: "text-blue-600",   bg: "bg-blue-50"   },
+            { key: "rh",         cor: "text-violet-600", bg: "bg-violet-50" },
+            { key: "financeiro", cor: "text-emerald-600",bg: "bg-emerald-50"},
+          ] as const).map(({ key, cor, bg }) => {
+            const ag = agentesState[key];
+            const fmtHora = (iso: string) => {
+              if (!iso) return "—";
+              try { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+              catch { return "—"; }
+            };
+            return (
+              <a key={key} href={ag.href} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors">
+                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${bg}`}>
+                  {ag.icone}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{ag.nome}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ag.executado_em ? `Executado às ${fmtHora(ag.executado_em)}` : "Aguardando execução"}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  {ag.alertas > 0 ? (
+                    <span className={`text-sm font-bold ${cor}`}>{ag.alertas}</span>
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  )}
+                  <p className="text-[11px] text-muted-foreground">{ag.alertas > 0 ? "alertas" : "ok"}</p>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+        {agentesState.orquestrador.ultimo && (
+          <div className="px-6 py-2.5 border-t border-border/40 bg-muted/20">
+            <p className="text-[11px] text-muted-foreground">
+              Orquestrador executado às {new Date(agentesState.orquestrador.ultimo).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              {" · "}{agentesState.orquestrador.alertas_total} alerta{agentesState.orquestrador.alertas_total !== 1 ? "s" : ""} gerado{agentesState.orquestrador.alertas_total !== 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
+      </section>
 
       {/* ── Alertas + Calendário fiscal ─────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

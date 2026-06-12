@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import {
   Plus, LayoutGrid, List, BarChart3, Search,
   RefreshCw, TrendingUp, Users, CheckCircle2,
-  XCircle, Flame, DollarSign, Filter,
+  XCircle, Flame, DollarSign, Filter, Zap,
 } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
@@ -144,7 +144,7 @@ function ListaView({ leads, onSelect }: { leads: Lead[]; onSelect: (l: Lead) => 
 
 /* ─── CrmPage ─────────────────────────────────────────────────────────────── */
 export default function CrmPage() {
-  const [view,      setView]      = useState<"kanban" | "lista" | "stats">("kanban");
+  const [view,      setView]      = useState<"kanban" | "lista" | "stats" | "automacoes">("kanban");
   const [leadSel,   setLeadSel]   = useState<Lead | null>(null);
   const [novoLead,  setNovoLead]  = useState(false);
   const [fBusca,    setFBusca]    = useState("");
@@ -215,7 +215,7 @@ export default function CrmPage() {
       <div className="flex gap-2 flex-wrap items-center">
         {/* Views */}
         <div className="flex border rounded-lg overflow-hidden">
-          {(["kanban","lista","stats"] as const).map(v => (
+          {(["kanban","lista","stats","automacoes"] as const).map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -224,9 +224,10 @@ export default function CrmPage() {
                 view === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"
               )}
             >
-              {v === "kanban" && <LayoutGrid className="h-3.5 w-3.5" />}
-              {v === "lista"  && <List className="h-3.5 w-3.5" />}
-              {v === "stats"  && <BarChart3 className="h-3.5 w-3.5" />}
+              {v === "kanban"     && <LayoutGrid className="h-3.5 w-3.5" />}
+              {v === "lista"      && <List className="h-3.5 w-3.5" />}
+              {v === "stats"      && <BarChart3 className="h-3.5 w-3.5" />}
+              {v === "automacoes" && <Zap className="h-3.5 w-3.5" />}
               <span className="capitalize">{v}</span>
             </button>
           ))}
@@ -319,6 +320,59 @@ export default function CrmPage() {
           </div>
         ) : view === "lista" ? (
           <ListaView leads={filtered} onSelect={setLeadSel} />
+        ) : view === "automacoes" ? (
+          /* Automações CRM */
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-card p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Automações do CRM</h3>
+                  <p className="text-sm text-muted-foreground">Sequências e gatilhos automáticos para leads</p>
+                </div>
+                <a href="/automacoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Gerenciar todas</button></a>
+              </div>
+              <div className="grid gap-3">
+                {[
+                  { nome: "Boas-vindas Lead Quente", gatilho: "Lead entra com temperatura 🔥", acao: "WhatsApp imediato", status: "ativa" },
+                  { nome: "Follow-up 3 dias", gatilho: "Sem contato por 3 dias", acao: "Lembrete + task", status: "ativa" },
+                  { nome: "Proposta enviada → Lembrete", gatilho: "7 dias na etapa Proposta", acao: "Notificação ao responsável", status: "inativa" },
+                  { nome: "Lead ganho → Onboarding", gatilho: "Etapa muda para Fechado", acao: "Cria cliente + WhatsApp boas-vindas", status: "inativa" },
+                ].map((a, i) => (
+                  <div key={i} className="flex items-start justify-between p-3 rounded-lg border bg-muted/20 gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{a.nome}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        <span className="text-foreground/70">Gatilho:</span> {a.gatilho}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="text-foreground/70">Ação:</span> {a.acao}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${a.status === "ativa" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {a.status === "ativa" ? "Ativa" : "Inativa"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-6">
+              <h3 className="font-semibold mb-3">Métricas do Funil</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: "Taxa de Conversão", value: `${leads.length ? Math.round((leads.filter(l => l.etapa === "fechado_ganho").length / leads.length) * 100) : 0}%` },
+                  { label: "Ticket Médio", value: leads.filter(l => l.honorario_proposto).length ? `R$ ${Math.round(leads.filter(l=>l.honorario_proposto).reduce((s,l)=>s+(l.honorario_proposto??0),0)/leads.filter(l=>l.honorario_proposto).length).toLocaleString("pt-BR")}` : "—" },
+                  { label: "Leads Ativos", value: leads.filter(l => !["fechado_ganho","fechado_perdido"].includes(l.etapa)).length },
+                  { label: "Pipeline Total", value: `R$ ${leads.filter(l=>l.honorario_proposto).reduce((s,l)=>s+(l.honorario_proposto??0),0).toLocaleString("pt-BR")}` },
+                ].map((m, i) => (
+                  <div key={i} className="p-3 rounded-lg border bg-muted/30 text-center">
+                    <p className="text-lg font-bold text-foreground">{m.value}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           /* Stats view */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
