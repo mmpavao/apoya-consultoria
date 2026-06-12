@@ -56,7 +56,7 @@ export function useLancamentos(empresaId: string, mesReferencia: string) {
         .from("lancamentos_contabeis")
         .select("*")
         .eq("empresa_id", empresaId)
-        .eq("competencia", mesReferencia)
+        .eq("mes_referencia", mesReferencia)
         .order("data_lancamento");
       if (error) throw error;
       const list = data ?? [];
@@ -111,7 +111,7 @@ export function usePeriodosContabeis(empresaId?: string) {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let q = (supabase as any).from("periodos_contabeis").select("*").order("competencia", { ascending: false });
+      let q = (supabase as any).from("periodos_contabeis").select("*").order("mes_referencia", { ascending: false });
       if (empresaId) q = q.eq("empresa_id", empresaId);
       const { data, error } = await q;
       if (error) throw error;
@@ -131,7 +131,7 @@ export function useAbrirPeriodo() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any).from("periodos_contabeis")
-        .insert({ empresa_id: empresaId, competencia, status: "aberto", aberto_em: new Date().toISOString() });
+        .insert({ empresa_id: empresaId, mes_referencia: competencia, status: "aberto" });
       if (error) throw error;
       toast.success(`Período ${competencia} aberto`);
       return true;
@@ -175,7 +175,7 @@ export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
         .from("extrato_bancario")
         .select("*")
         .eq("empresa_id", empresaId)
-        .eq("competencia", mesReferencia)
+        .eq("mes_referencia", mesReferencia)
         .order("data_movimento");
       if (error) throw error;
       setExtratos(data ?? []);
