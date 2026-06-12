@@ -10,6 +10,7 @@ import {
   RefreshCw, Zap, ExternalLink, TrendingDown, FileCheck2, ReceiptText, FileClock} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
@@ -67,8 +68,7 @@ function FinanceiroPage__Inner(){
 
   const { roles } = useAuth();
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
-  type FinView = "pipeline" | "cobrancas" | "inadimplencia";
-  const [finView, setFinView]          = useState<FinView>("cobrancas");
+
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
   const [executandoRegua, setExecRegua] = useState(false);
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");
@@ -392,32 +392,23 @@ function FinanceiroPage__Inner(){
 
 
 
-      {/* ── Tabs de view ── */}
-      <div className="flex items-center gap-1 border-b">
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${finView==="pipeline"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
-          onClick={()=>setFinView("pipeline")}>
-          Pipeline
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${finView==="cobrancas"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
-          onClick={()=>setFinView("cobrancas")}>
-          Cobranças
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${finView==="inadimplencia"?"border-primary text-primary":"border-transparent text-muted-foreground hover:text-foreground"}`}
-          onClick={()=>setFinView("inadimplencia")}>
-          <TrendingDown className="h-3.5 w-3.5"/>Inadimplência
-          {inadimplentes.length>0&&<span className="bg-rose-100 text-rose-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">{inadimplentes.length}</span>}
-        </button>
-      </div>
+      <Tabs defaultValue="cobrancas" className="space-y-4">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
+          <TabsTrigger value="inadimplencia">
+            Inadimplência{inadimplentes.length > 0 && <span className="ml-1.5 text-[10px] font-bold bg-red-100 text-red-600 px-1.5 rounded-full">{inadimplentes.length}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="gateway">Gateway</TabsTrigger>
+          <TabsTrigger value="automacoes">Automações</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
+        </TabsList>
 
-      {finView==="pipeline"&&(
-        <PipelineKanban setor="financeiro" podeAprovar={podeAprovar} />
-      )}
+        <TabsContent value="pipeline" className="mt-0">
+          <PipelineKanban setor="financeiro" podeAprovar={podeAprovar} />
+        </TabsContent>
 
-      {/* ── VIEW: INADIMPLÊNCIA ── */}
-      {finView==="inadimplencia"&&(
+        <TabsContent value="inadimplencia" className="mt-0">
         <div className="space-y-5">
           {/* KPIs inadimplência */}
           <KpiGrid cols={4}>
@@ -480,10 +471,9 @@ function FinanceiroPage__Inner(){
             </div>
           </div>
         </div>
-      )}
+        </TabsContent>
 
-      {/* ── VIEW: COBRANÇAS (original) ── */}
-      {finView==="cobrancas"&&(
+        <TabsContent value="cobrancas" className="mt-0">
       <div>
       {/* Barra de ações em lote */}
       {sel.size>0 && (
@@ -545,7 +535,75 @@ function FinanceiroPage__Inner(){
       </div>
 
       </div>
-      )} {/* fim finView=cobrancas */}
+        </TabsContent>
+
+        <TabsContent value="gateway" className="mt-0">
+        <div className="rounded-xl border bg-card p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">Gateway de Pagamento</h3>
+              <p className="text-sm text-muted-foreground">Asaas — configuração e status</p>
+            </div>
+            <a href="/configuracoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Config completa</button></a>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {[
+              { label: "Gateway", value: "Asaas" },
+              { label: "Ambiente", value: "Produção" },
+              { label: "Webhook", value: "Configurado ✓" },
+              { label: "Pix", value: "Ativo" },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</span>
+                <span className="text-sm font-medium">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        </TabsContent>
+
+        <TabsContent value="automacoes" className="mt-0">
+        <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Automações Financeiras</h3>
+            <a href="/automacoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Gerenciar</button></a>
+          </div>
+          {[
+            { nome: "Régua de Cobrança", desc: "Lembretes automáticos por e-mail/WhatsApp", status: "ativa" },
+            { nome: "Alerta Inadimplência", desc: "Notifica após 5 dias de atraso", status: "ativa" },
+            { nome: "Emissão NFS-e pós-pagamento", desc: "Emite nota após confirmar pagamento", status: "inativa" },
+          ].map((a, i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+              <div><p className="text-sm font-medium">{a.nome}</p><p className="text-xs text-muted-foreground">{a.desc}</p></div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.status==="ativa" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                {a.status==="ativa" ? "Ativa" : "Inativa"}
+              </span>
+            </div>
+          ))}
+        </div>
+        </TabsContent>
+
+        <TabsContent value="config" className="mt-0">
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="font-semibold mb-4">Configurações Financeiras</h3>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {[
+              { label: "Emitir NFS-e após pagamento", enabled: false },
+              { label: "Bloquear cliente inadimplente", enabled: true },
+              { label: "Juros automático após vencimento", enabled: false },
+              { label: "Notificar via WhatsApp", enabled: true },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
+                <span className="text-sm">{item.label}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  {item.enabled ? "Ativo" : "Inativo"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        </TabsContent>
+        </Tabs>
 
       <CobrancaFormDialog
         open={dialogCob}

@@ -83,6 +83,9 @@ function SocietarioPage__Inner() {
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline de Tarefas</TabsTrigger>
           <TabsTrigger value="processos">Processos Societários</TabsTrigger>
+        
+          <TabsTrigger value="automacoes">Automações</TabsTrigger>
+          <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline" className="mt-0">
@@ -200,6 +203,75 @@ function SocietarioPage__Inner() {
 
           <ProcessoModal processo={modalProcesso} open={!!modalProcesso} onClose={()=>setModalProcesso(null)}
             onMoverFase={handleMover} onComentario={adicionarComentario} onAtualizar={atualizarProcesso} autorPadrao="Gestor"/>
+        </TabsContent>
+
+        {/* Automações Societário */}
+        <TabsContent value="automacoes" className="mt-0">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Agentes de monitoramento e automação societária.</p>
+            {[
+              { nome: "Monitor JUCISRS", desc: "Verifica status de processos no portal JUCISRS", freq: "Diário", ativa: true },
+              { nome: "Alerta Renovação Licenças", desc: "Lembra vencimento de licenças municipais e alvarás", freq: "Semanal", ativa: true },
+              { nome: "Notificação Conclusão", desc: "Notifica o cliente via WhatsApp ao concluir o processo", freq: "On demand", ativa: true },
+              { nome: "Alerta Processos Parados", desc: "Alerta processos sem movimentação há mais de 15 dias", freq: "Diário", ativa: false },
+            ].map((a, i) => (
+              <div key={i} className="rounded-lg border bg-card p-4 flex items-start gap-4">
+                <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${a.ativa ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{a.nome}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Freq: <strong className="text-foreground">{a.freq}</strong></p>
+                </div>
+                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${a.ativa ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  {a.ativa ? "Ativa" : "Inativa"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Config Societário */}
+        <TabsContent value="config" className="mt-0">
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-card p-5 space-y-3">
+              <h3 className="text-sm font-semibold">Preferências Societárias</h3>
+              <div className="grid gap-2 md:grid-cols-2">
+                {[
+                  { label: "Notificar abertura concluída via WhatsApp", ativo: true },
+                  { label: "Alertar processos parados há +15 dias",      ativo: true },
+                  { label: "Aprovação obrigatória antes de enviar",       ativo: false },
+                  { label: "Gerar checklist automático por tipo",         ativo: true },
+                  { label: "Notificar prazo 7 dias antes",               ativo: true },
+                  { label: "Integração JUCISRS automática",              ativo: false },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/30 cursor-pointer">
+                    <span className="text-sm">{item.label}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.ativo ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {item.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-card p-5 space-y-3">
+              <h3 className="text-sm font-semibold">Portais Integrados</h3>
+              <div className="grid gap-2 md:grid-cols-2">
+                {[
+                  { portal: "JUCISRS", status: "Configurado", ok: true },
+                  { portal: "REDESIM", status: "Não configurado", ok: false },
+                  { portal: "e-CAC", status: "Via SERPRO", ok: true },
+                  { portal: "Prefeitura", status: "Manual", ok: false },
+                ].map(item => (
+                  <div key={item.portal} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                    <span className="text-sm font-medium">{item.portal}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${item.ok ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {item.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
