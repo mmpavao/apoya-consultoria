@@ -133,12 +133,13 @@ export function useDashboard() {
       /* ── 4. Obrigações ───────────────────────────────────── */
       const { data: obrigacoes } = await supabase
         .from("obrigacoes")
-        .select("status, competencia")
-        .eq("competencia", mesAtual);
+        .select("status, competencia, vencimento");
 
       const obArr = obrigacoes ?? [];
       const obPendentes = obArr.filter(o => o.status === "pendente").length;
-      const obAtrasadas = obArr.filter(o => o.status === "atrasada").length;
+      const obAtrasadas = obArr.filter(
+        o => o.status === "pendente" && o.vencimento && o.vencimento < hoje
+      ).length;
 
       /* ── 5. WhatsApp não lidas ──────────────────────────── */
       const waNaoLidasResult = await supabase

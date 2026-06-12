@@ -1,3 +1,4 @@
+import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle, ArrowRight, Building2, Calendar,
@@ -12,6 +13,98 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useDashboard, type AlertaDash } from "@/hooks/use-dashboard";
 import { Button } from "@/components/ui/button";
+
+
+/* ── Agente Fiscal ────────────────────────────────────────── */
+interface AgenteStatus {
+  vencidas:    number;
+  urgentes:    number;
+  no_prazo:    number;
+  total:       number;
+  executado_em: string;
+  loading:     boolean;
+  error:       string | null;
+}
+
+const AGENTE_DEFAULT: AgenteStatus = {
+  vencidas: 0, urgentes: 0, no_prazo: 0, total: 0,
+  executado_em: "", loading: false, error: null,
+};
+
+async function fetchAgenteFiscal(): Promise<AgenteStatus> {
+  const resp = await fetch(
+    "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-fiscal",
+    { method: "POST" }
+  );
+  const result = await resp.json();
+  if (!result.success) throw new Error(result.error ?? "Erro no agente");
+  return {
+    vencidas:    result.resumo.vencidas,
+    urgentes:    result.resumo.urgentes,
+    no_prazo:    result.resumo.no_prazo,
+    total:       result.resumo.total,
+    executado_em: result.executado_em ?? "",
+    loading:     false,
+    error:       null,
+  };
+}
+
+function AgenteCard({
+  status, onExecute,
+}: { status: AgenteStatus; onExecute: () => void }) {
+  const fmtHora = (iso: string) => {
+    if (!iso) return "—";
+    try { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+    catch { return "—"; }
+  };
+
+  return (
+    <div className="surface-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-primary">
+            <Zap className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Agente Fiscal</p>
+            <p className="text-xs text-muted-foreground">
+              {status.executado_em ? `Última execução: ${fmtHora(status.executado_em)}` : "Nunca executado"}
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onExecute}
+          disabled={status.loading}
+          className="h-8 rounded-full text-xs"
+        >
+          {status.loading
+            ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            : <RefreshCw className="h-3 w-3 mr-1" />}
+          Executar
+        </Button>
+      </div>
+
+      {status.error ? (
+        <p className="text-xs text-destructive">{status.error}</p>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-200">
+            <AlertTriangle className="h-3 w-3" /> {status.vencidas} vencidas
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.97_0.045_82)] px-3 py-1 text-xs font-medium text-[oklch(0.48_0.130_82)] ring-1 ring-amber-200">
+            <Clock className="h-3 w-3" /> {status.urgentes} urgentes
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 className="h-3 w-3" /> {status.no_prazo} no prazo
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground">{status.total} total</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
@@ -136,6 +229,20 @@ function DashSkeleton() {
 function Dashboard() {
   const { profile, user } = useAuth();
   const { data, loading, error, refetch } = useDashboard();
+  const [agenteStatus, setAgenteStatus] = React.useState<AgenteStatus>(AGENTE_DEFAULT);
+
+  const runAgente = React.useCallback(async () => {
+    setAgenteStatus(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const result = await fetchAgenteFiscal();
+      setAgenteStatus(result);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      setAgenteStatus(prev => ({ ...prev, loading: false, error: msg }));
+    }
+  }, []);
+
+  React.useEffect(() => { runAgente(); }, [runAgente]);
 
   const nome = profile?.nome?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Contador";
 
@@ -366,6 +473,10 @@ function Dashboard() {
         </section>
 
       </div>
+
+
+      {/* ── Agente Fiscal ────────────────────────────────── */}
+      <AgenteCard status={agenteStatus} onExecute={runAgente} />
 
       {/* ── Alertas + Calendário fiscal ─────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
