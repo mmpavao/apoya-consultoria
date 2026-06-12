@@ -79,6 +79,21 @@ export default {
       return Response.redirect(canonical.toString(), 301);
     }
 
+    // ── Injetar secrets/vars do CF Worker em globalThis.__env__ ──────────────
+    // Necessário para que rotas server-side (api/pipeline, api/das, etc.)
+    // consigam ler APOYA_SERVICE_TOKEN e outros secrets via (globalThis as any).__env__
+    if (env && typeof env === "object") {
+      (globalThis as any).__env__ = env;
+      // Também popular process.env para compatibilidade com libs que usam process.env
+      if (typeof process !== "undefined") {
+        for (const [k, v] of Object.entries(env as Record<string, string>)) {
+          if (typeof v === "string" && !process.env[k]) {
+            process.env[k] = v;
+          }
+        }
+      }
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
@@ -89,4 +104,3 @@ export default {
     }
   },
 };
-
