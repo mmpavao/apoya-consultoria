@@ -803,7 +803,7 @@ function McpSection() {
           </div>
         </TabsContent>
 
-      {/* Modal nova key */
+      {/* Modal nova key */}
       <Dialog open={modalOpen} onOpenChange={v => !v && closeModal()}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/>Nova API Key</DialogTitle></DialogHeader>
