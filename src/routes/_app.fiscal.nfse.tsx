@@ -355,3 +355,6 @@ function NfsePage() {
     </div>
   );
 }
+
+// Export para uso inline na aba do módulo fiscal
+export { NfsePage as NfseContent };

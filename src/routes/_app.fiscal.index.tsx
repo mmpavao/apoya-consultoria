@@ -1,195 +1,879 @@
 /**
  * Módulo Fiscal — /_app/fiscal/
- *
- * Estrutura:
- *   PageHeader  — titulo + acao
- *   KpiGrid     — 4 KPIs fiscais
- *   PageTabs    — Pipeline | DAS | NFS-e | SERPRO | Documentos
- *
- * B1: pipeline e KPIs funcionais. Abas das/nfse/serpro linkam para as rotas filhas existentes.
- * B2: isolamento de permissao (user_setor_permissoes) sera aplicado aqui.
+ * Tabs: Pipeline (default) | DAS | NFS-e | SERPRO | Documentos | Automações | Configurações
  */
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { SectorGuard } from "@/components/SectorGuard";
-import { useState } from "react";
+import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
 import {
-  AlertTriangle, Calendar, FileText, ShieldAlert,
-  TrendingDown, RefreshCw, Receipt, Search, BarChart2, Building2,
+  Activity, AlertCircle, AlertTriangle, Calendar,
+  CheckCircle2, ChevronDown, ChevronRight, Clock, Download,
+  FileText, FolderOpen, Loader2, Receipt,
+  RefreshCw, Search, Send, ShieldAlert,
+  ToggleLeft, ToggleRight, Upload, Wallet, Wifi, WifiOff, Zap, Eye,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
 import { useAuth } from "@/hooks/use-auth";
+import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
+import { useClientes } from "@/hooks/use-clientes";
+import { useSerpro } from "@/hooks/use-serpro";
+import { SERPRO_TOOLS, SERPRO_CATEGORIES, checkEligibility } from "@/lib/serpro/tools-catalog";
+import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
+import { Pagination } from "@/components/PagePlaceholder";
+import { DasGerarDialog } from "@/components/DasGerarDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_app/fiscal/")({
   component: FiscalModulo,
-  head: () => ({ meta: [{ title: "Fiscal · APOYA Gestao" }] }),
+  head: () => ({ meta: [{ title: "Fiscal · APOYA Gestão" }] }),
 });
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────
+const fmtBRL  = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+const MESES   = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  variant = "default",
-  loading,
+// ── KPI Card ──────────────────────────────────────────────────────────────
+function FKpiCard({
+  label, value, icon: Icon, variant = "default", loading,
 }: {
-  label: string;
-  value: number;
-  icon: React.ElementType;
-  variant?: "default" | "warning" | "danger" | "info";
-  loading: boolean;
+  label: string; value: number | string; icon: React.ElementType;
+  variant?: "default" | "warning" | "danger" | "info"; loading?: boolean;
 }) {
-  const borderBg = {
-    default: "border-border bg-card",
-    warning: "border-yellow-200 bg-yellow-50",
-    danger:  "border-red-200   bg-red-50",
-    info:    "border-blue-200  bg-blue-50",
+  const styles = {
+    default: { border: "border-border bg-card", icon: "text-muted-foreground",  val: "text-foreground"  },
+    warning: { border: "border-yellow-200 bg-yellow-50", icon: "text-yellow-600", val: "text-yellow-700" },
+    danger:  { border: "border-red-200 bg-red-50",       icon: "text-red-600",    val: "text-red-700"    },
+    info:    { border: "border-blue-200 bg-blue-50",      icon: "text-blue-600",   val: "text-blue-700"   },
   }[variant];
-
-  const iconColor = {
-    default: "text-muted-foreground",
-    warning: "text-yellow-600",
-    danger:  "text-red-600",
-    info:    "text-blue-600",
-  }[variant];
-
-  const valueColor = {
-    default: "text-foreground",
-    warning: "text-yellow-700",
-    danger:  "text-red-700",
-    info:    "text-blue-700",
-  }[variant];
-
   return (
-    <Card className={cn("border transition-colors", borderBg)}>
+    <Card className={cn("border transition-colors", styles.border)}>
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={cn("rounded-lg p-2 bg-white/60", iconColor)}>
-          <Icon className="h-5 w-5" />
-        </div>
+        <div className={cn("rounded-lg p-2 bg-white/60", styles.icon)}><Icon className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted-foreground truncate">{label}</p>
-          {loading ? (
-            <div className="h-6 w-12 bg-muted animate-pulse rounded mt-0.5" />
-          ) : (
-            <p className={cn("text-2xl font-bold tabular-nums leading-none mt-0.5", valueColor)}>
-              {value}
-            </p>
-          )}
+          {loading
+            ? <div className="h-6 w-12 bg-muted animate-pulse rounded mt-0.5" />
+            : <p className={cn("text-2xl font-bold tabular-nums leading-none mt-0.5", styles.val)}>{value}</p>}
         </div>
-        {!loading && value > 0 && (
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[10px] shrink-0",
-              variant === "danger"  ? "border-red-300 text-red-600" :
-              variant === "warning" ? "border-yellow-300 text-yellow-600" :
-              "border-border"
-            )}
-          >
-            {value === 1 ? "1 item" : `${value} itens`}
-          </Badge>
-        )}
       </CardContent>
     </Card>
   );
 }
 
-// ── Placeholder de aba com link para rota filha ───────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// TAB — DAS
+// ════════════════════════════════════════════════════════════════
+const DAS_COLOR: Partial<Record<DasStatus, "gray"|"blue"|"green"|"red">> = {
+  pendente: "blue", gerada: "green", paga: "green", erro: "red",
+};
+const DAS_LABEL: Partial<Record<DasStatus, string>> = {
+  pendente: "Pendente", gerada: "Gerada", paga: "Paga", erro: "Erro",
+};
 
-function TabLink({ to, label, icon: Icon, desc }: { to: string; label: string; icon: React.ElementType; desc: string }) {
+function DasTab() {
+  const now = new Date();
+  const [ano, setAno]       = useState(now.getFullYear());
+  const [mes, setMes]       = useState(now.getMonth() + 1);
+  const { guias: items, loading: dasLoading, refresh } = useDas();
+  const [query, setQuery]   = useState("");
+  const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
+  const [dialogDas, setDialogDas] = useState(false);
+  const [status, setStatus] = useState<"todos"|DasStatus>("todos");
+  const [sel, setSel]       = useState<Set<string>>(new Set());
+  const [busy, setBusy]     = useState(false);
+  const comp = `${ano}-${mes.toString().padStart(2, "0")}`;
+
+  useEffect(() => {
+    refresh();
+    const fn = () => refresh();
+    window.addEventListener("apoya:das:changed", fn);
+    window.addEventListener("apoya:clientes:changed", fn);
+    return () => { window.removeEventListener("apoya:das:changed", fn); window.removeEventListener("apoya:clientes:changed", fn); };
+  }, [comp]);
+  useEffect(() => setSel(new Set()), [comp]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items
+      .filter(g => q ? `${g.clienteNome} ${g.cnpj}`.toLowerCase().includes(q) : true)
+      .filter(g => regime === "todos" || g.regime === regime)
+      .filter(g => status === "todos" || g.status === status)
+      .sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
+  }, [items, query, regime, status]);
+
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [query, regime, status, mes, ano]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const kpi = useMemo(() => ({
+    total:    items.length,
+    pendente: items.filter(g => g.status === "pendente").length,
+    gerada:   items.filter(g => g.status === "gerada").length,
+    paga:     items.filter(g => g.status === "paga").length,
+    valor:    items.reduce((s, g) => s + g.valor, 0),
+  }), [items]);
+
+  const toggleAll = () => setSel(sel.size === filtered.length ? new Set() : new Set(filtered.map(g => g.id)));
+  const toggleOne = (id: string) => { const s = new Set(sel); s.has(id) ? s.delete(id) : s.add(id); setSel(s); };
+
+  async function gerarLote() {
+    const ids = filtered.filter(g => sel.has(g.id) && (g.status === "pendente" || g.status === "erro")).map(g => g.clienteId);
+    if (!ids.length) { toast.error("Selecione ao menos 1 DAS pendente"); return; }
+    setBusy(true);
+    toast.loading(`Gerando ${ids.length} DAS…`, { id: "das-lote" });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", { id: "das-lote" }); return; }
+      let ok = 0, err = 0;
+      for (const clienteId of ids) {
+        const res = await fetch("/api/das/gerar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ mode: "individual", cliente_id: clienteId, competencia: comp }),
+        });
+        const d = await res.json() as any;
+        if (d.ok && d.geradas > 0) ok++; else err++;
+      }
+      await refresh();
+      if (err === 0) toast.success(`${ok} DAS gerada(s)`, { id: "das-lote" });
+      else toast.warning(`${ok} gerada(s) · ${err} com erro`, { id: "das-lote" });
+      setSel(new Set());
+    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-lote" }); }
+    finally { setBusy(false); }
+  }
+
+  async function gerarTodosDoMes() {
+    setBusy(true);
+    toast.loading("Criando guias para todos os clientes elegíveis…", { id: "das-init" });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", { id: "das-init" }); return; }
+      const res = await fetch("/api/das/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: "lote", competencia: comp }),
+      });
+      const d = await res.json() as any;
+      if (d.ok) { toast.success(`${d.geradas ?? 0} guia(s) criada(s) para ${comp}`, { id: "das-init" }); await refresh(); }
+      else toast.error(d.error ?? "Erro ao gerar", { id: "das-init" });
+    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-init" }); }
+    finally { setBusy(false); }
+  }
+
+  async function enviarWhats() {
+    const elig = filtered.filter(g => sel.has(g.id) && g.status === "gerada");
+    if (!elig.length) { toast.error("Selecione DAS já geradas"); return; }
+    setBusy(true);
+    toast.loading(`Enviando ${elig.length} DAS via WhatsApp…`, { id: "das-wpp" });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada", { id: "das-wpp" }); return; }
+      let enviadas = 0, erros = 0;
+      for (const g of elig) {
+        const nome = g.clienteNome.split(" ")[0];
+        const cf   = g.competencia.split("-").reverse().join("/");
+        const msg  = `Olá ${nome}! DAS competência ${cf}. Valor: ${fmtBRL(g.valor)}. Venc: ${fmtDate(g.vencimento)}` +
+          (g.codigoBarras ? ` | Cód: ${g.codigoBarras}` : "") + (g.pdfUrl ? ` | PDF: ${g.pdfUrl}` : "");
+        const r = await fetch("/api/wa/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: g.clienteId }),
+        });
+        const dd = await r.json().catch(() => ({})) as any;
+        if (dd.ok) enviadas++; else erros++;
+      }
+      await refresh();
+      if (erros === 0) toast.success(`${enviadas} DAS enviado(s)!`, { id: "das-wpp" });
+      else toast.warning(`${enviadas} enviado(s) · ${erros} com erro`, { id: "das-wpp" });
+      setSel(new Set());
+    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-wpp" }); }
+    finally { setBusy(false); }
+  }
+
+  const cols: ColDef<DasGuia>[] = [
+    {
+      key: "cliente", header: "Cliente",
+      cell: g => (
+        <div>
+          <div className="font-medium leading-tight">{g.clienteNome}</div>
+          <div className="font-mono text-[11px] text-muted-foreground">{g.cnpj}</div>
+        </div>
+      ),
+    },
+    {
+      key: "regime", header: "Regime",
+      headerClassName: "hidden sm:table-cell", className: "hidden sm:table-cell",
+      cell: g => <InlineBadge color={g.regime === "MEI" ? "violet" : "blue"} dot>{g.regime === "Simples" ? "Simples Nacional" : g.regime}</InlineBadge>,
+    },
+    {
+      key: "vencimento", header: "Vencimento",
+      headerClassName: "hidden md:table-cell", className: "hidden md:table-cell",
+      cell: g => {
+        const late = g.status !== "paga" && new Date(g.vencimento) < new Date();
+        return <span className={late ? "font-semibold text-red-600" : ""}>{fmtDate(g.vencimento)}{late && <span className="ml-1 text-[10px] opacity-70">atrasado</span>}</span>;
+      },
+    },
+    {
+      key: "valor", header: "Valor",
+      headerClassName: "text-right", className: "text-right tabular-nums font-semibold",
+      cell: g => fmtBRL(g.valor),
+    },
+    {
+      key: "status", header: "Status",
+      cell: g => (
+        <div>
+          <InlineBadge color={DAS_COLOR[g.status]} dot>{DAS_LABEL[g.status]}</InlineBadge>
+          {g.enviadoWaEm && <div className="text-[10px] text-emerald-600">✓ WhatsApp</div>}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="rounded-xl border bg-card p-8 text-center space-y-3">
-      <div className="flex justify-center">
-        <div className="rounded-full bg-muted p-3">
-          <Icon className="h-6 w-6 text-muted-foreground" />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex items-center gap-2">
+          <Select value={mes.toString()} onValueChange={v => setMes(+v)}>
+            <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>{MESES.map((m, i) => <SelectItem key={m} value={(i + 1).toString()}>{m}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={ano.toString()} onValueChange={v => setAno(+v)}>
+            <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>{[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={gerarTodosDoMes} disabled={busy} className="h-8 text-xs gap-1">
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Receipt className="h-3 w-3" />}
+            Gerar DAS do Mês
+          </Button>
+          {sel.size > 0 && <>
+            <Button size="sm" onClick={gerarLote} disabled={busy} className="h-8 text-xs gap-1">
+              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              Gerar {sel.size}
+            </Button>
+            <Button size="sm" variant="outline" onClick={enviarWhats} disabled={busy} className="h-8 text-xs gap-1">
+              <Send className="h-3 w-3" /> WhatsApp
+            </Button>
+          </>}
         </div>
       </div>
-      <div>
-        <p className="font-medium text-foreground">{label}</p>
-        <p className="text-sm text-muted-foreground mt-1">{desc}</p>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <FKpiCard icon={FileText}      label="Total"    value={kpi.total}          loading={dasLoading} />
+        <FKpiCard icon={Clock}         label="Pendente" value={kpi.pendente}       loading={dasLoading} variant={kpi.pendente > 0 ? "warning" : "default"} />
+        <FKpiCard icon={CheckCircle2}  label="Geradas"  value={kpi.gerada}         loading={dasLoading} variant={kpi.gerada > 0 ? "info" : "default"} />
+        <FKpiCard icon={Wallet}        label="Pagas"    value={kpi.paga}           loading={dasLoading} />
+        <FKpiCard icon={AlertTriangle} label="Total R$" value={fmtBRL(kpi.valor)}  loading={dasLoading} />
       </div>
-      <Link to={to}>
-        <Button variant="outline" size="sm">Abrir {label}</Button>
-      </Link>
+      <DataTable
+        rows={pageRows} cols={cols} getKey={g => g.id}
+        selected={sel} onToggleAll={toggleAll} onToggleRow={toggleOne}
+        emptyIcon={<FileText className="h-8 w-8" />}
+        emptyText={`Nenhuma guia DAS para ${MESES[mes - 1]}/${ano}`}
+        rowClassName={g => g.status === "paga" ? "opacity-50" : ""}
+        toolbar={
+          <>
+            <TableSearch value={query} onChange={setQuery} placeholder="Buscar cliente ou CNPJ…" />
+            <Select value={regime} onValueChange={v => setRegime(v as typeof regime)}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os regimes</SelectItem>
+                <SelectItem value="MEI">MEI</SelectItem>
+                <SelectItem value="Simples">Simples Nacional</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={v => setStatus(v as typeof status)}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="gerada">Gerada</SelectItem>
+                <SelectItem value="paga">Paga</SelectItem>
+                <SelectItem value="erro">Erro</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size} />
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />
+      </div>
+      <DasGerarDialog open={dialogDas} onClose={() => setDialogDas(false)} onCreated={() => {}} />
     </div>
   );
 }
 
-// ── Modulo Principal ──────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// TAB — NFS-e  (lazy import da rota filha)
+// ════════════════════════════════════════════════════════════════
+function NfseTab() {
+  const NfseContent = lazy(() =>
+    import("@/routes/_app.fiscal.nfse").then(m => ({
+      default: (m as any).NfseContent ?? (() => (
+        <div className="p-8 text-center text-sm text-muted-foreground">Conteúdo NFS-e indisponível.</div>
+      )),
+    }))
+  );
+  return (
+    <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <NfseContent />
+    </Suspense>
+  );
+}
 
-function FiscalModulo__Inner() {
-  const { roles } = useAuth();
-  const { kpis, loading: kpisLoading, error: kpisError, refetch } = useFiscalKpis();
+// ════════════════════════════════════════════════════════════════
+// TAB — SERPRO
+// ════════════════════════════════════════════════════════════════
+type GwStatus = { online: boolean; version?: string; checkedAt: string; latencyMs: number };
+type ResultState = { loading: boolean; text: string | null; pdfB64: string | null; error: string | null; ms: number | null };
+const EMPTY_R: ResultState = { loading: false, text: null, pdfB64: null, error: null, ms: null };
 
-  // B2 aplicara verificacao real via user_setor_permissoes.
-  // Por ora: admin e contador podem aprovar.
-  const podeAprovar = roles.includes("admin") || roles.includes("contador");
+const SERPRO_CAT_TABS = [
+  { id: "all", label: "Todas" }, { id: "mei", label: "MEI" }, { id: "das_mei", label: "DAS MEI" },
+  { id: "pgdas", label: "PGDAS/DAS" }, { id: "declaracoes", label: "Declarações" },
+  { id: "ecac", label: "eCAC" }, { id: "fiscal", label: "Sit. Fiscal" },
+  { id: "parcelamentos", label: "Parcelamentos" }, { id: "pagamentos", label: "PagtoWeb" }, { id: "darf", label: "DARF" },
+];
+
+function dlPdf(b64: string, fn: string) {
+  try {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    Object.assign(document.createElement("a"), { href: url, download: fn }).click();
+    URL.revokeObjectURL(url);
+  } catch { toast.error("Falha ao gerar PDF"); }
+}
+
+function SRRow({ state, toolName, cnpj }: { state: ResultState; toolName: string; cnpj: string }) {
+  if (state.loading) return <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Consultando…</div>;
+  if (state.error)   return <div className="flex items-start gap-1.5 py-1.5 text-xs text-red-600"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="break-words">{state.error}</span></div>;
+  if (!state.text)   return null;
+  return (
+    <div className="mt-2 rounded-md border border-border/60 bg-muted/30 p-3">
+      {state.pdfB64 && <Button size="sm" variant="outline" className="mb-2 h-6 text-[11px] gap-1" onClick={() => dlPdf(state.pdfB64!, `${toolName}-${cnpj}.pdf`)}><Download className="h-3 w-3" /> Baixar PDF</Button>}
+      <pre className="text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap break-all max-h-52">{state.text}</pre>
+      {state.ms != null && <p className="mt-1 text-[10px] text-muted-foreground text-right">{state.ms}ms</p>}
+    </div>
+  );
+}
+
+function SerproTab() {
+  const { session } = useAuth();
+  const token = session?.access_token ?? null;
+  const { clientes } = useClientes();
+  const { call, extractText, extractPdf } = useSerpro();
+  const [gw, setGw]               = useState<GwStatus | null>(null);
+  const [gwLoading, setGwLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
+  const [catTab, setCatTab]       = useState("all");
+  const [searchTool, setSearchTool] = useState("");
+  const [openCats, setOpenCats]   = useState<Record<string, boolean>>({});
+  const [results, setResults]     = useState<Record<string, ResultState>>({});
+
+  async function checkGw() {
+    if (!token) return;
+    setGwLoading(true);
+    const t0 = Date.now();
+    try {
+      const res  = await fetch("/api/serpro/status", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      const s    = data?.serpro?.result ?? {};
+      setGw({ online: s.token_ok === true, version: s.version, checkedAt: new Date().toISOString(), latencyMs: Date.now() - t0 });
+    } catch { setGw({ online: false, checkedAt: new Date().toISOString(), latencyMs: 0 }); }
+    finally { setGwLoading(false); }
+  }
+  useEffect(() => { checkGw(); }, [token]);
+
+  const cliente   = useMemo(() => clientes.find(c => c.id === selectedId) ?? null, [clientes, selectedId]);
+  const regimeKey = useMemo(() => {
+    const r = (cliente?.regime ?? "").toUpperCase();
+    if (r === "SIMPLES NACIONAL" || r === "SIMPLES") return "SIMPLES";
+    if (r === "LUCRO PRESUMIDO") return "LUCRO_PRESUMIDO";
+    if (r === "LUCRO REAL") return "LUCRO_REAL";
+    return r;
+  }, [cliente]);
+  const cnpj = useMemo(() => (cliente?.cnpj ?? "").replace(/\D/g, ""), [cliente]);
+
+  const kpiElig = useMemo(() => {
+    const disp = SERPRO_TOOLS.filter(t =>
+      cliente ? checkEligibility(t.name, { regime: regimeKey, tem_certificado: (cliente as any).tem_certificado, tem_procuracao: (cliente as any).tem_procuracao }).eligible : false
+    ).length;
+    return { total: SERPRO_TOOLS.length, disp, bloq: SERPRO_TOOLS.length - disp };
+  }, [cliente, regimeKey]);
+
+  const filteredTools = useMemo(() => {
+    const q = searchTool.trim().toLowerCase();
+    return SERPRO_TOOLS.filter(t => {
+      if (catTab !== "all" && t.category !== catTab) return false;
+      if (q && !t.name.includes(q) && !t.description.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [catTab, searchTool]);
+
+  const grouped = useMemo(() =>
+    filteredTools.reduce<Record<string, typeof SERPRO_TOOLS>>((acc, t) => { acc[t.category] = [...(acc[t.category] ?? []), t]; return acc; }, {})
+  , [filteredTools]);
+
+  async function runTool(tool: typeof SERPRO_TOOLS[0]) {
+    if (!cnpj && tool.params.includes("cnpj")) { toast.error("Selecione um cliente com CNPJ"); return; }
+    const params: Record<string, string> = {};
+    if (tool.params.includes("cnpj")) params.cnpj = cnpj;
+    if (tool.params.includes("cpf") && (cliente as any)?.cpf) params.cpf = ((cliente as any).cpf as string).replace(/\D/g, "");
+    if (tool.params.includes("ano")) params.ano = String(new Date().getFullYear());
+    if (tool.params.includes("periodo")) { const d = new Date(); d.setMonth(d.getMonth() - 1); params.periodo = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`; }
+    setResults(p => ({ ...p, [tool.name]: { ...EMPTY_R, loading: true } }));
+    const res    = await call(tool.name, params, selectedId || undefined);
+    const text   = extractText(res);
+    const pdfB64 = extractPdf(res);
+    setResults(p => ({ ...p, [tool.name]: { loading: false, text: res.ok ? text : null, pdfB64: pdfB64 ?? null, error: res.ok ? null : (res.error ?? "Erro"), ms: res.duracao_ms ?? null } }));
+  }
 
   return (
-    <div className="space-y-6">
-      {/* PageHeader */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Fiscal</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Gestao tributaria · DAS · NFS-e · SERPRO · Pipeline de obrigacoes
-          </p>
+    <div className="space-y-4">
+      {/* Gateway */}
+      <div className="rounded-lg border bg-card p-4 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          {gw?.online ? <Wifi className="h-5 w-5 text-emerald-500" /> : <WifiOff className="h-5 w-5 text-red-400" />}
+          <div><p className="text-sm font-semibold">Gateway SERPRO</p><p className="text-xs text-muted-foreground">mcp.zapro.tech</p></div>
         </div>
-        <Button variant="outline" size="sm" onClick={refetch} disabled={kpisLoading}>
-          <RefreshCw className={cn("h-4 w-4 mr-1.5", kpisLoading && "animate-spin")} />
-          Atualizar KPIs
+        {gw && <>
+          <span className={cn("text-sm font-medium", gw.online ? "text-emerald-600" : "text-red-500")}>{gw.online ? "Autenticado" : "Offline"}</span>
+          {gw.latencyMs > 0 && <span className="text-xs text-muted-foreground">{gw.latencyMs}ms</span>}
+          {gw.version && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">v{gw.version}</span>}
+        </>}
+        <Button size="sm" variant="outline" className="ml-auto h-7 gap-1 text-xs" onClick={checkGw} disabled={gwLoading}>
+          {gwLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Verificar
         </Button>
       </div>
 
-      {/* KpiGrid */}
+      {/* Cliente */}
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <p className="text-sm font-semibold">Cliente para consulta</p>
+        <Select value={selectedId} onValueChange={setSelectedId}>
+          <SelectTrigger className="h-9 w-full max-w-sm"><SelectValue placeholder="Selecionar cliente…" /></SelectTrigger>
+          <SelectContent>
+            {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial ?? c.nomeFantasia} — {c.regime ?? "—"}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {cliente && (
+          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span>CNPJ: <strong className="text-foreground font-mono">{cliente.cnpj}</strong></span>
+            <span>Regime: <strong className="text-foreground">{cliente.regime}</strong></span>
+            <span className="text-emerald-600">{kpiElig.disp} tools disponíveis</span>
+            <span>{kpiElig.bloq} bloqueadas por regime/cert</span>
+          </div>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1">
+          {SERPRO_CAT_TABS.map(tab => (
+            <button key={tab.id} onClick={() => setCatTab(tab.id)}
+              className={cn("px-3 py-1 text-xs rounded-full border transition-colors",
+                catTab === tab.id ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground/40"
+              )}>{tab.label}</button>
+          ))}
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input placeholder="Buscar tool…" className="pl-9 h-9" value={searchTool} onChange={e => setSearchTool(e.target.value)} />
+        </div>
+      </div>
+
+      {/* Tools */}
+      <div className="space-y-2">
+        {Object.entries(grouped).map(([cat, tools]) => {
+          const isOpen = openCats[cat] ?? catTab !== "all";
+          return (
+            <div key={cat} className="rounded-lg border bg-card overflow-hidden">
+              <button className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                onClick={() => setOpenCats(p => ({ ...p, [cat]: !isOpen }))}>
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">{SERPRO_CATEGORIES[cat] ?? cat}</span>
+                  <span className="text-xs text-muted-foreground">({tools.length})</span>
+                </div>
+                {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {isOpen && (
+                <div className="divide-y divide-border/40 border-t border-border/40">
+                  {tools.map(tool => {
+                    const elig  = cliente ? checkEligibility(tool.name, { regime: regimeKey, tem_certificado: (cliente as any).tem_certificado, tem_procuracao: (cliente as any).tem_procuracao }) : { eligible: false, reason: "Selecione um cliente" } as any;
+                    const state = results[tool.name] ?? EMPTY_R;
+                    return (
+                      <div key={tool.name} className="px-4 py-3 hover:bg-muted/20 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium">{tool.description}</p>
+                              {tool.returnsPdf && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">PDF</span>}
+                              {tool.isHeavy   && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">Pesada</span>}
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{tool.name}</p>
+                            {!elig.eligible && <p className="text-xs text-amber-600 mt-1 flex items-start gap-1"><AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />{(elig as any).reason}</p>}
+                          </div>
+                          <Button size="sm" variant={elig.eligible ? "default" : "outline"} disabled={!elig.eligible || state.loading} className="shrink-0 h-7 text-xs gap-1" onClick={() => runTool(tool)}>
+                            {state.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : state.text ? <RefreshCw className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
+                            {state.text ? "Atualizar" : "Executar"}
+                          </Button>
+                        </div>
+                        <SRRow state={state} toolName={tool.name} cnpj={cnpj} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {Object.keys(grouped).length === 0 && (
+          <div className="rounded-lg border bg-card p-8 flex flex-col items-center gap-3 text-center text-muted-foreground">
+            <Search className="h-8 w-8 opacity-30" />
+            <p className="text-sm">Nenhuma tool encontrada{searchTool ? ` para "${searchTool}"` : ""}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB — DOCUMENTOS FISCAIS
+// ════════════════════════════════════════════════════════════════
+type DocFiscal = {
+  id: string; empresa_id: string; empresa_nome?: string; tipo: string;
+  numero?: string; data_emissao?: string; valor_total?: number; status: string;
+  xml_url?: string; pdf_url?: string; emitente_razao?: string; created_at: string;
+};
+const DOC_TIPOS   = ["NF-e", "NFS-e", "CT-e", "MDF-e", "SAT", "Outros"];
+const DOC_S_COLOR: Record<string, "green"|"gray"|"red"|"blue"> = {
+  autorizada: "green", emitida: "green", cancelada: "gray", denegada: "red", pendente: "blue",
+};
+
+function DocumentosTab() {
+  const { clientes } = useClientes();
+  const [docs, setDocs]           = useState<DocFiscal[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [query, setQuery]         = useState("");
+  const [clienteId, setClienteId] = useState("todos");
+  const [tipo, setTipo]           = useState("todos");
+  const [uploading, setUploading] = useState(false);
+  const [page, setPage]           = useState(1);
+  const PAGE_SIZE = 20;
+
+  const loadDocs = useCallback(async () => {
+    setLoading(true);
+    try {
+      let q = (supabase as any)
+        .from("documentos_fiscais")
+        .select("id,empresa_id,tipo,numero,data_emissao,valor_total,status,xml_url,pdf_url,emitente_razao,created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (clienteId !== "todos") q = q.eq("empresa_id", clienteId);
+      if (tipo !== "todos") q = q.eq("tipo", tipo);
+      const { data, error } = await q;
+      if (error) throw error;
+      setDocs((data ?? []).map((d: any) => ({ ...d, empresa_nome: clientes.find(c => c.id === d.empresa_id)?.razaoSocial ?? "—" })));
+    } catch (e: any) { toast.error("Erro ao carregar documentos: " + e.message); }
+    finally { setLoading(false); }
+  }, [clienteId, tipo, clientes]);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return docs.filter(d => !q || `${d.empresa_nome} ${d.numero} ${d.emitente_razao}`.toLowerCase().includes(q));
+  }, [docs, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => setPage(1), [query, clienteId, tipo]);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".xml") && !file.name.endsWith(".pdf")) { toast.error("Apenas XML ou PDF"); return; }
+    setUploading(true);
+    toast.loading("Enviando documento…", { id: "doc-up" });
+    try {
+      const path = `fiscal/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from("documentos").upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      toast.success("Documento enviado!", { id: "doc-up" });
+      await loadDocs();
+    } catch (e: any) { toast.error("Erro no upload: " + e.message, { id: "doc-up" }); }
+    finally { setUploading(false); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex flex-wrap gap-2">
+          <Select value={clienteId} onValueChange={setClienteId}>
+            <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os clientes</SelectItem>
+              {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial ?? c.nomeFantasia}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={tipo} onValueChange={setTipo}>
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              {DOC_TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <TableSearch value={query} onChange={setQuery} placeholder="Buscar…" />
+        </div>
+        <label className={cn("inline-flex items-center gap-1.5 h-8 px-3 text-xs rounded-md border border-border bg-card hover:bg-muted cursor-pointer transition-colors font-medium", uploading && "opacity-50 pointer-events-none")}>
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+          Enviar XML / PDF
+          <input type="file" accept=".xml,.pdf" className="sr-only" onChange={handleUpload} disabled={uploading} />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <FKpiCard icon={FileText}      label="Total"       value={docs.length}                                                              loading={loading} />
+        <FKpiCard icon={CheckCircle2}  label="Autorizadas" value={docs.filter(d => d.status === "autorizada" || d.status === "emitida").length} loading={loading} />
+        <FKpiCard icon={AlertTriangle} label="Canceladas"  value={docs.filter(d => d.status === "cancelada").length}                        loading={loading} variant="warning" />
+        <FKpiCard icon={AlertCircle}   label="Com erro"    value={docs.filter(d => d.status === "denegada" || d.status === "erro").length}   loading={loading} variant="danger" />
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-lg border border-dashed bg-card p-12 flex flex-col items-center gap-3 text-center">
+          <FolderOpen className="h-10 w-10 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">Nenhum documento fiscal encontrado</p>
+          <p className="text-xs text-muted-foreground/60">Envie XML ou PDF de NF-e, NFS-e, CT-e</p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-lg border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left">Empresa</th>
+                  <th className="px-4 py-2.5 text-left hidden md:table-cell">Tipo</th>
+                  <th className="px-4 py-2.5 text-left hidden lg:table-cell">Número</th>
+                  <th className="px-4 py-2.5 text-left hidden lg:table-cell">Data</th>
+                  <th className="px-4 py-2.5 text-right hidden md:table-cell">Valor</th>
+                  <th className="px-4 py-2.5 text-left">Status</th>
+                  <th className="px-4 py-2.5 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {pageRows.map(doc => (
+                  <tr key={doc.id} className="hover:bg-muted/20 transition-colors group">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-xs leading-tight">{doc.empresa_nome}</div>
+                      {doc.emitente_razao && <div className="text-[11px] text-muted-foreground truncate max-w-[180px]">{doc.emitente_razao}</div>}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell"><InlineBadge color="blue">{doc.tipo ?? "—"}</InlineBadge></td>
+                    <td className="px-4 py-3 hidden lg:table-cell font-mono text-xs">{doc.numero ?? "—"}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-xs">{doc.data_emissao ? new Date(doc.data_emissao + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-right text-xs tabular-nums">{doc.valor_total != null ? fmtBRL(doc.valor_total) : "—"}</td>
+                    <td className="px-4 py-3"><InlineBadge color={DOC_S_COLOR[doc.status] ?? "gray"} dot>{doc.status}</InlineBadge></td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {doc.pdf_url && <a href={doc.pdf_url} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" className="h-6 w-6 p-0"><Eye className="h-3 w-3" /></Button></a>}
+                        {doc.xml_url && <a href={doc.xml_url} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost" className="h-6 w-6 p-0"><Download className="h-3 w-3" /></Button></a>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <TableFooter total={docs.length} filtered={filtered.length} selected={0} />
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB — AUTOMAÇÕES
+// ════════════════════════════════════════════════════════════════
+type AutoFiscal = { id: string; nome: string; descricao: string; agente: string; frequencia: string; ultima_execucao?: string; ativa: boolean; ultima_resultado?: "ok"|"erro"|"aviso" };
+
+const AUTOMACOES_FIXAS: AutoFiscal[] = [
+  { id: "1", nome: "Monitoramento Fiscal Diário",  descricao: "Verifica obrigações vencidas, a vencer e certificados",         agente: "agente-fiscal",       frequencia: "Diário 08:00", ativa: true,  ultima_resultado: "ok" },
+  { id: "2", nome: "Geração DAS Automática",        descricao: "Gera guias DAS/DASMEI para todos os clientes Simples/MEI",     agente: "agente-fiscal",       frequencia: "Mensal dia 1", ativa: false },
+  { id: "3", nome: "Envio DAS por WhatsApp",        descricao: "Envia guias DAS geradas aos clientes via WhatsApp",            agente: "agente-fiscal",       frequencia: "Mensal dia 2", ativa: false },
+  { id: "4", nome: "Alerta Certificados 30d",       descricao: "Notifica sobre certificados digitais com vencimento em 30 dias", agente: "agente-fiscal",      frequencia: "Semanal",      ativa: true,  ultima_resultado: "ok" },
+  { id: "5", nome: "Orquestrador Central",          descricao: "Executa todos os agentes em paralelo e consolida alertas",     agente: "agente-orquestrador", frequencia: "Diário 08:00", ativa: true,  ultima_resultado: "ok" },
+];
+
+function AutomacoesTab() {
+  const [automacoes, setAutomacoes] = useState<AutoFiscal[]>(AUTOMACOES_FIXAS);
+  const [runningId, setRunningId]   = useState<string | null>(null);
+  const { session } = useAuth();
+  const toggle = (id: string) => setAutomacoes(a => a.map(x => x.id === id ? { ...x, ativa: !x.ativa } : x));
+
+  async function executarAgora(id: string, agente: string) {
+    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
+    setRunningId(id);
+    toast.loading(`Executando ${agente}…`, { id: "auto-run" });
+    try {
+      const res = await fetch(`https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/${agente}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ trigger: "manual" }),
+      });
+      if (res.ok) {
+        toast.success("Agente executado!", { id: "auto-run" });
+        setAutomacoes(a => a.map(x => x.id === id ? { ...x, ultima_execucao: new Date().toISOString(), ultima_resultado: "ok" } : x));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast.error((d as any)?.error ?? "Erro na execução", { id: "auto-run" });
+        setAutomacoes(a => a.map(x => x.id === id ? { ...x, ultima_resultado: "erro" } : x));
+      }
+    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "auto-run" }); }
+    finally { setRunningId(null); }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Agentes autônomos que monitoram e executam tarefas fiscais automaticamente.</p>
+      {automacoes.map(auto => (
+        <div key={auto.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
+          <div className={cn("mt-1 h-2.5 w-2.5 rounded-full shrink-0", auto.ativa ? "bg-emerald-500" : "bg-muted-foreground/30")} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-medium">{auto.nome}</p>
+              {auto.ultima_resultado === "ok"    && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+              {auto.ultima_resultado === "erro"   && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+              {auto.ultima_resultado === "aviso"  && <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{auto.descricao}</p>
+            <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-muted-foreground">
+              <span>Agente: <code className="text-foreground">{auto.agente}</code></span>
+              <span>Frequência: <strong className="text-foreground">{auto.frequencia}</strong></span>
+              {auto.ultima_execucao && <span>Última: {new Date(auto.ultima_execucao).toLocaleString("pt-BR")}</span>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningId === auto.id} onClick={() => executarAgora(auto.id, auto.agente)}>
+              {runningId === auto.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              Executar
+            </Button>
+            <button onClick={() => toggle(auto.id)} className={cn("p-1 rounded transition-colors", auto.ativa ? "text-emerald-600" : "text-muted-foreground/40")}>
+              {auto.ativa ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB — CONFIGURAÇÕES
+// ════════════════════════════════════════════════════════════════
+function ConfiguracoesTab() {
+  const { session } = useAuth();
+  const [gwStatus, setGwStatus] = useState<"idle"|"checking"|"ok"|"erro">("idle");
+  const [gwMsg, setGwMsg]       = useState("");
+
+  async function testarGateway() {
+    if (!session?.access_token) return;
+    setGwStatus("checking");
+    try {
+      const res  = await fetch("/api/serpro/status", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const data = await res.json().catch(() => ({}));
+      const ok   = data?.serpro?.result?.token_ok === true;
+      setGwStatus(ok ? "ok" : "erro");
+      setGwMsg(ok ? `v${data?.serpro?.result?.version ?? "—"} · ${data?.serpro?.result?.contratante ?? "—"}` : "Gateway offline ou token inválido");
+    } catch (e: any) { setGwStatus("erro"); setGwMsg(e.message); }
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="rounded-lg border bg-card p-5 space-y-4">
+        <div><h3 className="text-sm font-semibold">Gateway SERPRO</h3><p className="text-xs text-muted-foreground mt-0.5">Conexão com mcp.zapro.tech para consultas na Receita Federal</p></div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono text-muted-foreground">mcp.zapro.tech — Bearer apoya-mcp-serpro-2026</div>
+          <Button size="sm" variant="outline" className="h-8 text-xs gap-1 shrink-0" onClick={testarGateway} disabled={gwStatus === "checking"}>
+            {gwStatus === "checking" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />} Testar
+          </Button>
+        </div>
+        {gwStatus === "ok"   && <div className="flex items-center gap-1.5 text-xs text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Conectado · {gwMsg}</div>}
+        {gwStatus === "erro" && <div className="flex items-center gap-1.5 text-xs text-red-600"><AlertCircle className="h-3.5 w-3.5" /> {gwMsg}</div>}
+      </div>
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div><h3 className="text-sm font-semibold">Focus NF-e</h3><p className="text-xs text-muted-foreground mt-0.5">API de emissão e consulta de NFS-e</p></div>
+        <div className="flex items-center gap-2 text-xs"><AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" /><span className="text-amber-700">Emissão suspensa — pendência junto à prefeitura de Caçapava.</span></div>
+      </div>
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div><h3 className="text-sm font-semibold">Notificações</h3><p className="text-xs text-muted-foreground mt-0.5">Como o sistema notifica sobre pendências fiscais</p></div>
+        <div className="space-y-2">
+          {[
+            { label: "Alertas críticos no Dashboard", ativo: true },
+            { label: "Notificações por WhatsApp (em breve)", ativo: false },
+            { label: "E-mail diário de pendências (em breve)", ativo: false },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-3 text-sm">
+              <div className={cn("h-2 w-2 rounded-full", item.ativo ? "bg-emerald-500" : "bg-muted-foreground/30")} />
+              <span className={item.ativo ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
+              {item.ativo && <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 ml-auto">Ativo</Badge>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ════════════════════════════════════════════════════════════════
+function FiscalModuloInner() {
+  const { roles } = useAuth();
+  const { kpis, loading: kpisLoading, error: kpisError, refetch } = useFiscalKpis();
+  const podeAprovar = roles.includes("admin") || roles.includes("contador");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Fiscal</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Gestão tributária · DAS · NFS-e · SERPRO · Pipeline de obrigações</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={refetch} disabled={kpisLoading}>
+          <RefreshCw className={cn("h-4 w-4 mr-1.5", kpisLoading && "animate-spin")} /> Atualizar KPIs
+        </Button>
+      </div>
+
       {kpisError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>Erro ao carregar KPIs: {kpisError}</span>
-          <Button variant="ghost" size="sm" onClick={refetch} className="ml-auto">
-            Tentar novamente
-          </Button>
+          <AlertTriangle className="h-4 w-4 shrink-0" /> Erro ao carregar KPIs: {kpisError}
+          <Button variant="ghost" size="sm" onClick={refetch} className="ml-auto text-xs">Tentar novamente</Button>
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard
-            label="Obrigacoes Vencidas"
-            value={kpis?.obrigacoes_vencidas ?? 0}
-            icon={AlertTriangle}
-            variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}
-            loading={kpisLoading}
-          />
-          <KpiCard
-            label="A vencer (7 dias)"
-            value={kpis?.obrigacoes_a_vencer_7d ?? 0}
-            icon={Calendar}
-            variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"}
-            loading={kpisLoading}
-          />
-          <KpiCard
-            label="DAS Pendentes"
-            value={kpis?.das_pendentes ?? 0}
-            icon={TrendingDown}
-            variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}
-            loading={kpisLoading}
-          />
-          <KpiCard
-            label="Certificados < 30d"
-            value={kpis?.certificados_expirando ?? 0}
-            icon={ShieldAlert}
-            variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}
-            loading={kpisLoading}
-          />
+          <FKpiCard label="Obrigações Vencidas" value={kpis?.obrigacoes_vencidas ?? 0}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpisLoading} />
+          <FKpiCard label="A vencer (7 dias)"   value={kpis?.obrigacoes_a_vencer_7d ?? 0} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpisLoading} />
+          <FKpiCard label="DAS Pendentes"        value={kpis?.das_pendentes ?? 0}           icon={Receipt}       variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}          loading={kpisLoading} />
+          <FKpiCard label="Certificados < 30d"   value={kpis?.certificados_expirando ?? 0}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpisLoading} />
         </div>
       )}
 
-      {/* PageTabs */}
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
@@ -197,67 +881,44 @@ function FiscalModulo__Inner() {
           <TabsTrigger value="nfse">NFS-e</TabsTrigger>
           <TabsTrigger value="serpro">SERPRO</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
+          <TabsTrigger value="automacoes">Automações</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
-        {/* Pipeline — kanban do setor fiscal */}
         <TabsContent value="pipeline" className="mt-0">
           <PipelineKanban setor="fiscal" podeAprovar={podeAprovar} />
         </TabsContent>
-
-        {/* DAS — link para rota filha existente */}
         <TabsContent value="das" className="mt-0">
-          <TabLink
-            to="/fiscal/das"
-            label="DAS em Lote"
-            icon={Receipt}
-            desc="Gerenciamento de guias DAS do Simples Nacional para todos os clientes."
-          />
+          <DasTab />
         </TabsContent>
-
-        {/* NFS-e — Focus congelada */}
         <TabsContent value="nfse" className="mt-0">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4 flex items-center gap-2 text-sm text-amber-700">
             <ShieldAlert className="h-4 w-4 shrink-0" />
-            Emissao de NFS-e temporariamente suspensa (pendencia junto a prefeitura de Cacapava).
-            Apenas consulta disponivel.
+            Emissão temporariamente suspensa — pendência junto à prefeitura de Caçapava. Apenas consulta disponível.
           </div>
-          <TabLink
-            to="/fiscal/nfse"
-            label="NFS-e"
-            icon={FileText}
-            desc="Consulta de notas fiscais emitidas e recebidas. Emissao suspensa (Focus congelada)."
-          />
+          <NfseTab />
         </TabsContent>
-
-        {/* SERPRO */}
         <TabsContent value="serpro" className="mt-0">
-          <TabLink
-            to="/fiscal/serpro"
-            label="SERPRO"
-            icon={Search}
-            desc="Consultas diretas na Receita Federal: PGDAS, PGMEI, Situacao Fiscal, caixa postal."
-          />
+          <SerproTab />
         </TabsContent>
-
-        {/* Documentos */}
         <TabsContent value="documentos" className="mt-0">
-          <div className="rounded-xl border border-dashed bg-card p-8 text-center space-y-2">
-            <FileText className="h-8 w-8 mx-auto text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">
-              Repositorio de documentos fiscais em desenvolvimento.
-            </p>
-            <p className="text-xs text-muted-foreground/60">Disponivel na fase C.</p>
-          </div>
+          <DocumentosTab />
+        </TabsContent>
+        <TabsContent value="automacoes" className="mt-0">
+          <AutomacoesTab />
+        </TabsContent>
+        <TabsContent value="config" className="mt-0">
+          <ConfiguracoesTab />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function FiscalModulo() {
+export function FiscalModulo() {
   return (
     <SectorGuard setor="fiscal">
-      <FiscalModulo__Inner />
+      <FiscalModuloInner />
     </SectorGuard>
   );
 }
