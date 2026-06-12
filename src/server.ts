@@ -3,6 +3,10 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
+// Domínio canônico de produção — redirecionar workers.dev para o domínio real
+const CANONICAL_HOST = "apoyaproject.zapro.tech";
+const REDIRECT_HOSTS = ["apoya-gestao.talkzzbot.workers.dev"];
+
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
@@ -50,8 +54,6 @@ function isCatastrophicSsrErrorBody(body: string, responseStatus: number): boole
   );
 }
 
-// h3 swallows in-handler throws into a normal 500 Response with body
-// {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
@@ -68,6 +70,15 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // Redirect canônico: workers.dev → domínio de produção real
+    const url = new URL(request.url);
+    if (REDIRECT_HOSTS.includes(url.hostname)) {
+      const canonical = new URL(request.url);
+      canonical.hostname = CANONICAL_HOST;
+      canonical.protocol = "https:";
+      return Response.redirect(canonical.toString(), 301);
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
@@ -78,3 +89,4 @@ export default {
     }
   },
 };
+
