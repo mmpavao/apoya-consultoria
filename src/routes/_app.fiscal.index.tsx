@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
 import { useAuth } from "@/hooks/use-auth";
+import { ObrigacoesContent } from "@/components/ObrigacoesContent";
 
 export const Route = createFileRoute("/_app/fiscal/")({
   component: FiscalModulo,
@@ -193,15 +194,23 @@ function FiscalModulo__Inner() {
       <Tabs defaultValue="pipeline" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+          <TabsTrigger value="obrigacoes">Obrigações</TabsTrigger>
           <TabsTrigger value="das">DAS</TabsTrigger>
           <TabsTrigger value="nfse">NFS-e</TabsTrigger>
           <TabsTrigger value="serpro">SERPRO</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
+          <TabsTrigger value="automacoes">Automações</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
         {/* Pipeline — kanban do setor fiscal */}
         <TabsContent value="pipeline" className="mt-0">
           <PipelineKanban setor="fiscal" podeAprovar={podeAprovar} />
+        </TabsContent>
+
+        {/* Obrigações — calendário fiscal integrado */}
+        <TabsContent value="obrigacoes" className="mt-0">
+          <ObrigacoesContent />
         </TabsContent>
 
         {/* DAS — link para rota filha existente */}
@@ -247,6 +256,80 @@ function FiscalModulo__Inner() {
               Repositorio de documentos fiscais em desenvolvimento.
             </p>
             <p className="text-xs text-muted-foreground/60">Disponivel na fase C.</p>
+          </div>
+        </TabsContent>
+
+        {/* Automações — filtradas por setor fiscal */}
+        <TabsContent value="automacoes" className="mt-0">
+          <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">Automações Fiscais</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">Rotinas automáticas do módulo fiscal</p>
+              </div>
+              <a href="/automacoes?setor=fiscal">
+                <Button variant="outline" size="sm">Gerenciar todas</Button>
+              </a>
+            </div>
+            <div className="grid gap-3">
+              {[
+                { nome: "Monitor Obrigações", desc: "Varre obrigações vencidas e cria alertas", status: "ativa", freq: "Diário 08:00" },
+                { nome: "Geração DAS em Lote", desc: "Gera guias DAS para clientes Simples Nacional", status: "manual", freq: "Manual" },
+                { nome: "Alerta Certificado", desc: "Notifica 30 dias antes do vencimento", status: "ativa", freq: "Semanal" },
+              ].map((a, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{a.nome}</p>
+                    <p className="text-xs text-muted-foreground">{a.desc}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">{a.freq}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.status === "ativa" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {a.status === "ativa" ? "Ativa" : "Manual"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Configurações do módulo Fiscal */}
+        <TabsContent value="config" className="mt-0">
+          <div className="rounded-xl border bg-card p-6 space-y-5">
+            <h3 className="font-semibold text-foreground">Configurações do Módulo Fiscal</h3>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Alertas</h4>
+                {[
+                  { label: "Alertar obrigações vencidas", enabled: true },
+                  { label: "Alertar DAS próximo ao vencimento", enabled: true },
+                  { label: "Alertar certificado expirando", enabled: true },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <span className="text-sm text-foreground">{item.label}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {item.enabled ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Pipeline</h4>
+                {[
+                  { label: "Aprovação obrigatória para transmissão", enabled: true },
+                  { label: "Notificar cliente antes de transmitir", enabled: false },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                    <span className="text-sm text-foreground">{item.label}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {item.enabled ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Configurações completas disponíveis em Configurações → Módulo Fiscal</p>
           </div>
         </TabsContent>
       </Tabs>

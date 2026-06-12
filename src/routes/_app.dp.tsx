@@ -130,6 +130,10 @@ function DpPage__Inner() {
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="empresas">Empresas</TabsTrigger>
+          <TabsTrigger value="folha">Folha</TabsTrigger>
+          <TabsTrigger value="esocial">eSocial</TabsTrigger>
+          <TabsTrigger value="automacoes">Automações</TabsTrigger>
+          <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline" className="mt-0">
@@ -193,6 +197,80 @@ function DpPage__Inner() {
                 })}
               </tbody>
             </table>
+          </div>
+        </TabsContent>
+
+        {/* Folha Mensal */}
+        <TabsContent value="folha" className="mt-0">
+          <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">Folha de Pagamento</h3>
+                <p className="text-sm text-muted-foreground">Processamento mensal de salários e encargos</p>
+              </div>
+              <Button size="sm" variant="outline">+ Nova Folha</Button>
+            </div>
+            <div className="rounded-lg border border-dashed border-border p-8 text-center">
+              <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma folha aberta este mês</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Cadastre funcionários para processar folhas</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* eSocial */}
+        <TabsContent value="esocial" className="mt-0">
+          <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-foreground">eSocial</h3>
+              <a href="/obrigacoes"><Button variant="outline" size="sm">Ver Obrigações</Button></a>
+            </div>
+            {["S-1000 — Informações do Empregador","S-2200 — Cadastramento Inicial","S-1200 — Remuneração"].map((e,i)=>(
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <p className="text-sm font-mono text-foreground">{e}</p>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Pendente</span>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Automações */}
+        <TabsContent value="automacoes" className="mt-0">
+          <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Automações DP</h3>
+              <a href="/automacoes"><Button variant="outline" size="sm">Gerenciar</Button></a>
+            </div>
+            {[
+              { nome: "Monitor eSocial", desc: "Verifica eventos vencidos diariamente" },
+              { nome: "Alerta Férias", desc: "Notifica 30 dias antes do vencimento" },
+            ].map((a,i)=>(
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+                <div><p className="text-sm font-medium">{a.nome}</p><p className="text-xs text-muted-foreground">{a.desc}</p></div>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Ativa</span>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Config */}
+        <TabsContent value="config" className="mt-0">
+          <div className="rounded-xl border bg-card p-6">
+            <h3 className="font-semibold mb-4">Configurações do DP</h3>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[
+                { label: "Calcular FGTS automaticamente", enabled: true },
+                { label: "Alertar rescisões pendentes", enabled: true },
+                { label: "Aprovação antes de fechar folha", enabled: false },
+              ].map((item,i)=>(
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
+                  <span className="text-sm">{item.label}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                    {item.enabled ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </TabsContent>
       </Tabs>
