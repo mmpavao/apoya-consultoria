@@ -38,28 +38,26 @@ type NavItem =
 
 // ─── Itens SEMPRE visíveis (sem setor) ────────────────────────────────────────
 const GESTAO_ITEMS: NavItem[] = [
-  { group: "VISÃO GERAL" },
-  { to: "/",           label: "Dashboard",         icon: LayoutDashboard, exact: true },
-  { to: "/workflows",  label: "Central de Operações", icon: Workflow },
+  { group: "GESTÃO" },
+  { to: "/",           label: "Dashboard",    icon: LayoutDashboard, exact: true },
+  { to: "/clientes",   label: "Clientes",     icon: Building2,       setor: "clientes" },
+  { to: "/crm",        label: "CRM",          icon: UserRoundSearch, setor: "clientes" },
 ];
 
-const CLIENTES_ITEMS: NavItem[] = [
-  { group: "CLIENTES" },
-  { to: "/clientes",   label: "Clientes",          icon: Building2,       setor: "clientes" },
-  { to: "/crm",        label: "CRM",               icon: UserRoundSearch, setor: "clientes" },
+const OPERACIONAL_ITEMS: NavItem[] = [
+  { group: "OPERACIONAL" },
+  { to: "/obrigacoes", label: "Obrigações",   icon: Calendar,        setor: "obrigacoes" },
+  { to: "/workflows",  label: "Workflows",    icon: Workflow },   // sempre visível (B2 spec)
+  { to: "/societario", label: "Societário",   icon: Landmark,        setor: "societario" },
 ];
-
-// OPERACIONAL — removido: Obrigações vai para módulo Fiscal, Workflows virou Central de Operações
-const OPERACIONAL_ITEMS: NavItem[] = [];
 
 // ─── DEPARTAMENTOS: cada item tem setor obrigatório ───────────────────────────
-const DEPARTAMENTOS_ITEMS: NavItem[] = [
+const DEPT_ITEMS: NavItem[] = [
   { group: "DEPARTAMENTOS" },
   { to: "/fiscal",     label: "Fiscal",       icon: Receipt,     setor: "fiscal" },
   { to: "/dp",         label: "Dep. Pessoal", icon: Users2,      setor: "dp" },
   { to: "/contabil",   label: "Contábil",     icon: BookOpen,    setor: "contabil" },
   { to: "/financeiro", label: "Financeiro",   icon: DollarSign,  setor: "financeiro" },
-  { to: "/societario", label: "Societário",   icon: Landmark,    setor: "societario" },
 ];
 
 const FERRAMENTAS_ITEMS: NavItem[] = [
@@ -70,7 +68,6 @@ const FERRAMENTAS_ITEMS: NavItem[] = [
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
-  { group: "SISTEMA" },
   { to: "/administracao", label: "Administração", icon: Shield },
   { to: "/configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -197,8 +194,8 @@ export function AppSidebar({
 
   const allSections = [
     ...GESTAO_ITEMS,
-    ...CLIENTES_ITEMS,
-    ...DEPARTAMENTOS_ITEMS,
+    ...OPERACIONAL_ITEMS,
+    ...DEPT_ITEMS,
     ...FERRAMENTAS_ITEMS,
   ];
 

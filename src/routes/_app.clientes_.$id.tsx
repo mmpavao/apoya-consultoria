@@ -128,17 +128,17 @@ function KpiMini({ label, value, sub, tone = "neutral" }: { label: string; value
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 
-// ── Novas abas consolidadas (9 → 4) ─────────────────────────────────────
-// Cadastro   = dados empresa + sócios + certificados
-// Módulos    = links rápidos Fiscal / DP / Contábil com KPIs
-// Financeiro = serviços contratados + contratos + cobranças
-// Arquivos   = documentos + histórico
-type Tab = "cadastro" | "modulos" | "financeiro" | "arquivos";
+type Tab = "geral" | "fiscal" | "dp" | "contabil" | "comercial" | "socios" | "certificados" | "documentos" | "historico";
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: "cadastro",    label: "Cadastro",     icon: Building2  },
-  { id: "modulos",     label: "Módulos",      icon: BookOpen   },
-  { id: "financeiro",  label: "Financeiro",   icon: DollarSign },
-  { id: "arquivos",    label: "Arquivos",     icon: FileText   },
+  { id: "geral",        label: "Visão Geral",  icon: Building2  },
+  { id: "fiscal",       label: "Fiscal",        icon: FileText   },
+  { id: "dp",           label: "Dep. Pessoal",  icon: Users2     },
+  { id: "contabil",     label: "Contábil",      icon: BookOpen   },
+  { id: "comercial",    label: "Comercial",     icon: Briefcase  },
+  { id: "socios",       label: "Sócios",        icon: Users      },
+  { id: "certificados", label: "Certificados",  icon: Shield     },
+  { id: "documentos",   label: "Documentos",    icon: FileText   },
+  { id: "historico",    label: "Histórico",     icon: Clock      },
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────
@@ -150,7 +150,7 @@ function ClienteDetailPage() {
   const { cobrancas } = useCobrancas();
   const { obrigacoes } = useObrigacoes();
 
-  const [tab, setTab]         = useState<Tab>("cadastro");
+  const [tab, setTab]         = useState<Tab>("geral");
   const [modalNfse, setModalNfse] = useState(false);
   const { buscar: buscarCnpjApi, loading: buscandoCnpj } = useCnpjLookup();
 
@@ -326,7 +326,7 @@ function ClienteDetailPage() {
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setModalNfse(true)}>
                   <ReceiptText className="mr-1.5 h-3.5 w-3.5" />Emitir NFS-e
                 </Button>
-                <Button size="sm" onClick={() => { setEditMode(true); setTab("cadastro"); setTimeout(() => document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}>
+                <Button size="sm" onClick={() => { setEditMode(true); setTab("geral"); setTimeout(() => document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}>
                   <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
                 </Button>
                 {cliente.whatsapp && (
@@ -358,7 +358,7 @@ function ClienteDetailPage() {
                 label: "Contrato",
                 ok: temContrato,
                 icon: "📄",
-                tab: "financeiro",
+                tab: "comercial",
                 tip: "Contrato de prestação de serviços assinado",
               },
               {
@@ -366,7 +366,7 @@ function ClienteDetailPage() {
                 label: "Certificado Digital",
                 ok: temCertificado,
                 icon: "🔐",
-                tab: "cadastro" as Tab,
+                tab: "certificados" as Tab,
                 tip: "Certificado A1 ou A3 cadastrado",
               },
               {
@@ -374,7 +374,7 @@ function ClienteDetailPage() {
                 label: "Procuração eCAC",
                 ok: temProcuracao,
                 icon: "🛡️",
-                tab: "cadastro" as Tab,
+                tab: "certificados" as Tab,
                 tip: "Procuração para acesso ao eCAC/SERPRO",
               },
               {
@@ -382,7 +382,7 @@ function ClienteDetailPage() {
                 label: "Documentos",
                 ok: temDocumentos,
                 icon: "📁",
-                tab: "arquivos" as Tab,
+                tab: "documentos" as Tab,
                 tip: "Documentos societários e fiscais arquivados",
               },
               {
@@ -390,7 +390,7 @@ function ClienteDetailPage() {
                 label: "Quadro Societário",
                 ok: temSocios,
                 icon: "👥",
-                tab: "cadastro" as Tab,
+                tab: "socios" as Tab,
                 tip: "Sócios cadastrados com % de participação",
               },
               {
@@ -398,7 +398,7 @@ function ClienteDetailPage() {
                 label: "Serviço Ativo",
                 ok: temServico,
                 icon: "✅",
-                tab: "financeiro" as Tab,
+                tab: "comercial" as Tab,
                 tip: "Contrato de serviço contábil vigente",
               },
             ].map(item => (
@@ -442,108 +442,141 @@ function ClienteDetailPage() {
       </div>
 
       {/* ═════════════════════ ABA: VISÃO GERAL ═════════════════════ */}
-            {/* ═══════════ ABA: CADASTRO (empresa + sócios + certificados) ═══════════ */}
-      {tab === "cadastro" && (
-        <div className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-2">
-            {/* Dados cadastrais */}
-            <SectionCard title="Dados Cadastrais" icon={Building2}>
-              <InfoRow icon={Hash}         label="CNPJ / CPF"          value={cliente.cnpj} />
-              <InfoRow icon={Briefcase}    label="Razão Social"         value={cliente.razaoSocial} />
-              <InfoRow icon={Building2}    label="Nome Fantasia"        value={cliente.nomeFantasia} />
-              <InfoRow icon={Info}         label="Atividade Principal"  value={cliente.atividadePrincipal} />
-              <InfoRow icon={Home}         label="Município / UF"       value={(cliente.municipio || cliente.uf) ? `${cliente.municipio ?? ""} / ${cliente.uf ?? ""}`.trim().replace(/^\/ | \/$/g, "") : undefined} />
+      {tab === "geral" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {/* Dados cadastrais */}
+          <SectionCard title="Dados Cadastrais" icon={Building2}>
+            <InfoRow icon={Hash}         label="CNPJ / CPF"          value={cliente.cnpj} />
+            <InfoRow icon={Briefcase}    label="Razão Social"         value={cliente.razaoSocial} />
+            <InfoRow icon={Building2}    label="Nome Fantasia"        value={cliente.nomeFantasia} />
+            <InfoRow icon={FileText}     label="Atividade Principal"  value={cliente.atividadePrincipal} />
+            <InfoRow icon={Hash}         label="Insc. Municipal"      value={cliente.inscricaoMunicipal} />
+            <InfoRow icon={Hash}         label="Insc. Estadual"       value={cliente.inscricaoEstadual} />
+          </SectionCard>
+
+          {/* Regime e características */}
+          <SectionCard title="Regime Tributário" icon={ShieldCheck}>
+            <InfoRow icon={ShieldCheck}  label="Regime"               value={REGIME_LABEL[cliente.regime]} />
+            <InfoRow icon={Zap}          label="Regime Híbrido"       value={cliente.regimeHibrido ? "Sim" : undefined} />
+            <InfoRow icon={ReceiptText}  label="Cód. Serviço NFS-e"   value={cliente.codigoServicoNfse} />
+            <InfoRow icon={Users}        label="Tem Empregados (eSocial)" value={cliente.temEmpregados ? "Sim" : "Não"} />
+            <InfoRow icon={Zap}          label="Incentivo Fiscal"     value={cliente.temIncentivoFiscal ? "Sim" : "Não"} />
+            <InfoRow icon={User}         label="Responsável APOYA"    value={cliente.responsavel} />
+          </SectionCard>
+
+          {/* Endereço */}
+          <SectionCard title="Endereço" icon={MapPin}>
+            <InfoRow icon={Home}         label="Logradouro"   value={[cliente.endereco?.logradouro, cliente.endereco?.numero].filter(Boolean).join(", ")} />
+            <InfoRow icon={MapPin}       label="Bairro"       value={cliente.endereco?.bairro} />
+            <InfoRow icon={MapPin}       label="CEP"          value={cliente.endereco?.cep} />
+            <InfoRow icon={MapPin}       label="Município/UF" value={[cliente.endereco?.municipio ?? cliente.municipio, cliente.endereco?.uf ?? cliente.uf].filter(Boolean).join(" / ")} />
+          </SectionCard>
+
+          {/* Contato */}
+          <SectionCard title="Contato" icon={User}>
+            <InfoRow icon={Mail}   label="E-mail"    value={cliente.email}    href={cliente.email    ? `mailto:${cliente.email}` : undefined} />
+            <InfoRow icon={Phone}  label="Telefone"  value={cliente.telefone} href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
+            <div className="flex items-start gap-3 py-2.5 border-b border-border/50">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5">WhatsApp</p>
+                {cliente.whatsapp ? (
+                  <button
+                    className="text-sm text-primary hover:underline font-medium"
+                    onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}
+                  >
+                    {cliente.whatsapp}
+                  </button>
+                ) : <p className="text-sm text-muted-foreground">—</p>}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Observações */}
+          {cliente.observacoes && (
+            <SectionCard title="Observações" icon={Info}>
+              <p className="py-3 text-sm text-foreground leading-relaxed whitespace-pre-wrap">{cliente.observacoes}</p>
             </SectionCard>
-
-            {/* Contato */}
-            <SectionCard title="Contato" icon={User}>
-              <InfoRow icon={Mail}   label="E-mail"    value={cliente.email}     href={cliente.email ? `mailto:${cliente.email}` : undefined} />
-              <InfoRow icon={Phone}  label="Telefone"  value={cliente.telefone}  href={cliente.telefone ? `tel:${cliente.telefone}` : undefined} />
-              <InfoRow icon={MapPin} label="Município" value={cliente.municipio} />
-              <InfoRow icon={MapPin} label="UF" value={cliente.uf} />
-            </SectionCard>
-          </div>
-
-          {/* Sócios — componente existente */}
-          <TabSocios clienteId={id} />
-
-          {/* Certificados — componente existente */}
-          <TabCertificados clienteId={id} cnpj={cliente.cnpj ?? undefined} razaoSocial={cliente.razaoSocial} />
+          )}
         </div>
       )}
 
-      {/* ═══════════ ABA: MÓDULOS (Fiscal / DP / Contábil com KPIs) ══════════ */}
-      {tab === "modulos" && (
-        <div className="space-y-5">
-          {/* Fiscal */}
-          <div className="surface-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">Fiscal</h3>
-              </div>
-              <a href={`/fiscal?cliente=${id}`} className="text-xs text-primary hover:underline flex items-center gap-1">
-                Ver módulo completo <ChevronRight className="h-3 w-3" />
-              </a>
-            </div>
-            <div className="p-5">
-              <TabFiscal cliente={{ ...cliente, tem_certificado: temCertificado, tem_procuracao: temProcuracao, cnpj: cliente.cnpj ?? undefined, regime: cliente.regime }} />
-            </div>
-          </div>
-
-          {/* DP */}
-          <div className="surface-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Users2 className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">Departamento Pessoal</h3>
-              </div>
-              <a href={`/dp/${id}`} className="text-xs text-primary hover:underline flex items-center gap-1">
-                Ver módulo completo <ChevronRight className="h-3 w-3" />
-              </a>
-            </div>
-            <div className="p-5">
-              <TabDP clienteId={id} />
-            </div>
-          </div>
-
-          {/* Contábil */}
-          <div className="surface-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">Contabilidade</h3>
-              </div>
-              <a href="/contabil" className="text-xs text-primary hover:underline flex items-center gap-1">
-                Ver módulo completo <ChevronRight className="h-3 w-3" />
-              </a>
-            </div>
-            <div className="p-5">
-              <TabContabil clienteId={id} />
-            </div>
-          </div>
-        </div>
+      {/* ═════════════════════ ABA: FISCAL ═════════════════════ */}
+      {tab === "fiscal" && (
+        <TabFiscal
+          cliente={{
+            ...cliente,
+            tem_certificado: (cliente as any).tem_certificado ?? false,
+            tem_procuracao:  (cliente as any).tem_procuracao  ?? false,
+          }}
+        />
       )}
 
-      {/* ═══════════ ABA: FINANCEIRO (serviços + contratos + cobranças) ══════════ */}
-      {tab === "financeiro" && (
-        <div className="space-y-5">
-          <TabComercial cliente={cliente} />
-        </div>
+
+      
+
+      {tab === "socios" && <TabSocios clienteId={id} />}
+
+      {tab === "certificados" && (
+        <TabCertificados clienteId={id} cnpj={cliente?.cnpj} razaoSocial={cliente?.razaoSocial} onCertificateUpdated={handleCertUpdate} />
       )}
 
-      {/* ═══════════ ABA: ARQUIVOS (documentos + histórico) ══════════ */}
-      {tab === "arquivos" && (
-        <div className="space-y-5">
-          <TabDocumentos clienteId={id} />
+      {/* ═════════════════════ ABA: COMERCIAL (Serviços + Contratos + Financeiro) ═════════════════════ */}
+      {tab === "comercial" && <TabComercial cliente={cliente} />}
 
-          {/* Histórico inline */}
-          <div className="surface-card p-5">
-            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" /> Histórico de Alterações
-            </h3>
-            <p className="text-sm text-muted-foreground">Registro de alterações cadastrais e operações do cliente.</p>
-          </div>
+      {/* ═════════════════════ ABA: DOCUMENTOS ═══════════════════ */}
+      {tab === "documentos" && <TabDocumentos clienteId={id} />}
+
+      {/* ═════════════════════ ABA: HISTÓRICO ═════════════════════ */}
+      {tab === "historico" && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Linha do Tempo" icon={Clock}>
+            <div className="divide-y divide-border/50">
+              <div className="flex items-start gap-3 py-2.5">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Cliente cadastrado</p>
+                  <p className="text-xs text-muted-foreground">{new Date(cliente.createdAt).toLocaleDateString("pt-BR", { day:"2-digit",month:"long",year:"numeric" })}</p>
+                </div>
+              </div>
+              {cobCliente.filter(c=>c.status==="paga").slice(0,5).map(c => (
+                <div key={c.id} className="flex items-start gap-3 py-2.5">
+                  <DollarSign className="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Pagamento recebido — {fmtBRL(c.valor)}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+              {cobCliente.filter(c=>c.status==="vencida").slice(0,3).map(c => (
+                <div key={c.id} className="flex items-start gap-3 py-2.5">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Cobrança vencida — {fmtBRL(c.valor)}</p>
+                    <p className="text-xs text-muted-foreground">Venceu em {new Date(c.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+              {obgCliente.filter(o=>o.status==="concluida").slice(0,5).map(o => (
+                <div key={o.id} className="flex items-start gap-3 py-2.5">
+                  <FileText className="h-4 w-4 mt-0.5 text-blue-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{o.tipo} — concluída</p>
+                    <p className="text-xs text-muted-foreground">{new Date(o.vencimento).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Resumo Geral" icon={Info}>
+            <InfoRow icon={Calendar}    label="Cadastro em"         value={new Date(cliente.createdAt).toLocaleDateString("pt-BR")} />
+            <InfoRow icon={DollarSign}  label="Total arrecadado"    value={fmtBRL(totalPago)} />
+            <InfoRow icon={AlertTriangle} label="Em aberto"         value={totalDevido > 0 ? fmtBRL(totalDevido) : "Sem pendências"} />
+            <InfoRow icon={FileText}    label="Obrigações totais"   value={String(obgCliente.length)} />
+            <InfoRow icon={CheckCircle2} label="Obrigações concluídas" value={String(obgCliente.filter(o=>o.status==="concluida").length)} />
+            <InfoRow icon={AlertTriangle} label="Obrigações atrasadas" value={obgAtrasada > 0 ? String(obgAtrasada) : "Nenhuma"} />
+          </SectionCard>
         </div>
       )}
 
@@ -722,6 +755,19 @@ function ClienteDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ═════════════════════ ABA: DEP. PESSOAL ═══════════════════ */}
+      {tab === "dp" && cliente?.temEmpregados && <TabDP clienteId={id} />}
+      {tab === "dp" && !cliente?.temEmpregados && (
+        <div className="text-center text-muted-foreground py-12">
+          <Users2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="font-medium">Sem empregados cadastrados</p>
+          <p className="text-sm mt-1">Ative "Tem empregados CLT" no cadastro para habilitar este módulo.</p>
+        </div>
+      )}
+
+      {/* ═════════════════════ ABA: CONTÁBIL ═════════════════════ */}
+      {tab === "contabil" && <TabContabil clienteId={id} />}
 
     </div>
 

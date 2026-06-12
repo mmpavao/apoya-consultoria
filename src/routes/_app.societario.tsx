@@ -83,9 +83,6 @@ function SocietarioPage__Inner() {
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline de Tarefas</TabsTrigger>
           <TabsTrigger value="processos">Processos Societários</TabsTrigger>
-        
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
-          <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline" className="mt-0">
@@ -203,48 +200,6 @@ function SocietarioPage__Inner() {
 
           <ProcessoModal processo={modalProcesso} open={!!modalProcesso} onClose={()=>setModalProcesso(null)}
             onMoverFase={handleMover} onComentario={adicionarComentario} onAtualizar={atualizarProcesso} autorPadrao="Gestor"/>
-        </TabsContent>
-
-        {/* Automações Societário */}
-        <TabsContent value="automacoes" className="mt-0">
-          <div className="rounded-xl border bg-card p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Automações Societárias</h3>
-              <a href="/automacoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border">Gerenciar</button></a>
-            </div>
-            {[
-              { nome: "Monitor JUCISRS", desc: "Verifica status de processos no portal", status: "em breve" },
-              { nome: "Alerta Renovação", desc: "Lembra vencimento de licenças municipais", status: "ativa" },
-            ].map((a, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
-                <div><p className="text-sm font-medium">{a.nome}</p><p className="text-xs text-muted-foreground">{a.desc}</p></div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.status === "ativa" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                  {a.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Config Societário */}
-        <TabsContent value="config" className="mt-0">
-          <div className="rounded-xl border bg-card p-6">
-            <h3 className="font-semibold mb-4">Configurações do Módulo Societário</h3>
-            <div className="grid gap-3">
-              {[
-                { label: "Notificar abertura concluída via WhatsApp", enabled: true },
-                { label: "Alertar processos parados há +15 dias", enabled: true },
-                { label: "Aprovação obrigatória antes de enviar", enabled: false },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="text-sm">{item.label}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                    {item.enabled ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </TabsContent>
       </Tabs>
 

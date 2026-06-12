@@ -2,36 +2,12 @@
  * Versão do sistema APOYA CONTABILIDADE
  * Atualizado automaticamente pelo DEV APOYA a cada deploy.
  */
-export const APP_VERSION    = "1.4.1";
+export const APP_VERSION    = "1.3.2";
 export const APP_BUILD_DATE = "2026-06-12";
-export const APP_BUILD_TS   = "2026-06-12T16:15:00-03:00";
-export const APP_SPRINT     = "v1.4.1 — UX Sprint D+E";
+export const APP_BUILD_TS   = "2026-06-12T17:00:00-03:00";
+export const APP_SPRINT     = "v1.3.2 — fix pipeline token";
 
 export const VERSION_HISTORY = [
-  {
-    version: "1.4.1",
-    date: "2026-06-12",
-    sha: "e788c9e",
-    sprint: "Sprint UX A+B+C",
-    changes: [
-      "feat(ux): Sidebar reorganizada em 5 grupos + ModuleHeader/ModuleNav",
-      "feat(ux): Cliente detalhe 9 abas → 4 contextuais",
-      "feat(ux): Fiscal — +Obrigações integrada, Automações, Config",
-      "feat(ux): DP — +Folha, eSocial, Automações, Config",
-      "feat(ux): Contábil — +Lançamentos, Plano de Contas, Automações, Config",
-      "feat(ux): Financeiro — +Gateway, Relatórios, Automações, Config",
-      "feat(ux): Societário — +Automações, Config",
-    ],
-  },
-  {
-    version: "1.3.4",
-    date: "2026-06-12",
-    sha: "47ee0ae",
-    sprint: "Hotfix",
-    changes: [
-      "fix(pipeline): token MCP como constante direta",
-    ],
-  },
   {
     version: "1.3.2",
     date: "2026-06-12",
@@ -40,6 +16,15 @@ export const VERSION_HISTORY = [
     changes: [
       "fix(pipeline): fallback hardcoded APOYA_SERVICE_TOKEN",
       "fix(server): injetar CF Worker env em globalThis.__env__",
+    ],
+  },
+  {
+    version: "1.3.1",
+    date: "2026-06-12",
+    sha: "6d3c5c4",
+    sprint: "Hotfix",
+    changes: [
+      "fix(server): env injection no CF Worker",
     ],
   },
   {

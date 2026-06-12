@@ -32,25 +32,44 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
-  const router = useRouter();
+function ErrorComponent({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // Log completo para diagnóstico
+  console.error("[APOYA ERROR]", {
+    message: error?.message,
+    stack: error?.stack,
+    digest: error?.digest,
+    name: error?.name,
+  });
+
+  const isDev = typeof window !== "undefined" && (
+    window.location.hostname === "localhost" ||
+    window.location.hostname.includes("staging") ||
+    window.location.hostname.includes("workers.dev")
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+      <div className="max-w-2xl w-full text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           Erro ao carregar a página
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Ocorreu um erro inesperado. Tente novamente ou volte ao início.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        {/* Mostrar detalhes do erro SEMPRE para facilitar diagnóstico */}
+        <details className="mt-4 text-left rounded-lg border border-destructive/30 bg-destructive/5 p-4" open>
+          <summary className="cursor-pointer text-xs font-mono text-destructive font-semibold mb-2">
+            Detalhes do erro (para diagnóstico) — v1.4.2
+          </summary>
+          <pre className="text-xs text-destructive/80 overflow-auto max-h-64 whitespace-pre-wrap break-all">
+            {`${error?.name || "Error"}: ${error?.message || "unknown"}${error?.digest ? "\nDigest: " + error.digest : ""}${error?.stack ? "\n\n" + error.stack : "\n(sem stack)"}`}
+          </pre>
+        </details>
+
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
+            onClick={() => { try { reset(); } catch { window.location.reload(); } }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Tentar novamente

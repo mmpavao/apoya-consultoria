@@ -231,11 +231,6 @@ function ContabilPage__Inner() {
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="periodos">Períodos</TabsTrigger>
-        
-          <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
-          <TabsTrigger value="plano_contas">Plano de Contas</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
-          <TabsTrigger value="config">Config</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline" className="mt-0">
@@ -293,78 +288,6 @@ function ContabilPage__Inner() {
               onRowClick={(r) => navigate({ to: "/clientes/$id", params: { id: r.id } })}
             />
           )}
-        </TabsContent>
-
-        {/* Lançamentos */}
-        <TabsContent value="lancamentos" className="mt-0">
-          <div className="rounded-xl border bg-card p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">Lançamentos Contábeis</h3>
-                <p className="text-sm text-muted-foreground">Débitos e créditos do período corrente</p>
-              </div>
-              <button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">+ Lançamento</button>
-            </div>
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="text-sm text-muted-foreground">Nenhum lançamento no período</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Abra um período contábil para registrar lançamentos</p>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Plano de Contas */}
-        <TabsContent value="plano_contas" className="mt-0">
-          <div className="rounded-xl border bg-card p-6 space-y-4">
-            <h3 className="font-semibold">Plano de Contas</h3>
-            <div className="grid gap-2">
-              {["1 — Ativo", "2 — Passivo", "3 — Patrimônio Líquido", "4 — Receitas", "5 — Despesas"].map((c,i)=>(
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 cursor-pointer">
-                  <span className="text-sm font-mono text-foreground">{c}</span>
-                  <span className="text-xs text-muted-foreground">►</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Automações */}
-        <TabsContent value="automacoes" className="mt-0">
-          <div className="rounded-xl border bg-card p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Automações Contábeis</h3>
-              <a href="/automacoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border">Gerenciar</button></a>
-            </div>
-            {[
-              { nome: "Reconciliação Automática", desc: "Concilia extratos bancários com lançamentos" },
-              { nome: "Fechamento Mensal", desc: "Fecha período e gera balancete automaticamente" },
-            ].map((a,i)=>(
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
-                <div><p className="text-sm font-medium">{a.nome}</p><p className="text-xs text-muted-foreground">{a.desc}</p></div>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Em breve</span>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Config */}
-        <TabsContent value="config" className="mt-0">
-          <div className="rounded-xl border bg-card p-6">
-            <h3 className="font-semibold mb-4">Configurações Contábeis</h3>
-            <div className="grid gap-3 lg:grid-cols-2">
-              {[
-                { label: "Aprovação antes de fechar período", enabled: true },
-                { label: "Gerar balancete automaticamente", enabled: false },
-                { label: "Notificar divergências ao contador", enabled: true },
-              ].map((item,i)=>(
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="text-sm">{item.label}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                    {item.enabled ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
