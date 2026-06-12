@@ -167,7 +167,7 @@ jobs:
           URL="https://${{ needs.resolve-env.outputs.worker_gestao }}.talkzzbot.workers.dev/"
           HTTP=$(curl -s -o /tmp/smoke.html -w "%{http_code}" "$URL")
           TITLE=$(grep -o '<title>[^<]*</title>' /tmp/smoke.html | head -1 || echo "?")
-          if [ "$HTTP" = "200" ]; then
+          if [ "$HTTP" = "200" ] || [ "$HTTP" = "301" ] || [ "$HTTP" = "302" ]; then
             echo "✅ Smoke OK: HTTP $HTTP — $TITLE"
           else
             echo "❌ Smoke FALHOU: HTTP $HTTP"

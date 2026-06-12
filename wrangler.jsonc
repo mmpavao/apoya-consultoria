@@ -14,8 +14,7 @@
     "not_found_handling": "none"
   },
   "vars": {
-    "APOYA_SERVICE_TOKEN": "apoya-gestao-worker-44993fcc52d20535c97de6be366ad1f0",
-    "APP_VERSION": "1.1.0",
-    "APP_DEPLOY_TS": "2026-06-12T14:19:24-03:00"
+    "APP_VERSION": "1.3.0",
+    "APP_DEPLOY_TS": "2026-06-12T15:45:00-03:00"
   }
 }
