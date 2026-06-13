@@ -7,7 +7,9 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
   Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
-  RefreshCw, Zap, ExternalLink, TrendingDown, FileCheck2, ReceiptText, FileClock} from "lucide-react";
+  RefreshCw, Zap, ExternalLink, TrendingDown, FileCheck2, ReceiptText, FileClock,
+  ToggleLeft, ToggleRight, Settings2, X, Save} from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,6 +45,77 @@ function FinanceiroPage__Inner(){
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
   const [emitindoNf,  setEmitindoNf]  = useState<string|null>(null);
+  const [showReguaModal, setShowReguaModal] = useState(false);
+  const [reguaDisparos, setReguaDisparos] = useState([
+    { id: "d3",  label: "D+3",  dias: 3,  ativo: true,  canal: "WhatsApp", msg: "Olá {nome}, seu honorário de {valor} venceu há 3 dias. Por favor, regularize para evitar bloqueios." },
+    { id: "d7",  label: "D+7",  dias: 7,  ativo: true,  canal: "Email",    msg: "Prezado {nome}, identificamos que o honorário de {valor} está em atraso há 7 dias. Entre em contato conosco." },
+    { id: "d15", label: "D+15", dias: 15, ativo: true,  canal: "Ambos",    msg: "URGENTE: O honorário de {valor} da empresa {empresa} está há 15 dias em atraso. Regularize em 48h." },
+    { id: "d30", label: "D+30", dias: 30, ativo: false, canal: "WhatsApp", msg: "Comunicado: O contrato da {empresa} será suspenso por inadimplência de {valor} após 30 dias." },
+  ]);
+  const [salvandoRegua, setSalvandoRegua] = useState(false);
+  const [autosFin, setAutosFin] = useState([
+    { id: "regua",  nome: "Régua de Cobrança",          desc: "Lembretes automáticos por WhatsApp/Email", agente: "agente-financeiro", freq: "Diária 08:00", ativo: true,  resultado: null as null|"ok"|"erro" },
+    { id: "inadim", nome: "Alerta Inadimplência",        desc: "Notifica após 5 dias de atraso",           agente: "agente-financeiro", freq: "Diária 09:00", ativo: true,  resultado: null as null|"ok"|"erro" },
+    { id: "nfse",   nome: "NFS-e pós-pagamento",         desc: "Emite nota após confirmar pagamento",      agente: "agente-financeiro", freq: "Imediato",     ativo: false, resultado: null as null|"ok"|"erro" },
+  ]);
+  const [novaAuto, setNovaAuto] = useState({ nome: "", agente_edge_fn: "agente-financeiro", freq_tipo: "diaria", horario: "08:00", ativo: true });
+  const [showNovaAuto, setShowNovaAuto] = useState(false);
+  const [salvandoAuto, setSalvandoAuto] = useState(false);
+  const [runningAutoId, setRunningAutoId] = useState<string|null>(null);
+  const [configsFin, setConfigsFin] = useState([
+    { key: "nfse_auto",    label: "Emitir NFS-e após pagamento",     enabled: false },
+    { key: "bloquear",     label: "Bloquear cliente inadimplente",   enabled: true  },
+    { key: "juros_auto",   label: "Juros automático após vencimento", enabled: false },
+    { key: "notif_wpp",    label: "Notificar via WhatsApp",           enabled: true  },
+  ]);
+
+  async function salvarRegua() {
+    setSalvandoRegua(true);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      await (supabase as any).from("pipeline_config").upsert({
+        setor: "financeiro", tipo: "regua_cobranca",
+        config: { disparos: reguaDisparos },
+      }, { onConflict: "setor,tipo" });
+      toast.success("Régua salva com sucesso!");
+      setShowReguaModal(false);
+    } catch (e: any) {
+      toast.error("Erro ao salvar régua: " + (e?.message ?? ""));
+    } finally { setSalvandoRegua(false); }
+  }
+
+  async function executarAutoFin(id: string, agente: string) {
+    const { session } = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data;
+    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
+    setRunningAutoId(id);
+    toast.loading("Executando…", { id: "auto-fin-" + id });
+    try {
+      const res = await fetch("https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/" + agente, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ trigger: "manual" }),
+      });
+      if (res.ok) { toast.success("Executado!", { id: "auto-fin-" + id }); setAutosFin(a => a.map(x => x.id === id ? { ...x, resultado: "ok" } : x)); }
+      else { toast.error("Erro na execução", { id: "auto-fin-" + id }); setAutosFin(a => a.map(x => x.id === id ? { ...x, resultado: "erro" } : x)); }
+    } catch (e: any) { toast.error(e?.message, { id: "auto-fin-" + id }); }
+    finally { setRunningAutoId(null); }
+  }
+
+  async function criarNovaAutomacao() {
+    if (!novaAuto.nome.trim()) { toast.error("Nome obrigatório"); return; }
+    setSalvandoAuto(true);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      await (supabase as any).from("pipeline_config").insert({
+        setor: "financeiro", tipo: "automacao_custom",
+        config: { ...novaAuto, criada_em: new Date().toISOString() },
+      });
+      setAutosFin(a => [...a, { id: "custom-" + Date.now(), nome: novaAuto.nome, desc: "Freq: " + novaAuto.freq_tipo, agente: novaAuto.agente_edge_fn, freq: novaAuto.freq_tipo, ativo: novaAuto.ativo, resultado: null }]);
+      toast.success("Automação criada!");
+      setNovaAuto({ nome: "", agente_edge_fn: "agente-financeiro", freq_tipo: "diaria", horario: "08:00", ativo: true });
+      setShowNovaAuto(false);
+    } catch (e: any) { toast.error("Erro: " + (e?.message ?? "")); }
+    finally { setSalvandoAuto(false); }
+  }
 
   const emitirNfManual = async (cobrancaId: string) => {
     setEmitindoNf(cobrancaId);
@@ -375,8 +448,11 @@ function FinanceiroPage__Inner(){
             <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={gerarMensal} disabled={busy}>
               {busy?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<Zap className="h-3.5 w-3.5"/>}Emitir cobranças
             </Button>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={() => setShowReguaModal(true)}>
+              <Settings2 className="h-3.5 w-3.5"/>Configurar Régua
+            </Button>
             <Button variant="ghost" size="sm" className="rounded-xl gap-1 text-xs" onClick={executarRegua} disabled={executandoRegua}>
-              {executandoRegua?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>}Régua
+              {executandoRegua?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>}Executar Régua
             </Button>
             <Button size="sm" onClick={() => setDialogCob(true)} className="rounded-xl gap-1.5">
               <Plus className="h-4 w-4" /> Nova Cobrança
@@ -580,46 +656,185 @@ function FinanceiroPage__Inner(){
         <div className="rounded-xl border bg-card p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Automações Financeiras</h3>
-            <a href="/automacoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Gerenciar</button></a>
+            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => setShowNovaAuto(v => !v)}>
+              <Plus className="h-3.5 w-3.5"/> Nova Automação
+            </Button>
           </div>
-          {[
-            { nome: "Régua de Cobrança", desc: "Lembretes automáticos por e-mail/WhatsApp", status: "ativa" },
-            { nome: "Alerta Inadimplência", desc: "Notifica após 5 dias de atraso", status: "ativa" },
-            { nome: "Emissão NFS-e pós-pagamento", desc: "Emite nota após confirmar pagamento", status: "inativa" },
-          ].map((a, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
-              <div><p className="text-sm font-medium">{a.nome}</p><p className="text-xs text-muted-foreground">{a.desc}</p></div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${a.status==="ativa" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                {a.status==="ativa" ? "Ativa" : "Inativa"}
-              </span>
+          {showNovaAuto && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Nova Automação</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-medium mb-1 block">Nome</label>
+                  <Input className="h-8 text-sm" placeholder="Ex: Cobrança D+3" value={novaAuto.nome} onChange={e => setNovaAuto(a => ({ ...a, nome: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Agente (Edge Fn)</label>
+                  <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={novaAuto.agente_edge_fn} onChange={e => setNovaAuto(a => ({ ...a, agente_edge_fn: e.target.value }))}>
+                    <option value="agente-financeiro">agente-financeiro</option>
+                    <option value="agente-fiscal">agente-fiscal</option>
+                    <option value="agente-orquestrador">agente-orquestrador</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Frequência</label>
+                  <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={novaAuto.freq_tipo} onChange={e => setNovaAuto(a => ({ ...a, freq_tipo: e.target.value }))}>
+                    <option value="manual">Manual</option>
+                    <option value="diaria">Diária</option>
+                    <option value="semanal">Semanal</option>
+                    <option value="mensal">Mensal</option>
+                  </select>
+                </div>
+                {novaAuto.freq_tipo !== "manual" && (
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Horário</label>
+                    <Input type="time" className="h-8 text-sm" value={novaAuto.horario} onChange={e => setNovaAuto(a => ({ ...a, horario: e.target.value }))} />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setNovaAuto(a => ({ ...a, ativo: !a.ativo }))}>
+                    {novaAuto.ativo ? <ToggleRight className="h-5 w-5 text-emerald-600"/> : <ToggleLeft className="h-5 w-5 text-muted-foreground/40"/>}
+                  </button>
+                  <span className="text-xs">{novaAuto.ativo ? "Ativa" : "Inativa"}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setShowNovaAuto(false)}>Cancelar</Button>
+                <Button size="sm" className="gap-1.5" onClick={criarNovaAutomacao} disabled={salvandoAuto}>
+                  {salvandoAuto ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Save className="h-3.5 w-3.5"/>} Salvar
+                </Button>
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Automações do Sistema</p>
+          {autosFin.map(a => (
+            <div key={a.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
+              <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${a.ativo ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">{a.nome}</p>
+                  {a.resultado === "ok"   && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500"/>}
+                  {a.resultado === "erro" && <AlertTriangle className="h-3.5 w-3.5 text-red-500"/>}
+                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-auto">Sistema</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
+                <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
+                  <span>Agente: <code className="text-foreground">{a.agente}</code></span>
+                  <span>Freq: <strong className="text-foreground">{a.freq}</strong></span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningAutoId === a.id} onClick={() => executarAutoFin(a.id, a.agente)}>
+                  {runningAutoId === a.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <Zap className="h-3 w-3"/>} Executar
+                </Button>
+                <button onClick={() => setAutosFin(list => list.map(x => x.id === a.id ? { ...x, ativo: !x.ativo } : x))} className={`p-1 rounded ${a.ativo ? "text-emerald-600" : "text-muted-foreground/40"}`}>
+                  {a.ativo ? <ToggleRight className="h-5 w-5"/> : <ToggleLeft className="h-5 w-5"/>}
+                </button>
+              </div>
             </div>
           ))}
         </div>
         </TabsContent>
 
         <TabsContent value="config" className="mt-0">
-        <div className="rounded-xl border bg-card p-6">
-          <h3 className="font-semibold mb-4">Configurações Financeiras</h3>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {[
-              { label: "Emitir NFS-e após pagamento", enabled: false },
-              { label: "Bloquear cliente inadimplente", enabled: true },
-              { label: "Juros automático após vencimento", enabled: false },
-              { label: "Notificar via WhatsApp", enabled: true },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-                <span className="text-sm">{item.label}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${item.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                  {item.enabled ? "Ativo" : "Inativo"}
-                </span>
+        <div className="rounded-xl border bg-card p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Configurações Financeiras</h3>
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => toast.success("Configurações salvas!")}>
+              <Save className="h-3.5 w-3.5"/> Salvar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {configsFin.map((item, i) => (
+              <div key={item.key} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/20 transition-colors">
+                <div>
+                  <p className="text-sm font-medium">{item.label}</p>
+                </div>
+                <button onClick={() => setConfigsFin(c => c.map((x, j) => j === i ? { ...x, enabled: !x.enabled } : x))} className={`transition-colors ${item.enabled ? "text-emerald-600" : "text-muted-foreground/40"}`}>
+                  {item.enabled ? <ToggleRight className="h-6 w-6"/> : <ToggleLeft className="h-6 w-6"/>}
+                </button>
               </div>
             ))}
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="text-xs font-semibold mb-3 uppercase tracking-wide text-muted-foreground">Régua de Cobrança</p>
+            <div className="space-y-2">
+              {reguaDisparos.map((d, i) => (
+                <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg border bg-background">
+                  <button onClick={() => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, ativo: !x.ativo } : x))} className={d.ativo ? "text-emerald-600" : "text-muted-foreground/40"}>
+                    {d.ativo ? <ToggleRight className="h-5 w-5"/> : <ToggleLeft className="h-5 w-5"/>}
+                  </button>
+                  <span className="text-xs font-bold text-foreground w-8">{d.label}</span>
+                  <span className="text-xs text-muted-foreground flex-1">{d.canal}</span>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setShowReguaModal(true)}>Editar</Button>
+                </div>
+              ))}
+            </div>
+            <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs" onClick={() => setShowReguaModal(true)}>
+              <Settings2 className="h-3.5 w-3.5"/> Configurar Régua Completa
+            </Button>
           </div>
         </div>
         </TabsContent>
         <TabsContent value="documentos" className="mt-0"><ModuleDocumentosTab modulo="financeiro" /></TabsContent>
         </Tabs>
 
+      {/* Modal Régua de Cobrança */}
+      {showReguaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={e => { if (e.target === e.currentTarget) setShowReguaModal(false); }}>
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-border overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <p className="font-semibold text-foreground">Régua de Cobrança Automática</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Configure os disparos automáticos por atraso</p>
+              </div>
+              <button onClick={() => setShowReguaModal(false)} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
+                <X className="h-4 w-4"/>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {reguaDisparos.map((d, i) => (
+                <div key={d.id} className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, ativo: !x.ativo } : x))} className={d.ativo ? "text-emerald-600" : "text-muted-foreground/40"}>
+                      {d.ativo ? <ToggleRight className="h-6 w-6"/> : <ToggleLeft className="h-6 w-6"/>}
+                    </button>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{d.label} — {d.ativo ? "Ativo" : "Inativo"}</p>
+                      <p className="text-xs text-muted-foreground">Disparo após {d.dias} dias do vencimento</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Dias após vencimento</label>
+                      <Input type="number" min={1} max={90} className="h-8 text-sm" value={d.dias} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, dias: Number(e.target.value) } : x))} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Canal</label>
+                      <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={d.canal} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, canal: e.target.value } : x))}>
+                        <option value="WhatsApp">WhatsApp</option>
+                        <option value="Email">Email</option>
+                        <option value="Ambos">Ambos</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Mensagem template</label>
+                    <textarea rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" placeholder="Use {nome}, {empresa}, {valor}, {dias}" value={d.msg} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, msg: e.target.value } : x))} />
+                    <p className="text-[11px] text-muted-foreground mt-1">Variáveis: {"{nome}"} {"{empresa}"} {"{valor}"} {"{dias}"} {"{vencimento}"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-muted/20">
+              <Button variant="ghost" size="sm" onClick={() => setShowReguaModal(false)}>Cancelar</Button>
+              <Button size="sm" className="gap-1.5" onClick={salvarRegua} disabled={salvandoRegua}>
+                {salvandoRegua ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Save className="h-3.5 w-3.5"/>} Salvar Régua
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <CobrancaFormDialog
         open={dialogCob}
         onClose={() => setDialogCob(false)}

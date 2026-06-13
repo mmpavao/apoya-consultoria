@@ -1031,7 +1031,7 @@ function FiscalModuloInner() {
         </div>
       )}
 
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
