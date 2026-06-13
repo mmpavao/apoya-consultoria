@@ -3,6 +3,7 @@ import { SectorGuard } from "@/components/SectorGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PipelineKanban } from "@/components/PipelineKanban";
+import { KanbanModulo } from "@/components/KanbanModulo";
 import { useAuth } from "@/hooks/use-auth";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
@@ -495,7 +496,28 @@ function FinanceiroPage__Inner(){
         </TabsContent>
 
         <TabsContent value="pipeline" className="mt-0">
-          <PipelineKanban setor="financeiro" podeAprovar={podeAprovar} />
+          <KanbanModulo
+              setor="financeiro"
+              titulo="Processos"
+              fases={[
+    { key: "emissao",     label: "Emissão",       cor: { border: "border-t-blue-400",   bg: "bg-blue-50/30",   header: "text-blue-700",   dot: "bg-blue-400" } },
+    { key: "cobranca",    label: "Cobrança",      cor: { border: "border-t-amber-400",  bg: "bg-amber-50/30",  header: "text-amber-700",  dot: "bg-amber-400" } },
+    { key: "inadimplencia",label: "Inadimplência",cor: { border: "border-t-red-400",    bg: "bg-red-50/30",    header: "text-red-700",    dot: "bg-red-400" } },
+    { key: "negociacao",  label: "Negociação",    cor: { border: "border-t-purple-400", bg: "bg-purple-50/30", header: "text-purple-700", dot: "bg-purple-400" } },
+    { key: "concluido",   label: "Concluído",     cor: { border: "border-t-emerald-400",bg: "bg-emerald-50/30",header: "text-emerald-700",dot: "bg-emerald-400"} },
+  ]}
+              camposForm={[
+    { key: "titulo",      label: "Descrição",     tipo: "text" as const,   placeholder: "Ex: Honorário Maio/2026 — Empresa W", obrigatorio: true },
+    { key: "tipo",        label: "Tipo",          tipo: "select" as const, opcoes: [
+      { value: "honorario",   label: "Honorário" },
+      { value: "avulso",      label: "Serviço Avulso" },
+      { value: "parcelamento",label: "Parcelamento" },
+      { value: "reembolso",   label: "Reembolso" },
+      { value: "outros",      label: "Outros" },
+    ]},
+    { key: "responsavel", label: "Responsável",   tipo: "text" as const,   placeholder: "Nome do responsável" },
+  ]}
+            />
         </TabsContent>
 
         <TabsContent value="inadimplencia" className="mt-0">

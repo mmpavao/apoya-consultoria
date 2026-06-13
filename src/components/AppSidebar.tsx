@@ -51,11 +51,11 @@ const NAV: NavItem[] = [
 
   // ── Departamentos
   { kind: "group",  label: "DEPARTAMENTOS" },
+  { kind: "link",   to: "/societario", label: "Societário",          icon: Landmark,        setor: "societario" },
   { kind: "link",   to: "/fiscal",     label: "Fiscal",              icon: Receipt,         setor: "fiscal" },
   { kind: "link",   to: "/dp",         label: "Dep. Pessoal",        icon: Users2,          setor: "dp" },
   { kind: "link",   to: "/contabil",   label: "Contábil",            icon: BookOpen,        setor: "contabil" },
   { kind: "link",   to: "/financeiro", label: "Financeiro",          icon: DollarSign,      setor: "financeiro" },
-  { kind: "link",   to: "/societario", label: "Societário",          icon: Landmark,        setor: "societario" },
 
   // ── Ferramentas
   { kind: "group",  label: "FERRAMENTAS" },

@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
+import { KanbanModulo } from "@/components/KanbanModulo";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
@@ -513,7 +514,28 @@ function ContabilPageInner() {
             ]}
           />
         </TabsContent>
-        <TabsContent value="pipeline"     className="mt-0"><PipelineKanban setor="contabil" podeAprovar={podeAprovar} /></TabsContent>
+        <TabsContent value="pipeline"     className="mt-0"><KanbanModulo
+              setor="contabil"
+              titulo="Processos"
+              fases={[
+    { key: "coleta",      label: "Coleta",        cor: { border: "border-t-blue-400",   bg: "bg-blue-50/30",   header: "text-blue-700",   dot: "bg-blue-400" } },
+    { key: "lancamento",  label: "Lançamento",    cor: { border: "border-t-amber-400",  bg: "bg-amber-50/30",  header: "text-amber-700",  dot: "bg-amber-400" } },
+    { key: "revisao",     label: "Revisão",       cor: { border: "border-t-purple-400", bg: "bg-purple-50/30", header: "text-purple-700", dot: "bg-purple-400" } },
+    { key: "fechamento",  label: "Fechamento",    cor: { border: "border-t-orange-400", bg: "bg-orange-50/30", header: "text-orange-700", dot: "bg-orange-400" } },
+    { key: "concluido",   label: "Concluído",     cor: { border: "border-t-emerald-400",bg: "bg-emerald-50/30",header: "text-emerald-700",dot: "bg-emerald-400"} },
+  ]}
+              camposForm={[
+    { key: "titulo",      label: "Descrição",     tipo: "text" as const,   placeholder: "Ex: Fechamento Contábil Maio — Empresa Z", obrigatorio: true },
+    { key: "tipo",        label: "Tipo",          tipo: "select" as const, opcoes: [
+      { value: "fechamento",   label: "Fechamento Mensal" },
+      { value: "balancete",    label: "Balancete" },
+      { value: "reconciliacao",label: "Reconciliação Bancária" },
+      { value: "importacao",   label: "Importação NF" },
+      { value: "outros",       label: "Outros" },
+    ]},
+    { key: "responsavel", label: "Responsável",   tipo: "text" as const,   placeholder: "Nome do contador" },
+  ]}
+            /></TabsContent>
         <TabsContent value="periodos"     className="mt-0"><PeriodosTab /></TabsContent>
         <TabsContent value="lancamentos"  className="mt-0"><LancamentosTab /></TabsContent>
         <TabsContent value="plano_contas" className="mt-0"><PlanoContasTab /></TabsContent>

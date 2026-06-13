@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
+import { KanbanModulo } from "@/components/KanbanModulo";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
@@ -563,7 +564,29 @@ function DpPageInner() {
             ]}
           />
         </TabsContent>
-        <TabsContent value="pipeline" className="mt-0"><PipelineKanban setor="dp" podeAprovar={podeAprovar} /></TabsContent>
+        <TabsContent value="pipeline" className="mt-0"><KanbanModulo
+              setor="dp"
+              titulo="Processos"
+              fases={[
+    { key: "admissao",    label: "Admissão",      cor: { border: "border-t-blue-400",   bg: "bg-blue-50/30",   header: "text-blue-700",   dot: "bg-blue-400" } },
+    { key: "folha",       label: "Folha",         cor: { border: "border-t-amber-400",  bg: "bg-amber-50/30",  header: "text-amber-700",  dot: "bg-amber-400" } },
+    { key: "esocial",     label: "eSocial",       cor: { border: "border-t-purple-400", bg: "bg-purple-50/30", header: "text-purple-700", dot: "bg-purple-400" } },
+    { key: "rescisao",    label: "Rescisão",      cor: { border: "border-t-orange-400", bg: "bg-orange-50/30", header: "text-orange-700", dot: "bg-orange-400" } },
+    { key: "concluido",   label: "Concluído",     cor: { border: "border-t-emerald-400",bg: "bg-emerald-50/30",header: "text-emerald-700",dot: "bg-emerald-400"} },
+  ]}
+              camposForm={[
+    { key: "titulo",      label: "Descrição",     tipo: "text" as const,   placeholder: "Ex: Admissão João Silva — Empresa Y", obrigatorio: true },
+    { key: "tipo",        label: "Tipo",          tipo: "select" as const, opcoes: [
+      { value: "admissao",    label: "Admissão" },
+      { value: "folha",       label: "Folha de Pagamento" },
+      { value: "ferias",      label: "Férias" },
+      { value: "rescisao",    label: "Rescisão" },
+      { value: "esocial",     label: "eSocial" },
+      { value: "outros",      label: "Outros" },
+    ]},
+    { key: "responsavel", label: "Responsável",   tipo: "text" as const,   placeholder: "Nome do analista" },
+  ]}
+            /></TabsContent>
         <TabsContent value="empresas" className="mt-0"><EmpresasTab /></TabsContent>
         <TabsContent value="folha"    className="mt-0"><FolhaTab /></TabsContent>
         <TabsContent value="ferias"   className="mt-0"><FeriasTab /></TabsContent>

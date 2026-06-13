@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PipelineKanban } from "@/components/PipelineKanban";
+import { KanbanModulo } from "@/components/KanbanModulo";
 import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
 import { useAuth } from "@/hooks/use-auth";
 import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
@@ -1002,7 +1003,6 @@ function ConfiguracoesTab() {
 // ════════════════════════════════════════════════════════════════
 function FiscalModuloInner() {
   const { roles } = useAuth();
-  const { kpis, loading: kpisLoading, error: kpisError, refetch } = useFiscalKpis();
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   return (
@@ -1012,24 +1012,7 @@ function FiscalModuloInner() {
           <h1 className="text-2xl font-bold tracking-tight">Fiscal</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Gestão tributária · DAS · NFS-e · SERPRO · Pipeline de obrigações</p>
         </div>
-        <Button variant="outline" size="sm" onClick={refetch} disabled={kpisLoading}>
-          <RefreshCw className={cn("h-4 w-4 mr-1.5", kpisLoading && "animate-spin")} /> Atualizar KPIs
-        </Button>
       </div>
-
-      {kpisError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> Erro ao carregar KPIs: {kpisError}
-          <Button variant="ghost" size="sm" onClick={refetch} className="ml-auto text-xs">Tentar novamente</Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <FKpiCard label="Obrigações Vencidas" value={kpis?.obrigacoes_vencidas ?? 0}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpisLoading} />
-          <FKpiCard label="A vencer (7 dias)"   value={kpis?.obrigacoes_a_vencer_7d ?? 0} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpisLoading} />
-          <FKpiCard label="DAS Pendentes"        value={kpis?.das_pendentes ?? 0}           icon={Receipt}       variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}          loading={kpisLoading} />
-          <FKpiCard label="Certificados < 30d"   value={kpis?.certificados_expirando ?? 0}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpisLoading} />
-        </div>
-      )}
 
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
@@ -1047,7 +1030,29 @@ function FiscalModuloInner() {
           <DashboardTab />
         </TabsContent>
         <TabsContent value="pipeline" className="mt-0">
-          <PipelineKanban setor="fiscal" podeAprovar={podeAprovar} />
+          <KanbanModulo
+              setor="fiscal"
+              titulo="Processos"
+              fases={[
+    { key: "recebimento",  label: "Recebimento",  cor: { border: "border-t-blue-400",   bg: "bg-blue-50/30",   header: "text-blue-700",   dot: "bg-blue-400" } },
+    { key: "analise",      label: "Análise",       cor: { border: "border-t-amber-400",  bg: "bg-amber-50/30",  header: "text-amber-700",  dot: "bg-amber-400" } },
+    { key: "transmissao",  label: "Transmissão",   cor: { border: "border-t-purple-400", bg: "bg-purple-50/30", header: "text-purple-700", dot: "bg-purple-400" } },
+    { key: "pendencias",   label: "Pendências",    cor: { border: "border-t-orange-400", bg: "bg-orange-50/30", header: "text-orange-700", dot: "bg-orange-400" } },
+    { key: "concluido",    label: "Concluído",     cor: { border: "border-t-emerald-400",bg: "bg-emerald-50/30",header: "text-emerald-700",dot: "bg-emerald-400"} },
+  ]}
+              camposForm={[
+    { key: "titulo",      label: "Descrição",     tipo: "text" as const,   placeholder: "Ex: PGDAS Maio/2026 — Empresa X", obrigatorio: true },
+    { key: "tipo",        label: "Tipo",          tipo: "select" as const, opcoes: [
+      { value: "pgdas",        label: "PGDAS-D" },
+      { value: "das",          label: "DAS" },
+      { value: "sped",         label: "SPED Fiscal" },
+      { value: "ecf",          label: "ECF" },
+      { value: "nfse",         label: "NFS-e" },
+      { value: "outros",       label: "Outros" },
+    ]},
+    { key: "responsavel", label: "Responsável",   tipo: "text" as const,   placeholder: "Nome do contador" },
+  ]}
+            />
         </TabsContent>
         <TabsContent value="das" className="mt-0">
           <DasTab />
