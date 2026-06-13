@@ -9,7 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const MCP_URL   = "https://mcp.zapro.tech/mcp";
-const MCP_TOKEN = "apoya-mcp-serpro-2026";
+const MCP_TOKEN = process.env.SERPRO_TOKEN ?? "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

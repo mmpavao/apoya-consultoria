@@ -59,6 +59,26 @@ export const Route = createFileRoute("/api/nfse/emitir-cobranca")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // ── Auth gate (SEC-002) ───────────────────────────────────────────
+        const authHeader = request.headers.get("Authorization") ?? "";
+        const xInternal  = request.headers.get("x-internal") ?? "";
+        const serviceToken = (globalThis as any).__env__?.APOYA_SERVICE_TOKEN
+          ?? process.env.APOYA_SERVICE_TOKEN ?? "";
+        const hasValidBearer = authHeader.startsWith("Bearer ") && authHeader.length > 20;
+        const hasValidInternal = xInternal.length > 0 && xInternal === serviceToken;
+        if (!hasValidBearer && !hasValidInternal) {
+          return json({ error: "Unauthorized" }, 401);
+        }
+        // ── Bloqueio emissão (SEC-005) ────────────────────────────────────
+        const nfseBloqueada = (globalThis as any).__env__?.NFSE_EMISSAO_BLOQUEADA
+          ?? process.env.NFSE_EMISSAO_BLOQUEADA ?? "";
+        if (nfseBloqueada === "true") {
+          return json({
+            error: "Emissão de NFS-e temporariamente suspensa",
+            motivo: "Pendência junto à prefeitura de Caçapava — Erro 11",
+          }, 503);
+        }
+        // ─────────────────────────────────────────────────────────────────
         let body: any;
         try { body = await request.json(); } catch { return err("JSON inválido"); }
 

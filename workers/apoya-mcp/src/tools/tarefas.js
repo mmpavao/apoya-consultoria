@@ -11,10 +11,18 @@ function checkSetorScope(identity, setor, operacao) {
   if (!setor) return null; // tarefa sem setor = global = não restringida por setor
   const escopos = identity?.escopo_setores ?? ["*"];
   if (escopos.includes("*") || escopos.includes(setor)) return null;
+  // SEC-010: retornar no formato MCP correto com isError:true (fail-closed)
   return {
-    error: `Chave '${identity?.agentName}' não autorizada para setor '${setor}' em ${operacao}.`,
-    escopo_setores: escopos,
-    setor_requisitado: setor
+    isError: true,
+    content: [{
+      type: "text",
+      text: JSON.stringify({
+        error: `Acesso negado: chave '${identity?.agentName ?? "desconhecida"}' não autorizada para setor '${setor}' em ${operacao}.`,
+        code: "SCOPE_DENIED",
+        setor_requisitado: setor,
+        escopo_disponivel: escopos
+      })
+    }]
   };
 }
 

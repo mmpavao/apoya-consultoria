@@ -1,7 +1,7 @@
 /**
  * Catálogo completo das 61 tools do MCP SERPRO.
  * Gateway: POST https://mcp.zapro.tech/mcp
- * Auth: Bearer apoya-mcp-serpro-2026
+ * Auth: Bearer $SERPRO_TOKEN (ver wrangler secrets)
  *
  * Flags:
  *   requiresCert: exige certificado digital A1/A3 do cliente

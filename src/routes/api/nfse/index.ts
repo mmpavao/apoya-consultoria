@@ -263,7 +263,16 @@ export const Route = createFileRoute("/api/nfse/")({
         // EMITIR NFS-e
         // Docs: https://dev.focusnfe.com.br/referencia/nfse/
         // ────────────────────────────────────────────────────────────────────
+        // ── Bloqueio emissão (SEC-005) ────────────────────────────────────
         if (action === "emitir") {
+          const nfseBloqueada = (globalThis as any).__env__?.NFSE_EMISSAO_BLOQUEADA
+            ?? process.env.NFSE_EMISSAO_BLOQUEADA ?? "";
+          if (nfseBloqueada === "true") {
+            return json({
+              error: "Emissão de NFS-e temporariamente suspensa",
+              motivo: "Pendência junto à prefeitura de Caçapava — Erro 11",
+            }, 503);
+          }
           const { nota } = body;
           if (!nota) return err("campo 'nota' é obrigatório");
           if (!config.cnpj) return err("CNPJ do escritório não configurado em escritorio_config");

@@ -116,6 +116,15 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        // ── SEC-003: Validação de authToken Asaas ─────────────────────────
+        const receivedToken = request.headers.get("asaas-access-token") ?? "";
+        const expectedToken = (globalThis as any).__env__?.ASAAS_WEBHOOK_TOKEN
+          ?? process.env.ASAAS_WEBHOOK_TOKEN ?? "";
+        if (expectedToken && receivedToken !== expectedToken) {
+          console.warn("[webhook] Token Asaas inválido — rejeitado:", receivedToken.slice(0, 6) + "...");
+          return json({ error: "Unauthorized" }, 401);
+        }
+        // ─────────────────────────────────────────────────────────────────
         let evento: any;
         try { evento = await request.json(); }
         catch { return json({ error: "Body inválido" }, 400); }

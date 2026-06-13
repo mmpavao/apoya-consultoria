@@ -155,10 +155,15 @@ export default {
             const result = await handler(toolArgs, env, identity);
             return mcpResult(id, result);
           } catch (err) {
+            // SEC-010/A6: sem stack trace em produção, mensagem genérica
+            const isProd = (env?.ENVIRONMENT ?? "production") !== "development";
+            const errMsg = isProd
+              ? `Erro interno ao executar '${toolName}'. Consulte os logs do sistema.`
+              : JSON.stringify({ error: err.message, tool: toolName, stack: err.stack?.slice(0, 200) });
             return json({
               jsonrpc: "2.0", id,
               result: {
-                content: [{ type: "text", text: JSON.stringify({ error: err.message, tool: toolName, stack: err.stack?.slice(0, 200) }) }],
+                content: [{ type: "text", text: errMsg }],
                 isError: true
               }
             });

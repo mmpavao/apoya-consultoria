@@ -13,7 +13,7 @@ const CORS = {
 };
 
 const MCP_URL     = "https://mcp.zapro.tech/mcp";
-const MCP_BEARER  = "apoya-mcp-serpro-2026";
+const MCP_BEARER  = Deno.env.get("SERPRO_TOKEN") ?? "";
 const MCP_TIMEOUT = 9000;
 
 async function callMcp(toolName: string, args: Record<string, string>): Promise<any> {

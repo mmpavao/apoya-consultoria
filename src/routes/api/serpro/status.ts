@@ -5,7 +5,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const MCP_URL = "https://mcp.zapro.tech/mcp";
-const MCP_TOKEN = "apoya-mcp-serpro-2026";
+const MCP_TOKEN = process.env.SERPRO_TOKEN ?? "";
 
 export const Route = createFileRoute("/api/serpro/status")({
   server: {
