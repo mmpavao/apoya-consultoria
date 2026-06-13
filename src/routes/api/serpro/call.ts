@@ -7,14 +7,21 @@
  * Antes de chamar o MCP, valida:
  *   - Autenticação do usuário (Bearer Supabase)
  *   - Loga resultado (ok/erro) em serpro_log
- *   - Loga resultado em serpro_log
+ *
+ * SEGURANÇA: Token MCP lido exclusivamente de env var SERPRO_TOKEN.
+ * Configurar via: wrangler secret put SERPRO_TOKEN (workers: apoya-gestao, apoya-mcp)
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SERPRO_TOOLS } from "@/lib/serpro/tools-catalog";
 
 const MCP_URL = "https://mcp.zapro.tech/mcp";
-const MCP_TOKEN = "apoya-mcp-serpro-2026";
+const MCP_TOKEN: string =
+  (typeof process !== "undefined" ? process.env.SERPRO_TOKEN : undefined) ??
+  (typeof globalThis !== "undefined"
+    ? (globalThis as Record<string, unknown>).SERPRO_TOKEN as string | undefined
+    : undefined) ??
+  "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -36,6 +43,10 @@ export const Route = createFileRoute("/api/serpro/call")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!MCP_TOKEN) {
+          return json({ error: "SERPRO_TOKEN não configurado. Execute: wrangler secret put SERPRO_TOKEN" }, 503);
+        }
+
         const auth = await authenticate(request);
         if (auth instanceof Response) return auth;
         const { userId } = auth;

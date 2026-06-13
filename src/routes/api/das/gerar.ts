@@ -4,12 +4,20 @@
  * Body:
  *   { mode: "individual", cliente_id: string, competencia: "YYYY-MM" }
  *   { mode: "lote", competencia: "YYYY-MM" }
+ *
+ * SEGURANÇA: Token MCP lido exclusivamente de env var SERPRO_TOKEN.
+ * Configurar via: wrangler secret put SERPRO_TOKEN (workers: apoya-gestao, apoya-mcp)
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const MCP_URL   = "https://mcp.zapro.tech/mcp";
-const MCP_TOKEN = "apoya-mcp-serpro-2026";
+const MCP_URL = "https://mcp.zapro.tech/mcp";
+const MCP_TOKEN: string =
+  (typeof process !== "undefined" ? process.env.SERPRO_TOKEN : undefined) ??
+  (typeof globalThis !== "undefined"
+    ? (globalThis as Record<string, unknown>).SERPRO_TOKEN as string | undefined
+    : undefined) ??
+  "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -28,6 +36,9 @@ async function getUserFromReq(req: Request) {
 }
 
 async function callSerpro(tool: string, params: Record<string, unknown>) {
+  if (!MCP_TOKEN) {
+    throw new Error("SERPRO_TOKEN não configurado. Execute: wrangler secret put SERPRO_TOKEN");
+  }
   const res = await fetch(MCP_URL, {
     method: "POST",
     headers: {
@@ -137,58 +148,52 @@ export const Route = createFileRoute("/api/das/gerar")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        if (!MCP_TOKEN) {
+          return json({ error: "SERPRO_TOKEN não configurado. Execute: wrangler secret put SERPRO_TOKEN" }, 503);
+        }
+
         const user = await getUserFromReq(request);
-        if (!user) return json({ error: "Unauthorized" }, 401);
+        if (!user) return json({ error: "Não autenticado" }, 401);
 
-        let body: { mode?: string; cliente_id?: string; competencia?: string };
-        try { body = await request.json(); }
-        catch { return json({ error: "Body inválido" }, 400); }
+        let body: any;
+        try { body = await request.json(); } catch { return json({ error: "JSON inválido" }, 400); }
 
-        const { mode = "individual", cliente_id, competencia } = body;
-        const now  = new Date();
-        const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const comp = competencia ?? `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
-        const db   = supabaseAdmin as any;
+        const { mode, competencia, cliente_id } = body;
+        if (!competencia || !/^\d{4}-\d{2}$/.test(competencia)) {
+          return json({ error: "competencia inválida. Use YYYY-MM" }, 400);
+        }
 
-        // ── Individual ───────────────────────────────────────────────────
+        const db = supabaseAdmin as any;
+
         if (mode === "individual") {
-          if (!cliente_id) return json({ error: "cliente_id obrigatório" }, 400);
-          const { data: cli, error: cliErr } = await db
-            .from("clientes").select("id,razao_social,cnpj,regime")
+          if (!cliente_id) return json({ error: "cliente_id obrigatório no modo individual" }, 400);
+          const { data: c, error: e } = await db.from("clientes")
+            .select("id,razao_social,cnpj,regime")
             .eq("id", cliente_id).single();
-          if (cliErr || !cli) return json({ error: "Cliente não encontrado" }, 404);
-          if (!["MEI", "Simples Nacional", "Simples"].includes(cli.regime)) {
-            return json({ error: `Regime ${cli.regime} não gera DAS automático` }, 400);
-          }
-          const resultado = await gerarUm(cli, comp, user.id);
-          return json({ ok: resultado.ok, resultados: [resultado], geradas: resultado.ok ? 1 : 0, erros: resultado.ok ? 0 : 1 });
+          if (e || !c) return json({ error: "Cliente não encontrado" }, 404);
+          const r = await gerarUm(c, competencia, user.id);
+          return json(r, r.ok ? 200 : 502);
         }
 
-        // ── Lote ─────────────────────────────────────────────────────────
-        const { data: clientes, error: cliErr } = await db
-          .from("clientes").select("id,razao_social,cnpj,regime")
-          .in("regime", ["MEI", "Simples Nacional", "Simples"]).eq("status", "ativo");
+        if (mode === "lote") {
+          const { data: clientes, error: e2 } = await db.from("clientes")
+            .select("id,razao_social,cnpj,regime")
+            .in("regime", ["MEI", "SIMPLES"]);
+          if (e2) return json({ error: `Erro ao buscar clientes: ${e2.message}` }, 500);
 
-        if (cliErr) return json({ error: `Erro ao buscar clientes: ${cliErr.message}` }, 500);
-        if (!clientes?.length) {
-          return json({ ok: true, resultados: [], geradas: 0, erros: 0, msg: "Nenhum cliente MEI/Simples ativo" });
+          const results = await Promise.allSettled(
+            (clientes ?? []).map((c: any) => gerarUm(c, competencia, user.id))
+          );
+
+          const summary = results.map((r) =>
+            r.status === "fulfilled" ? r.value : { ok: false, error: String(r.reason) }
+          );
+          const ok    = summary.filter((r: any) => r.ok).length;
+          const fail  = summary.filter((r: any) => !r.ok).length;
+          return json({ total: summary.length, ok, fail, detalhes: summary });
         }
 
-        const resultados: ReturnType<typeof gerarUm> extends Promise<infer T> ? T[] : never[] = [];
-        for (let i = 0; i < clientes.length; i += 3) {
-          const batch = clientes.slice(i, i + 3);
-          const res   = await Promise.all(batch.map((c: any) => gerarUm(c, comp, user.id)));
-          resultados.push(...res);
-        }
-
-        return json({
-          ok:          true,
-          resultados,
-          geradas:     resultados.filter(r => r.ok).length,
-          erros:       resultados.filter(r => !r.ok).length,
-          competencia: comp,
-          total:       clientes.length,
-        });
+        return json({ error: "mode deve ser 'individual' ou 'lote'" }, 400);
       },
     },
   },

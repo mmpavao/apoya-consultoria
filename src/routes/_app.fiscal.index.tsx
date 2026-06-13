@@ -966,7 +966,7 @@ function ConfiguracoesTab() {
       <div className="rounded-lg border bg-card p-5 space-y-4">
         <div><h3 className="text-sm font-semibold">Gateway SERPRO</h3><p className="text-xs text-muted-foreground mt-0.5">Conexão com mcp.zapro.tech para consultas na Receita Federal</p></div>
         <div className="flex items-center gap-3">
-          <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono text-muted-foreground">mcp.zapro.tech — Bearer apoya-mcp-serpro-2026</div>
+          <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono text-muted-foreground">mcp.zapro.tech — Bearer ••••••••••••••••</div>
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1 shrink-0" onClick={testarGateway} disabled={gwStatus === "checking"}>
             {gwStatus === "checking" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />} Testar
           </Button>
