@@ -100,6 +100,11 @@ Deno.serve(async (req: Request) => {
   } catch (_) { /* sem leitura → segue e tenta criar */ }
 
   for (const alerta of criticos) {
+    // Um dono por tarefa: setores com EXPERT EXECUTOR próprio gerenciam o
+    // próprio pipeline (granular). O orquestrador não cria tarefa agregada p/
+    // eles — só consolida/reflete. (FINANCEIRO já é executor; outros entram
+    // nesta lista conforme viram experts.)
+    if (alerta.agente === "FINANCEIRO") continue;
     const dedupKey = `${alerta.agente}:${alerta.tipo}`;
     if (abertasKeys.has(dedupKey)) continue; // já existe tarefa aberta p/ este alerta
     try {
