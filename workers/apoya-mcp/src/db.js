@@ -105,7 +105,11 @@ async function validateApiKey(authHeader, env) {
   if (key.expires_at && new Date(key.expires_at) < new Date()) return null;
   await db.patch("mcp_api_keys", `id=eq.${key.id}`, { last_used_at: new Date().toISOString() });
 
-  const scopes     = key.scopes?.length ? key.scopes : ["*"];
+  // FAIL-CLOSED: chave sem scopes explícito NÃO vira master — recebe [] (nega
+  // tudo), forçando cadastro explícito. (escopo_setores mantém default ["*"]
+  // por ora: as chaves atuais têm setores=null e dependem disso; restringir por
+  // setor exige atribuição explícita por chave — follow-up separado.)
+  const scopes     = Array.isArray(key.scopes) ? key.scopes : [];
   const escopoSet  = Array.isArray(key.escopo_setores) ? key.escopo_setores : ["*"];
   // is_human_delegate: chave marcada explicitamente como representante de ação humana aprovada
   // (ex: webhook de aprovação do painel web). Padrão = false.

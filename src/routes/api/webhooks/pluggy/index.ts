@@ -154,7 +154,7 @@ async function notificarErroConexao(db: any, itemId: string, erro: PluggyEvent["
 async function verifyPluggySignature(request: Request, rawBody: string): Promise<boolean> {
   const secret = (globalThis as any).__env__?.PLUGGY_WEBHOOK_SECRET
     ?? process.env.PLUGGY_WEBHOOK_SECRET ?? "";
-  if (!secret) return true; // se não configurado, não bloqueia (mas loga warning)
+  if (!secret) return false; // FAIL-CLOSED: sem segredo configurado, rejeita
 
   const signature = request.headers.get("x-pluggy-signature") ?? "";
   if (!signature) return false;
@@ -177,16 +177,13 @@ export const Route = createFileRoute("/api/webhooks/pluggy/")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
-        // ── SEC-004: Validação HMAC antes de processar ────────────────────
+        // ── SEC-004: Validação HMAC antes de processar (FAIL-CLOSED) ──────
+        // Sem PLUGGY_WEBHOOK_SECRET ou assinatura inválida → rejeita sempre.
         const rawBody = await request.text();
-        const pluggySecret = (globalThis as any).__env__?.PLUGGY_WEBHOOK_SECRET
-          ?? process.env.PLUGGY_WEBHOOK_SECRET ?? "";
-        if (pluggySecret) {
-          const valid = await verifyPluggySignature(request, rawBody);
-          if (!valid) {
-            console.warn("[Pluggy] Assinatura HMAC inválida — rejeitado");
-            return json({ error: "Unauthorized — assinatura inválida" }, 401);
-          }
+        const valid = await verifyPluggySignature(request, rawBody);
+        if (!valid) {
+          console.warn("[Pluggy] Assinatura HMAC ausente/inválida — rejeitado");
+          return json({ error: "Unauthorized — assinatura inválida" }, 401);
         }
         // ─────────────────────────────────────────────────────────────────
         let body: PluggyEvent;

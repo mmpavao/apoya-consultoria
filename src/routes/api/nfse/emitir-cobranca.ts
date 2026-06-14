@@ -20,6 +20,25 @@ function json(body: unknown, status = 200) {
 }
 function err(msg: string, status = 400) { return json({ error: msg }, status); }
 
+// Valida um JWT de usuário consultando o endpoint de auth do Supabase.
+const SUPA_URL = (globalThis as any).__env__?.SUPABASE_URL
+  ?? (typeof process !== "undefined" ? process.env.SUPABASE_URL : "")
+  ?? "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
+function anonKey(): string {
+  return (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY
+    ?? (typeof process !== "undefined" ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY : "")
+    ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+}
+async function isValidSupabaseUser(token: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: anonKey() },
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
 // ── Focus NF-e helpers ───────────────────────────────────────────────────────
 const FOCUS_HML  = "https://homologacao.focusnfe.com.br/v2";
 const FOCUS_PROD = "https://api.focusnfe.com.br/v2";
@@ -59,14 +78,21 @@ export const Route = createFileRoute("/api/nfse/emitir-cobranca")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // ── Auth gate (SEC-002) ───────────────────────────────────────────
+        // ── Auth gate (SEC-002, reforçado) ────────────────────────────────
+        // Interno (webhook): x-internal === APOYA_SERVICE_TOKEN (fail-closed
+        // se o token não estiver configurado). Humano (UI): Bearer = JWT de
+        // usuário REAL, validado no Supabase (não mais "qualquer string >20").
         const authHeader = request.headers.get("Authorization") ?? "";
         const xInternal  = request.headers.get("x-internal") ?? "";
         const serviceToken = (globalThis as any).__env__?.APOYA_SERVICE_TOKEN
           ?? process.env.APOYA_SERVICE_TOKEN ?? "";
-        const hasValidBearer = authHeader.startsWith("Bearer ") && authHeader.length > 20;
-        const hasValidInternal = xInternal.length > 0 && xInternal === serviceToken;
-        if (!hasValidBearer && !hasValidInternal) {
+        const hasValidInternal = serviceToken !== "" && xInternal === serviceToken;
+
+        let hasValidUser = false;
+        if (!hasValidInternal && authHeader.startsWith("Bearer ")) {
+          hasValidUser = await isValidSupabaseUser(authHeader.slice(7).trim());
+        }
+        if (!hasValidInternal && !hasValidUser) {
           return json({ error: "Unauthorized" }, 401);
         }
         // ── Bloqueio emissão (SEC-005) ────────────────────────────────────

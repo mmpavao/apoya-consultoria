@@ -3,7 +3,7 @@
  * Registra (ou atualiza) o webhook Asaas apontando para este worker.
  * Idempotente — pode ser chamado múltiplas vezes com segurança.
  * 
- * Auth: header x-setup-key: apoya-setup-2026
+ * Auth: header x-setup-key === env SETUP_KEY (obrigatória)
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin }   from "@/integrations/supabase/client.server";
@@ -20,9 +20,11 @@ export const Route = createFileRoute("/api/cobranca/setup-webhook")({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
 
-        // Auth via secret header
+        // Auth via secret header — segredo lido de env (fail-closed se ausente)
         const setupKey = request.headers.get("x-setup-key") ?? "";
-        if (setupKey !== "apoya-setup-2026") {
+        const expectedSetupKey = (globalThis as any).__env__?.SETUP_KEY
+          ?? process.env.SETUP_KEY ?? "";
+        if (!expectedSetupKey || setupKey !== expectedSetupKey) {
           return json({ error: "Não autorizado" }, 401);
         }
 

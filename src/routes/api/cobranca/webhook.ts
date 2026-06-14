@@ -39,18 +39,19 @@ async function notificarWA(db: any, clienteId: string, mensagem: string): Promis
 }
 
 // ── Disparar NFS-e via rota interna do Worker (fire-and-forget) ──────────────
-// Usa /api/nfse/emitir-cobranca com SERVICE_ROLE para bypass de auth
+// Chama /api/nfse/emitir-cobranca como serviço interno: autentica via x-internal
+// = APOYA_SERVICE_TOKEN (segredo real), não mais a string fixa "webhook".
 async function dispararNfse(cobrancaId: string, _clienteId: string): Promise<void> {
   try {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    const serviceToken = process.env.APOYA_SERVICE_TOKEN
+      ?? (globalThis as any).__env__?.APOYA_SERVICE_TOKEN ?? "";
     const workerUrl      = process.env.WORKER_BASE_URL ?? "https://apoya-gestao.talkzzbot.workers.dev";
 
     const res = await fetch(`${workerUrl}/api/nfse/emitir-cobranca`, {
       method: "POST",
       headers: {
         "Content-Type":  "application/json",
-        "Authorization": `Bearer ${serviceRoleKey}`,
-        "x-internal":    "webhook",
+        "x-internal":    serviceToken,
       },
       body: JSON.stringify({ cobranca_id: cobrancaId }),
     });
@@ -116,12 +117,22 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
-        // ── SEC-003: Validação de authToken Asaas ─────────────────────────
+        // ── SEC-003: Validação de authToken Asaas (FAIL-CLOSED) ───────────
+        // Fonte de verdade: token gravado pelo setup-webhook em integracao_config
+        // (tipo=asaas → config.webhook_token), com env como override. Sem token
+        // configurado → rejeita (não processa evento de pagamento não verificado).
         const receivedToken = request.headers.get("asaas-access-token") ?? "";
-        const expectedToken = (globalThis as any).__env__?.ASAAS_WEBHOOK_TOKEN
+        let expectedToken = (globalThis as any).__env__?.ASAAS_WEBHOOK_TOKEN
           ?? process.env.ASAAS_WEBHOOK_TOKEN ?? "";
-        if (expectedToken && receivedToken !== expectedToken) {
-          console.warn("[webhook] Token Asaas inválido — rejeitado:", receivedToken.slice(0, 6) + "...");
+        if (!expectedToken) {
+          try {
+            const { data: cfg } = await (supabaseAdmin as any)
+              .from("integracao_config").select("config").eq("tipo", "asaas").single();
+            expectedToken = cfg?.config?.webhook_token ?? "";
+          } catch { /* ignore — cai no fail-closed abaixo */ }
+        }
+        if (!expectedToken || receivedToken !== expectedToken) {
+          console.warn("[webhook] Token Asaas ausente/inválido — rejeitado");
           return json({ error: "Unauthorized" }, 401);
         }
         // ─────────────────────────────────────────────────────────────────
