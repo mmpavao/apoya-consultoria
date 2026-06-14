@@ -13,5 +13,11 @@ verify_jwt = false
 [functions.agente-financeiro]
 verify_jwt = false
 
+[functions.agente-contabil]
+verify_jwt = false
+
+[functions.agente-societario]
+verify_jwt = false
+
 [functions.agente-orquestrador]
 verify_jwt = false

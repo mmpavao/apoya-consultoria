@@ -191,6 +191,8 @@ jobs:
           supabase functions deploy agente-fiscal        --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy agente-rh            --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy agente-financeiro    --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy agente-contabil      --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy agente-societario    --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy agente-orquestrador  --project-ref ajaqbdsalxfgrwpjbtbn
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
