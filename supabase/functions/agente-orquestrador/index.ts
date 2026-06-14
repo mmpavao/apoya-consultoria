@@ -12,7 +12,15 @@ const CORS = {
 async function chamarAgente(slug: string): Promise<{ agente: string; success: boolean; alertas: number; resumo: Record<string, unknown>; erro?: string }> {
   const url = `${SUPABASE_URL}/functions/v1/${slug}`;
   try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" } });
+    // Chamada interna autenticada com a service-role (defesa em profundidade:
+    // funciona com verify_jwt on ou off).
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return { agente: slug, success: data.success ?? false, alertas: data.alertas?.length ?? 0, resumo: data.resumo ?? {} };
@@ -96,12 +104,13 @@ Deno.serve(async (req: Request) => {
   await supabase.from("agente_logs").insert({
     agente: "ORQUESTRADOR",
     acao: "CICLO_COMPLETO",
-    detalhe: JSON.stringify({
+    // coluna real é 'detalhes' (jsonb) — não 'detalhe'
+    detalhes: {
       duracao_ms: Date.now() - inicio,
       agentes: [fiscal, rh, financeiro].map(r => ({ agente: r.agente, success: r.success, alertas: r.alertas })),
       criticos: criticos.length, altos: altos.length, medios: medios.length,
       tarefas_criadas: tarefasCriadas.length,
-    }),
+    },
     executado_em: new Date().toISOString(),
   });
 
@@ -113,6 +122,12 @@ Deno.serve(async (req: Request) => {
       fiscal:     { success: fiscal.success,     alertas: fiscal.alertas,     resumo: fiscal.resumo },
       rh:         { success: rh.success,         alertas: rh.alertas,         resumo: rh.resumo },
       financeiro: { success: financeiro.success, alertas: financeiro.alertas, resumo: financeiro.resumo },
+    },
+    // Contrato lido pelo dashboard (_app.index.tsx): resultados.X.alertas_gerados
+    resultados: {
+      fiscal:     { alertas_gerados: fiscal.alertas,     success: fiscal.success,     resumo: fiscal.resumo },
+      rh:         { alertas_gerados: rh.alertas,         success: rh.success,         resumo: rh.resumo },
+      financeiro: { alertas_gerados: financeiro.alertas, success: financeiro.success, resumo: financeiro.resumo },
     },
     consolidado: {
       total_alertas: todos.length,

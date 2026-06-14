@@ -1,1 +1,17 @@
 project_id = "ajaqbdsalxfgrwpjbtbn"
+
+# Agentes — invocados pelo dashboard (sem token) e pelo orquestrador (com
+# service-role). verify_jwt=false PRESERVA o comportamento atual em produção
+# (hoje já são públicas). HARDENING pendente (fase 2): front enviar o token da
+# sessão + verify_jwt=true, mantendo só a chamada interna via service-role.
+[functions.agente-fiscal]
+verify_jwt = false
+
+[functions.agente-rh]
+verify_jwt = false
+
+[functions.agente-financeiro]
+verify_jwt = false
+
+[functions.agente-orquestrador]
+verify_jwt = false

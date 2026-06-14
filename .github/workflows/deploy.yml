@@ -185,8 +185,13 @@ jobs:
       - name: Deploy Edge Functions (produção)
         if: needs.resolve-env.outputs.target == 'production'
         run: |
-          supabase functions deploy nfse-pos-pagamento --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy sync-nfse-nfeio    --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy nfse-pos-pagamento  --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy sync-nfse-nfeio      --project-ref ajaqbdsalxfgrwpjbtbn
+          # Time de agentes (reconciliado no repo — fonte de verdade)
+          supabase functions deploy agente-fiscal        --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy agente-rh            --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy agente-financeiro    --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy agente-orquestrador  --project-ref ajaqbdsalxfgrwpjbtbn
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         continue-on-error: true
