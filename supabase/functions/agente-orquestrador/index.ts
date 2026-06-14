@@ -80,9 +80,28 @@ Deno.serve(async (req: Request) => {
   const altos    = todos.filter(a => a.prioridade === "alta");
   const medios   = todos.filter(a => a.prioridade === "media");
 
-  // 3. Criar tarefas automáticas para CRÍTICOS
+  // 3. Criar tarefas automáticas para CRÍTICOS — IDEMPOTENTE.
+  //    Dedup por (agente, tipo): se já existe uma tarefa [AUTO] aberta para o
+  //    mesmo alerta, não recria (evita duplicar a cada ciclo/cron).
   const tarefasCriadas: string[] = [];
+  const abertasKeys = new Set<string>();
+  try {
+    const { data: abertas } = await supabase.from("tarefas")
+      .select("metadados, descricao")
+      .eq("criado_por", "agente-orquestrador")
+      .not("status", "in", "(concluida,cancelada)");
+    for (const t of (abertas ?? []) as { metadados?: { dedup_key?: string }; descricao?: string }[]) {
+      const k = t.metadados?.dedup_key;
+      if (k) { abertasKeys.add(k); continue; }
+      // fallback p/ tarefas legadas (sem dedup_key): extrai de "Agente: X | Tipo: Y"
+      const m = (t.descricao ?? "").match(/Agente:\s*(\w+)\s*\|\s*Tipo:\s*(\w+)/);
+      if (m) abertasKeys.add(`${m[1]}:${m[2]}`);
+    }
+  } catch (_) { /* sem leitura → segue e tenta criar */ }
+
   for (const alerta of criticos) {
+    const dedupKey = `${alerta.agente}:${alerta.tipo}`;
+    if (abertasKeys.has(dedupKey)) continue; // já existe tarefa aberta p/ este alerta
     try {
       await supabase.from("tarefas").insert({
         titulo: `[AUTO] ${alerta.mensagem}`,
@@ -95,7 +114,9 @@ Deno.serve(async (req: Request) => {
         criado_por: "agente-orquestrador",
         criado_por_tipo: "agente",
         requer_aprovacao: false,
+        metadados: { origem: "orquestrador", agente: alerta.agente, tipo: alerta.tipo, dedup_key: dedupKey },
       });
+      abertasKeys.add(dedupKey); // evita duplicar no mesmo ciclo também
       tarefasCriadas.push(alerta.mensagem);
     } catch (_) { /* silencioso */ }
   }
