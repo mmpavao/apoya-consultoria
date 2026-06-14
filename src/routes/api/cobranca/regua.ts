@@ -87,6 +87,21 @@ export const Route = createFileRoute("/api/cobranca/regua")({
         const now = new Date();
         const today = now.toISOString().split("T")[0];
 
+        // Régua configurável: lê os thresholds de regua_cobranca_config
+        // (a MESMA tabela editada em Administração). Sem linha configurada,
+        // mantém os valores históricos desta rotina — sem mudança de comportamento.
+        let cfg: any = null;
+        try {
+          const { data } = await db.from("regua_cobranca_config")
+            .select("dias_lembrete_1,dias_primeiro_contato,dias_segundo_contato,dias_suspensao")
+            .eq("escritorio_id", "apoya").single();
+          cfg = data;
+        } catch { /* sem config → fallback abaixo */ }
+        const tLembrete    = Number(cfg?.dias_lembrete_1)      || 5;   // dias ANTES do vencimento
+        const tCobranca    = Number(cfg?.dias_primeiro_contato) || 1;  // dias após venc — 1º contato
+        const tNegativacao = Number(cfg?.dias_segundo_contato)  || 15; // dias após venc — negativação
+        const tSuspensao   = Number(cfg?.dias_suspensao)        || 45; // dias após venc — suspensão
+
         // Buscar todas as cobranças não pagas/canceladas
         const { data: cobrancas, error: cErr } = await db
           .from("cobrancas")
@@ -121,7 +136,7 @@ export const Route = createFileRoute("/api/cobranca/regua")({
             const nome    = cob.cliente_nome?.split(" ")[0] ?? "Cliente";
             const telefone = (cob as any).clientes?.whatsapp ?? (cob as any).clientes?.telefone ?? "";
             const vencFmt = new Date(venc + "T12:00:00").toLocaleDateString("pt-BR");
-            const suspFmt = new Date(addDays(venc, 45) + "T12:00:00").toLocaleDateString("pt-BR");
+            const suspFmt = new Date(addDays(venc, tSuspensao) + "T12:00:00").toLocaleDateString("pt-BR");
 
             // Calcular novo estágio
             let novoStage = cob.regua_stage;
@@ -129,15 +144,15 @@ export const Route = createFileRoute("/api/cobranca/regua")({
             let novoStatus = cob.status;
             let bloqueiarCliente = false;
 
-            if (dias <= -5) {
-              // D-5 ou antes — lembrete
+            if (dias <= -tLembrete) {
+              // Antes do vencimento (≤ -tLembrete) — lembrete
               if (cob.regua_stage === "ok") {
                 novoStage = "lembrete";
                 mensagemWA = `⚠️ Olá ${nome}! Sua mensalidade APOYA de ${valor} vence em *${Math.abs(dias)} dias* (${vencFmt}).\n🔗 Pague agora: ${link}`;
                 resultados.lembrete++;
               }
-            } else if (dias >= 1 && dias < 15) {
-              // D+1 a D+14 — cobrança
+            } else if (dias >= tCobranca && dias < tNegativacao) {
+              // 1º contato após vencimento — cobrança
               if (cob.regua_stage !== "cobranca" && cob.regua_stage !== "negativacao" && cob.regua_stage !== "suspensao") {
                 novoStage  = "cobranca";
                 novoStatus = "vencida";
@@ -152,16 +167,16 @@ export const Route = createFileRoute("/api/cobranca/regua")({
                   resultados.cobranca++;
                 }
               }
-            } else if (dias >= 15 && dias < 45) {
-              // D+15 a D+44 — negativação
+            } else if (dias >= tNegativacao && dias < tSuspensao) {
+              // 2º contato → negativação
               if (cob.regua_stage !== "negativacao" && cob.regua_stage !== "suspensao") {
                 novoStage  = "negativacao";
                 novoStatus = "vencida";
                 mensagemWA = `🔴 ${nome}, sua conta APOYA está em atraso há *${dias} dias* (${valor}).\n⚠️ Risco de suspensão em ${suspFmt}.\nRegularize: ${link}`;
                 resultados.negativacao++;
               }
-            } else if (dias >= 45) {
-              // D+45 — suspensão
+            } else if (dias >= tSuspensao) {
+              // suspensão
               if (cob.regua_stage !== "suspensao") {
                 novoStage  = "suspensao";
                 novoStatus = "vencida";
