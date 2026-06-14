@@ -1,93 +1,75 @@
-// Agente Fiscal — observa obrigações fiscais e materializa pendências.
-// Contrato de retorno (consumido por dois lados):
-//   dashboard  (_app.index.tsx)        → resumo: { vencidas, urgentes, no_prazo, total }
-//   orquestrador (extrairAlertas)      → resumo: { obrigacoes_vencidas, sem_responsavel }
-// Tabela: obrigacoes (status, vencimento, responsavel, cliente_nome, tipo, competencia)
+// Agente Fiscal — EXPERT EXECUTOR autônomo do setor fiscal.
+// Materializa/tria cada obrigação vencida ou urgente no pipeline fiscal
+// (idempotente, etapa de entrada a_apurar). PARA antes de transmitir (gate
+// humano: etapa pronto_transmitir requer aprovação). Mantém o resumo lido pelo
+// dashboard ({vencidas,urgentes,no_prazo,total}) e pelo orquestrador
+// ({obrigacoes_vencidas,sem_responsavel}).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logAgentRun, upsertPipelineTask, json } from "../_shared/agent.ts";
 
 Deno.serve(async (_req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Missing Supabase configuration" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return json({ success: false, error: "Missing Supabase configuration" }, 500);
   }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     const hoje    = new Date().toISOString().slice(0, 10);
     const em7dias = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
 
-    // Todas as obrigações ainda em aberto (não concluídas/canceladas)
-    const { data: abertas, error: errAbertas } = await supabase
+    const { data: abertas, error } = await sb
       .from("obrigacoes")
       .select("id, cliente_id, cliente_nome, tipo, competencia, vencimento, status, responsavel")
       .not("status", "in", "(concluida,cancelada)");
-    if (errAbertas) throw errAbertas;
+    if (error) throw error;
 
-    const lista = abertas ?? [];
-    const vencidas       = lista.filter(o => o.vencimento && o.vencimento < hoje);
-    const urgentes       = lista.filter(o => o.vencimento && o.vencimento >= hoje && o.vencimento <= em7dias);
-    const noPrazo        = lista.filter(o => o.vencimento && o.vencimento > em7dias);
-    const semResponsavel = lista.filter(o => !o.responsavel || String(o.responsavel).trim() === "");
+    const lista          = abertas ?? [];
+    const vencidas       = lista.filter((o) => o.vencimento && o.vencimento < hoje);
+    const urgentes       = lista.filter((o) => o.vencimento && o.vencimento >= hoje && o.vencimento <= em7dias);
+    const noPrazo        = lista.filter((o) => o.vencimento && o.vencimento > em7dias);
+    const semResponsavel = lista.filter((o) => !o.responsavel || String(o.responsavel).trim() === "");
 
-    // Log — obrigações vencidas (idempotente por dia: 1 log de ciclo, não 1 por item)
-    await supabase.from("agente_logs").insert({
-      agente: "FISCAL",
-      acao: "CICLO_FISCAL",
-      resultado: vencidas.length > 0 ? "ALERTA" : "OK",
-      detalhes: {
-        vencidas: vencidas.length,
-        urgentes: urgentes.length,
-        sem_responsavel: semResponsavel.length,
-        total: lista.length,
-        exemplos_vencidas: vencidas.slice(0, 10).map(o => ({
-          cliente: o.cliente_nome, tipo: o.tipo, vencimento: o.vencimento, obrigacao_id: o.id,
-        })),
-      },
+    // AÇÃO autônoma: tria vencidas + urgentes no pipeline fiscal (entrada a_apurar).
+    let criadas = 0, existentes = 0;
+    for (const o of [...vencidas, ...urgentes]) {
+      const venc = o.vencimento <  hoje;
+      const r = await upsertPipelineTask(sb, {
+        setor: "fiscal",
+        titulo: `${venc ? "Obrigação vencida" : "Obrigação a vencer"} — ${o.cliente_nome ?? "cliente"} · ${o.tipo ?? "obrigação"}`,
+        descricao: `Competência ${o.competencia ?? "—"} · vencimento ${o.vencimento}. Triada pelo agente-fiscal; transmissão requer aprovação humana.`,
+        etapa_pipeline: "a_apurar",
+        dedup_key: `obrigacao:${o.id}`,
+        prioridade: venc ? "alta" : "normal",
+        cliente_id: o.cliente_id ?? null,
+        criado_por: "agente-fiscal",
+        meta: { obrigacao_id: o.id, tipo: o.tipo, vencimento: o.vencimento, vencida: venc },
+      });
+      if (r === "criada") criadas++; else if (r === "existente") existentes++;
+    }
+
+    await logAgentRun(sb, "FISCAL", "TRIAGEM_OBRIGACOES",
+      vencidas.length > 0 ? "ALERTA" : "OK",
+      { vencidas: vencidas.length, urgentes: urgentes.length, sem_responsavel: semResponsavel.length,
+        total: lista.length, tarefas_criadas: criadas, tarefas_existentes: existentes });
+
+    return json({
+      success: true,
       executado_em: new Date().toISOString(),
+      resumo: {
+        vencidas: vencidas.length, urgentes: urgentes.length, no_prazo: noPrazo.length, total: lista.length,
+        obrigacoes_vencidas: vencidas.length, sem_responsavel: semResponsavel.length,
+        tarefas_criadas: criadas, tarefas_existentes: existentes,
+      },
+      acoes: [{ tipo: "TRIAGEM_PIPELINE", criadas, existentes, gate: "transmissão = ação humana" }],
+      alertas: [
+        ...vencidas.map((o) => ({ tipo: "OBRIGACAO_VENCIDA", cliente: o.cliente_nome, obrigacao: o.tipo, vencimento: o.vencimento })),
+        ...urgentes.map((o) => ({ tipo: "OBRIGACAO_URGENTE", cliente: o.cliente_nome, obrigacao: o.tipo, vencimento: o.vencimento })),
+      ],
     });
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        executado_em: new Date().toISOString(),
-        resumo: {
-          // chaves lidas pelo dashboard
-          vencidas:  vencidas.length,
-          urgentes:  urgentes.length,
-          no_prazo:  noPrazo.length,
-          total:     lista.length,
-          // chaves lidas pelo orquestrador (extrairAlertas)
-          obrigacoes_vencidas: vencidas.length,
-          sem_responsavel:     semResponsavel.length,
-        },
-        alertas: [
-          ...vencidas.map(o => ({
-            tipo: "OBRIGACAO_VENCIDA",
-            cliente: o.cliente_nome,
-            obrigacao: o.tipo,
-            vencimento: o.vencimento,
-          })),
-          ...urgentes.map(o => ({
-            tipo: "OBRIGACAO_URGENTE",
-            cliente: o.cliente_nome,
-            obrigacao: o.tipo,
-            vencimento: o.vencimento,
-          })),
-        ],
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
   } catch (err) {
-    return new Response(
-      JSON.stringify({ success: false, error: (err as Error).message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return json({ success: false, error: (err as Error).message }, 500);
   }
 });

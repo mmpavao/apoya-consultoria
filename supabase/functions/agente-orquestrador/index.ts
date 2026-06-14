@@ -81,8 +81,9 @@ Deno.serve(async (req: Request) => {
   const medios   = todos.filter(a => a.prioridade === "media");
 
   // 3. Criar tarefas automáticas para CRÍTICOS — IDEMPOTENTE.
-  //    Dedup por (agente, tipo): se já existe uma tarefa [AUTO] aberta para o
-  //    mesmo alerta, não recria (evita duplicar a cada ciclo/cron).
+  //    Setores que já têm EXPERT EXECUTOR próprio gerenciam o próprio pipeline;
+  //    o orquestrador não cria tarefa agregada p/ eles (um dono por tarefa).
+  const EXPERT_SECTORS = new Set(["FINANCEIRO", "FISCAL", "RH"]);
   const tarefasCriadas: string[] = [];
   const abertasKeys = new Set<string>();
   try {
@@ -102,9 +103,8 @@ Deno.serve(async (req: Request) => {
   for (const alerta of criticos) {
     // Um dono por tarefa: setores com EXPERT EXECUTOR próprio gerenciam o
     // próprio pipeline (granular). O orquestrador não cria tarefa agregada p/
-    // eles — só consolida/reflete. (FINANCEIRO já é executor; outros entram
-    // nesta lista conforme viram experts.)
-    if (alerta.agente === "FINANCEIRO") continue;
+    // eles — só consolida/reflete. FINANCEIRO, FISCAL e RH já são executores.
+    if (EXPERT_SECTORS.has(alerta.agente)) continue;
     const dedupKey = `${alerta.agente}:${alerta.tipo}`;
     if (abertasKeys.has(dedupKey)) continue; // já existe tarefa aberta p/ este alerta
     try {

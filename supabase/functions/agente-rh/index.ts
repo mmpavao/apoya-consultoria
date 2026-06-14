@@ -1,121 +1,82 @@
+// Agente RH/DP — EXPERT EXECUTOR autônomo do setor pessoal.
+// Materializa/tria cada folha em aberto no pipeline DP (idempotente, etapa de
+// entrada coleta_dados). PARA antes do fechamento/transmissão eSocial (gate
+// humano: etapa conferencia requer aprovação). Mantém o resumo lido pelo
+// orquestrador ({folhas_abertas, ferias_proximas_30d}).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logAgentRun, upsertPipelineTask, json } from "../_shared/agent.ts";
 
 Deno.serve(async (_req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Missing Supabase configuration" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return json({ success: false, error: "Missing Supabase configuration" }, 500);
   }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const today = new Date();
-    const mesAtual = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-    const hoje = today.toISOString().slice(0, 10);
-    const trintaDias = new Date(today);
-    trintaDias.setDate(today.getDate() + 30);
-    const limite30d = trintaDias.toISOString().slice(0, 10);
+    const hoje      = new Date().toISOString().slice(0, 10);
+    const limite30d = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
 
-    /* ── 1. Folhas em aberto ───────────────────────────── */
-    const { data: folhasAbertas, error: errFolhas } = await supabase
+    // Folhas em aberto (status 'aberto' — valor real usado em produção)
+    const { data: folhas, error: errF } = await sb
       .from("folha_mensal")
       .select("id, empresa_id, competencia, status")
       .eq("status", "aberto");
-    if (errFolhas) throw errFolhas;
+    if (errF) throw errF;
 
-    /* ── 2. Férias próximas (30 dias) ─────────────────── */
-    const { data: feriasProximas, error: errFerias } = await supabase
+    // Férias aprovadas vencendo em 30 dias (observação)
+    const { data: ferias } = await sb
       .from("ferias")
-      .select("id, funcionario_id, empresa_id, gozo_inicio, gozo_fim, dias_gozo, status")
-      .gte("gozo_inicio", hoje)
-      .lte("gozo_inicio", limite30d)
-      .eq("status", "aprovada");
-    if (errFerias) throw errFerias;
+      .select("id, empresa_id, gozo_inicio, status")
+      .gte("gozo_inicio", hoje).lte("gozo_inicio", limite30d).eq("status", "aprovada");
 
-    /* ── 3. Funcionários ativos ───────────────────────── */
-    const { data: funcionariosAtivos, error: errFunc } = await supabase
-      .from("funcionarios")
-      .select("id, nome, empresa_id")
-      .eq("status", "ativo");
-    if (errFunc) throw errFunc;
-
-    /* ── 4. Funcionários sem folha no mês atual ────────── */
-    const empresasComFolhaMes = new Set(
-      (folhasAbertas ?? [])
-        .filter(f => f.competencia === mesAtual)
-        .map(f => f.empresa_id)
-    );
-    const funcionariosSemFolha = (funcionariosAtivos ?? []).filter(
-      f => !empresasComFolhaMes.has(f.empresa_id)
-    ).length;
-
-    /* ── 5. Logs para folhas em aberto ────────────────── */
-    for (const folha of (folhasAbertas ?? [])) {
-      await supabase.from("agente_logs").insert({
-        agente: "RH",
-        acao: "FOLHA_EM_ABERTO",
-        resultado: "ALERTA",
-        cliente_id: folha.empresa_id ?? null,
-        detalhes: {
-          competencia: folha.competencia,
-          empresa_id: folha.empresa_id,
-          folha_id: folha.id,
-        },
-      });
+    // Mapa empresa_id → razão social (para títulos legíveis)
+    const lista = folhas ?? [];
+    const ids = [...new Set(lista.map((f) => f.empresa_id).filter(Boolean))];
+    const nomeMap: Record<string, string> = {};
+    if (ids.length) {
+      const { data: cls } = await sb.from("clientes").select("id, razao_social").in("id", ids);
+      for (const c of cls ?? []) nomeMap[c.id] = c.razao_social;
     }
 
-    /* ── 6. Logs para férias próximas ─────────────────── */
-    for (const ferias of (feriasProximas ?? [])) {
-      await supabase.from("agente_logs").insert({
-        agente: "RH",
-        acao: "FERIAS_PROXIMAS",
-        resultado: "ALERTA",
-        cliente_id: ferias.empresa_id ?? null,
-        detalhes: {
-          funcionario_id: ferias.funcionario_id,
-          gozo_inicio: ferias.gozo_inicio,
-          gozo_fim: ferias.gozo_fim,
-          dias_gozo: ferias.dias_gozo,
-        },
+    // AÇÃO autônoma: tria folhas em aberto no pipeline DP (entrada coleta_dados).
+    let criadas = 0, existentes = 0;
+    for (const f of lista) {
+      const r = await upsertPipelineTask(sb, {
+        setor: "dp",
+        titulo: `Folha em aberto — ${nomeMap[f.empresa_id] ?? "empresa"} (${f.competencia ?? "—"})`,
+        descricao: `Folha da competência ${f.competencia ?? "—"} ainda em aberto. Triada pelo agente-rh; fechamento/eSocial requer aprovação humana.`,
+        etapa_pipeline: "coleta_dados",
+        dedup_key: `folha:${f.id}`,
+        prioridade: "normal",
+        criado_por: "agente-rh",
+        meta: { folha_id: f.id, competencia: f.competencia, empresa_id: f.empresa_id },
       });
+      if (r === "criada") criadas++; else if (r === "existente") existentes++;
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        executado_em: new Date().toISOString(),
-        resumo: {
-          folhas_abertas: (folhasAbertas ?? []).length,
-          ferias_proximas_30d: (feriasProximas ?? []).length,
-          funcionarios_sem_folha: funcionariosSemFolha,
-          total_funcionarios_ativos: (funcionariosAtivos ?? []).length,
-        },
-        alertas: [
-          ...(folhasAbertas ?? []).map(f => ({
-            tipo: "FOLHA_EM_ABERTO",
-            empresa_id: f.empresa_id,
-            competencia: f.competencia,
-          })),
-          ...(feriasProximas ?? []).map(f => ({
-            tipo: "FERIAS_PROXIMAS",
-            funcionario_id: f.funcionario_id,
-            gozo_inicio: f.gozo_inicio,
-            dias_gozo: f.dias_gozo,
-          })),
-        ],
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    await logAgentRun(sb, "RH", "TRIAGEM_FOLHAS",
+      lista.length > 0 ? "ALERTA" : "OK",
+      { folhas_abertas: lista.length, ferias_proximas_30d: (ferias ?? []).length,
+        tarefas_criadas: criadas, tarefas_existentes: existentes });
+
+    return json({
+      success: true,
+      executado_em: new Date().toISOString(),
+      resumo: {
+        folhas_abertas: lista.length,
+        ferias_proximas_30d: (ferias ?? []).length,
+        tarefas_criadas: criadas, tarefas_existentes: existentes,
+      },
+      acoes: [{ tipo: "TRIAGEM_PIPELINE", criadas, existentes, gate: "fechamento/eSocial = ação humana" }],
+      alertas: [
+        ...lista.map((f) => ({ tipo: "FOLHA_ABERTA", empresa: nomeMap[f.empresa_id] ?? f.empresa_id, competencia: f.competencia })),
+        ...(ferias ?? []).map((f) => ({ tipo: "FERIAS_PROXIMA", inicio: f.gozo_inicio })),
+      ],
+    });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ success: false, error: (err as Error).message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return json({ success: false, error: (err as Error).message }, 500);
   }
 });
