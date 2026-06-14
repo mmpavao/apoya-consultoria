@@ -54,7 +54,8 @@ export function useLancamentos(empresaId: string, mesReferencia: string) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("lancamentos_contabeis")
-        .select("*")
+        // alias: a coluna real é mes_referencia; a UI/tipo usa competencia
+        .select("*, competencia:mes_referencia")
         .eq("empresa_id", empresaId)
         .eq("mes_referencia", mesReferencia)
         .order("data_lancamento");
@@ -111,7 +112,10 @@ export function usePeriodosContabeis(empresaId?: string) {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let q = (supabase as any).from("periodos_contabeis").select("*").order("mes_referencia", { ascending: false });
+      // aliases: colunas reais são mes_referencia e created_at; UI usa competencia/aberto_em
+      let q = (supabase as any).from("periodos_contabeis")
+        .select("*, competencia:mes_referencia, aberto_em:created_at")
+        .order("mes_referencia", { ascending: false });
       if (empresaId) q = q.eq("empresa_id", empresaId);
       const { data, error } = await q;
       if (error) throw error;
