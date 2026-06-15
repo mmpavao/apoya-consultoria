@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
 import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
+import { useDepartamentoConfig } from "@/hooks/use-departamento-config";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { KanbanModulo } from "@/components/KanbanModulo";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
@@ -511,26 +512,37 @@ function AutomacoesDP() {
 // ═══════════════════════════════════════════════════════════
 // TAB — CONFIGURAÇÕES DP
 // ═══════════════════════════════════════════════════════════
+const DP_PREFS = [
+  { key: "fgts_auto",        label: "Calcular FGTS automaticamente",          def: true },
+  { key: "alerta_rescisao",  label: "Alertar rescisões pendentes",            def: true },
+  { key: "aprovacao_folha",  label: "Aprovação antes de fechar folha",        def: false },
+  { key: "notif_ferias",     label: "Notificação de férias vencendo (30d)",   def: true },
+  { key: "esocial_auto",     label: "Transmissão eSocial automática",         def: false },
+];
+
 function ConfigDP() {
-  const [configs, setConfigs] = useState([
-    { label: "Calcular FGTS automaticamente",       ativo: true },
-    { label: "Alertar rescisões pendentes",           ativo: true },
-    { label: "Aprovação antes de fechar folha",       ativo: false },
-    { label: "Notificação de férias vencendo (30d)",  ativo: true },
-    { label: "Transmissão eSocial automática",        ativo: false },
-  ]);
-  const toggle = (i: number) => setConfigs(c => c.map((x, j) => j === i ? { ...x, ativo: !x.ativo } : x));
+  const { config, loading, saving, save } = useDepartamentoConfig("dp");
+  const [vals, setVals] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setVals(Object.fromEntries(DP_PREFS.map(p => [p.key, (config[p.key] as boolean) ?? p.def])));
+  }, [config]);
+  const toggle = (key: string) => setVals(v => ({ ...v, [key]: !v[key] }));
 
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-card p-5 space-y-3">
-        <h3 className="text-sm font-semibold">Preferências do DP</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Preferências do DP</h3>
+          <Button size="sm" className="h-8 text-xs gap-1" disabled={saving || loading} onClick={() => save(vals)}>
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Salvar
+          </Button>
+        </div>
         <div className="grid gap-2 md:grid-cols-2">
-          {configs.map((c, i) => (
-            <div key={c.label} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => toggle(i)}>
-              <span className="text-sm">{c.label}</span>
-              <div className={cn("h-5 w-9 rounded-full transition-colors relative", c.ativo ? "bg-emerald-500" : "bg-muted-foreground/30")}>
-                <div className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform", c.ativo ? "translate-x-4" : "translate-x-0.5")} />
+          {DP_PREFS.map(p => (
+            <div key={p.key} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => toggle(p.key)}>
+              <span className="text-sm">{p.label}</span>
+              <div className={cn("h-5 w-9 rounded-full transition-colors relative", vals[p.key] ? "bg-emerald-500" : "bg-muted-foreground/30")}>
+                <div className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform", vals[p.key] ? "translate-x-4" : "translate-x-0.5")} />
               </div>
             </div>
           ))}

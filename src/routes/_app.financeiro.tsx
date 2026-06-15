@@ -5,6 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { KanbanModulo } from "@/components/KanbanModulo";
 import { useAuth } from "@/hooks/use-auth";
+import { useDepartamentoConfig } from "@/hooks/use-departamento-config";
 import {
   AlertTriangle, CheckCircle2, DollarSign,
   Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
@@ -63,12 +64,21 @@ function FinanceiroPage__Inner(){
   const [showNovaAuto, setShowNovaAuto] = useState(false);
   const [salvandoAuto, setSalvandoAuto] = useState(false);
   const [runningAutoId, setRunningAutoId] = useState<string|null>(null);
+  const { config: depConfig, saving: savingCfg, save: saveDepConfig } = useDepartamentoConfig("financeiro");
   const [configsFin, setConfigsFin] = useState([
     { key: "nfse_auto",    label: "Emitir NFS-e após pagamento",     enabled: false },
     { key: "bloquear",     label: "Bloquear cliente inadimplente",   enabled: true  },
     { key: "juros_auto",   label: "Juros automático após vencimento", enabled: false },
     { key: "notif_wpp",    label: "Notificar via WhatsApp",           enabled: true  },
   ]);
+  // hidrata os toggles com o que está salvo no banco
+  useEffect(() => {
+    if (depConfig && Object.keys(depConfig).length) {
+      setConfigsFin(c => c.map(x => ({ ...x, enabled: (depConfig[x.key] as boolean) ?? x.enabled })));
+    }
+  }, [depConfig]);
+  const salvarConfigsFin = () =>
+    saveDepConfig(Object.fromEntries(configsFin.map(c => [c.key, c.enabled])));
 
   async function salvarRegua() {
     setSalvandoRegua(true);
@@ -767,8 +777,8 @@ function FinanceiroPage__Inner(){
         <div className="rounded-xl border bg-card p-6 space-y-5">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Configurações Financeiras</h3>
-            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => toast.success("Configurações salvas!")}>
-              <Save className="h-3.5 w-3.5"/> Salvar
+            <Button size="sm" className="h-7 text-xs gap-1.5" disabled={savingCfg} onClick={salvarConfigsFin}>
+              <Save className="h-3.5 w-3.5"/> {savingCfg ? "Salvando…" : "Salvar"}
             </Button>
           </div>
           <div className="space-y-2">
