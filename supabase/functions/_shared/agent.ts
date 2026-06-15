@@ -20,9 +20,12 @@ export async function logAgentRun(
   resultado: "OK" | "ALERTA" | "ERRO",
   detalhes: Record<string, unknown>,
 ): Promise<void> {
+  // A coluna agente_logs.resultado tem CHECK constraint: só aceita
+  // 'sucesso' | 'erro' | 'parcial'. Normaliza para não falhar o insert.
+  const r = resultado === "ERRO" ? "erro" : resultado === "ALERTA" ? "parcial" : "sucesso";
   try {
     await sb.from("agente_logs").insert({
-      agente, acao, resultado, detalhes,
+      agente, acao, resultado: r, detalhes,
       executado_em: new Date().toISOString(),
     });
   } catch (_) { /* log nunca derruba o agente */ }

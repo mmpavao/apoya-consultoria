@@ -141,8 +141,9 @@ Deno.serve(async (req: Request) => {
 
   // 5. Run guarda-chuva do time
   await supabase.from("agente_logs").insert({
-    agente: "ORQUESTRADOR", acao: "CICLO_COMPLETO",
-    resultado: reflexao.meta_atingida ? "OK" : "ALERTA",
+    agente: "agente-orquestrador", acao: "CICLO_COMPLETO",
+    // resultado tem CHECK: 'sucesso' | 'erro' | 'parcial'
+    resultado: reflexao.meta_atingida ? "sucesso" : "parcial",
     detalhes: {
       duracao_ms, max_steps: MAX_STEPS, steps_usados: aChamar.length,
       agentes: resultados.map(r => ({ agente: r.agente, success: r.success, alertas: r.alertas, erro: r.erro })),
