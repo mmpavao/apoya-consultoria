@@ -1,11 +1,20 @@
 /**
- * Versão do sistema APOYA CONTABILIDADE
- * Atualizado automaticamente pelo DEV APOYA a cada deploy.
+ * Versão do sistema APOYA CONTABILIDADE.
+ * CARIMBADO AUTOMATICAMENTE no build/deploy (CI injeta VITE_APP_VERSION da tag
+ * e VITE_APP_BUILD_TS do momento do deploy). Fallback p/ build local.
  */
-export const APP_VERSION    = "2.0.0";
-export const APP_BUILD_DATE = "2026-06-12";
-export const APP_BUILD_TS   = "2026-06-12T21:14:00-03:00";
-export const APP_SPRINT     = "v2.0.0 — Sprint B: Pipeline humano + Régua + Automações";
+const env = (import.meta as any).env ?? {};
+export const APP_VERSION    = (env.VITE_APP_VERSION as string) || "3.3.0";
+export const APP_BUILD_TS   = (env.VITE_APP_BUILD_TS as string) || "2026-06-15T00:00:00";
+export const APP_BUILD_DATE = APP_BUILD_TS.slice(0, 10);
+export const APP_SPRINT     = "Time multi-agente vivo + Societário unificado";
+
+/** "15/06 23:45" — versão curta data/hora p/ o rodapé */
+export function buildStamp(): string {
+  const d = new Date(APP_BUILD_TS);
+  if (isNaN(d.getTime())) return APP_BUILD_DATE;
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
 
 export const VERSION_HISTORY = [
   {

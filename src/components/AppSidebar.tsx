@@ -28,7 +28,7 @@ import {
   Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
+import { APP_VERSION, buildStamp } from "@/lib/version";
 import { useUserSetores } from "@/hooks/use-user-setores";
 
 /* ── Types ─────────────────────────────────────────────── */
@@ -314,10 +314,10 @@ export function AppSidebar({
           </button>
         )}
 
-        {/* Versão */}
+        {/* Versão — carimbada no deploy (versão · data/hora) */}
         {!collapsed && (
           <p className="mt-2 px-3 text-[10px] text-sidebar-foreground/25 font-mono">
-            v{APP_VERSION}
+            v{APP_VERSION} · {buildStamp()}
           </p>
         )}
       </div>
