@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
@@ -155,7 +157,7 @@ function EmpresasTab() {
 // ═══════════════════════════════════════════════════════════
 // TAB — FOLHA DE PAGAMENTO
 // ═══════════════════════════════════════════════════════════
-function FolhaTab() {
+function FolhaTab({ autoNovo = 0 }: { autoNovo?: number }) {
   const now = new Date();
   const [ano, setAno]           = useState(now.getFullYear());
   const { clientes }            = useClientes();
@@ -166,6 +168,30 @@ function FolhaTab() {
   const [fechandoId, setFechandoId] = useState<string|null>(null);
   const { createFolha } = useCreateFolha();
   const { fecharFolha } = useFecharFolha();
+
+  const compAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [showNova, setShowNova] = useState(false);
+  const [novaForm, setNovaForm] = useState({ empresa_id: "", competencia: compAtual });
+
+  // quickAction do dashboard abre o modal (já com a empresa selecionada, se houver)
+  useEffect(() => {
+    if (autoNovo > 0) {
+      setNovaForm({ empresa_id: empresaId, competencia: compAtual });
+      setShowNova(true);
+    }
+  }, [autoNovo]);
+
+  async function salvarNovaFolha() {
+    if (!novaForm.empresa_id) { toast.error("Selecione a empresa"); return; }
+    setCreating(true);
+    const ok = await createFolha(novaForm.empresa_id, novaForm.competencia);
+    setCreating(false);
+    if (ok) {
+      setShowNova(false);
+      if (novaForm.empresa_id === empresaId) loadFolhas();
+      else setEmpresaId(novaForm.empresa_id);
+    }
+  }
 
   const loadFolhas = useCallback(async () => {
     if (!empresaId) return;
@@ -180,9 +206,6 @@ function FolhaTab() {
   }, [empresaId, ano]);
 
   useEffect(() => { loadFolhas(); }, [loadFolhas]);
-
-  const now2 = new Date();
-  const comp = `${ano}-${String(now2.getMonth() + 1).padStart(2, "0")}`;
 
   const kpi = useMemo(() => ({
     total:    folhas.length,
@@ -231,10 +254,9 @@ function FolhaTab() {
             <SelectContent>{[now.getFullYear() - 1, now.getFullYear()].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <Button size="sm" variant="outline" className="h-8 text-xs gap-1" disabled={!empresaId || creating}
-          onClick={async () => { setCreating(true); await createFolha(empresaId, comp); await loadFolhas(); setCreating(false); }}>
-          {creating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-          Nova Folha
+        <Button size="sm" className="h-8 text-xs gap-1"
+          onClick={() => { setNovaForm({ empresa_id: empresaId, competencia: compAtual }); setShowNova(true); }}>
+          <Plus className="h-3 w-3" /> Nova Folha
         </Button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -255,6 +277,30 @@ function FolhaTab() {
           emptyIcon={<FileText className="h-8 w-8" />}
           emptyText="Nenhuma folha neste período — clique em Nova Folha para criar" />
       )}
+
+      <Dialog open={showNova} onOpenChange={setShowNova}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Nova Folha de Pagamento</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Empresa</Label>
+              <Select value={novaForm.empresa_id} onValueChange={v => setNovaForm(f => ({ ...f, empresa_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecionar empresa…" /></SelectTrigger>
+                <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Competência</Label>
+              <Input type="month" value={novaForm.competencia} onChange={e => setNovaForm(f => ({ ...f, competencia: e.target.value }))} />
+              <p className="text-[11px] text-muted-foreground mt-1">A folha será aberta com os funcionários ativos da empresa.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNova(false)}>Cancelar</Button>
+            <Button disabled={creating || !novaForm.empresa_id} onClick={salvarNovaFolha}>{creating ? "Abrindo…" : "Abrir Folha"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -516,6 +562,7 @@ function DpPageInner() {
   const { ferias } = useFerias();
   const agenteAtiv = useAgenteAtividade("dp");
   const [tab, setTab] = useState("dashboard");
+  const [novaFolhaNonce, setNovaFolhaNonce] = useState(0);
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -566,7 +613,7 @@ function DpPageInner() {
             logs={agenteAtiv.logs}
             logsLoading={agenteAtiv.loading}
             quickActions={[
-              { label: "Nova Folha", icon: FileText, onClick: () => setTab("folha"), variant: "outline" },
+              { label: "Nova Folha", icon: FileText, onClick: () => { setTab("folha"); setNovaFolhaNonce(n => n + 1); }, variant: "outline" },
               { label: "Registrar Férias", icon: Calendar, onClick: () => setTab("ferias"), variant: "outline" },
             ]}
           />
@@ -595,7 +642,7 @@ function DpPageInner() {
   ]}
             /></TabsContent>
         <TabsContent value="empresas" className="mt-0"><EmpresasTab /></TabsContent>
-        <TabsContent value="folha"    className="mt-0"><FolhaTab /></TabsContent>
+        <TabsContent value="folha"    className="mt-0"><FolhaTab autoNovo={novaFolhaNonce} /></TabsContent>
         <TabsContent value="ferias"   className="mt-0"><FeriasTab /></TabsContent>
         <TabsContent value="esocial"  className="mt-0"><EsocialTab /></TabsContent>
         <TabsContent value="documentos" className="mt-0"><ModuleDocumentosTab modulo="dp" /></TabsContent>

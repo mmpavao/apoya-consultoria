@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react
 import {
   Activity, AlertCircle, AlertTriangle, Calendar,
   CheckCircle2, ChevronDown, ChevronRight, Clock, Download,
-  FileText, FolderOpen, Loader2, Receipt,
+  FileText, FolderOpen, Loader2, Plus, Receipt,
   RefreshCw, Search, Send, ShieldAlert,
   ToggleLeft, ToggleRight, Upload, Wallet, Wifi, WifiOff, Zap, Eye,
 } from "lucide-react";
@@ -256,6 +256,9 @@ function DasTab() {
           </Select>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setDialogDas(true)} disabled={busy} className="h-8 text-xs gap-1">
+            <Plus className="h-3 w-3" /> DAS manual
+          </Button>
           <Button size="sm" variant="outline" onClick={gerarTodosDoMes} disabled={busy} className="h-8 text-xs gap-1">
             {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Receipt className="h-3 w-3" />}
             Gerar DAS do Mês
@@ -312,7 +315,7 @@ function DasTab() {
         <TableFooter total={items.length} filtered={filtered.length} selected={sel.size} />
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />
       </div>
-      <DasGerarDialog open={dialogDas} onClose={() => setDialogDas(false)} onCreated={() => {}} />
+      <DasGerarDialog open={dialogDas} onClose={() => setDialogDas(false)} onCreated={() => { setDialogDas(false); refresh(); }} />
     </div>
   );
 }

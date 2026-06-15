@@ -30,6 +30,7 @@ import { Pagination } from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
 import {
   useLancamentos, usePlanoContas, usePeriodosContabeis, useAbrirPeriodo, useFecharPeriodo,
+  useCriarLancamento,
   type Lancamento, type PlanoContas, type PeriodoContabil,
 } from "@/hooks/use-contabil";
 import { useAuth } from "@/hooks/use-auth";
@@ -151,7 +152,7 @@ function PeriodosTab() {
 // ═══════════════════════════════════════════════════════════
 // TAB — LANÇAMENTOS CONTÁBEIS
 // ═══════════════════════════════════════════════════════════
-function LancamentosTab() {
+function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
   const { clientes }              = useClientes();
   const now                       = new Date();
   const [empresaId, setEmpresaId] = useState("");
@@ -160,8 +161,35 @@ function LancamentosTab() {
   const [query, setQuery]         = useState("");
   const [page, setPage]           = useState(1);
   const comp = `${ano}-${String(mes).padStart(2, "0")}`;
-  const { lancamentos, loading, totais } = useLancamentos(empresaId, comp);
+  const { lancamentos, loading, totais, refresh } = useLancamentos(empresaId, comp);
+  const { criarLancamento, loading: criando } = useCriarLancamento();
   const PAGE_SIZE = 20;
+
+  const hoje = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const emptyForm = { data_lancamento: hoje, historico: "", conta_debito: "", conta_credito: "", valor: "", tipo: "debito" };
+  const [showNovo, setShowNovo] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+
+  // quickAction do dashboard abre o modal (com a empresa já selecionada)
+  useEffect(() => { if (autoNovo > 0) setShowNovo(true); }, [autoNovo]);
+
+  async function salvarLancamento() {
+    if (!empresaId) { toast.error("Selecione a empresa primeiro"); return; }
+    const valorNum = Number(String(form.valor).replace(",", "."));
+    if (!form.historico.trim() || !form.conta_debito.trim() || !form.conta_credito.trim() || !(valorNum > 0)) {
+      toast.error("Preencha histórico, contas débito/crédito e um valor válido"); return;
+    }
+    const ok = await criarLancamento({
+      empresa_id: empresaId,
+      data_lancamento: form.data_lancamento,
+      historico: form.historico.trim(),
+      conta_debito: form.conta_debito.trim(),
+      conta_credito: form.conta_credito.trim(),
+      valor: valorNum,
+      tipo: form.tipo,
+    });
+    if (ok) { setShowNovo(false); setForm(emptyForm); refresh(); }
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -201,6 +229,9 @@ function LancamentosTab() {
           </Select>
           <TableSearch value={query} onChange={setQuery} placeholder="Buscar histórico…" />
         </div>
+        <Button size="sm" className="h-8 text-xs gap-1" onClick={() => setShowNovo(true)}>
+          <Plus className="h-3 w-3" /> Novo Lançamento
+        </Button>
       </div>
       {empresaId && !loading && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -227,6 +258,59 @@ function LancamentosTab() {
           </div>
         </>
       )}
+
+      <Dialog open={showNovo} onOpenChange={setShowNovo}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Novo Lançamento Contábil</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Empresa</Label>
+              <Select value={empresaId} onValueChange={setEmpresaId}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar empresa…" /></SelectTrigger>
+                <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Data</Label>
+                <Input type="date" value={form.data_lancamento} onChange={e => setForm(f => ({ ...f, data_lancamento: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Valor (R$)</Label>
+                <Input inputMode="decimal" placeholder="0,00" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Histórico</Label>
+              <Input placeholder="Ex: Pagamento de fornecedor X" value={form.historico} onChange={e => setForm(f => ({ ...f, historico: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Conta Débito</Label>
+                <Input placeholder="Ex: 1.1.1" value={form.conta_debito} onChange={e => setForm(f => ({ ...f, conta_debito: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Conta Crédito</Label>
+                <Input placeholder="Ex: 2.1.1" value={form.conta_credito} onChange={e => setForm(f => ({ ...f, conta_credito: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Tipo</Label>
+              <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="debito">Débito</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNovo(false)}>Cancelar</Button>
+            <Button disabled={criando} onClick={salvarLancamento}>{criando ? "Salvando…" : "Salvar Lançamento"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -471,6 +555,7 @@ function ContabilPageInner() {
   const { periodos, loading: pLoad } = usePeriodosContabeis();
   const agenteAtiv = useAgenteAtividade("contabil");
   const [tab, setTab] = useState("dashboard");
+  const [novoLancNonce, setNovoLancNonce] = useState(0);
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -516,7 +601,7 @@ function ContabilPageInner() {
             logs={agenteAtiv.logs}
             logsLoading={agenteAtiv.loading}
             quickActions={[
-              { label: "Novo Lançamento", icon: BookOpen,      onClick: () => setTab("lancamentos"), variant: "outline" },
+              { label: "Novo Lançamento", icon: BookOpen,      onClick: () => { setTab("lancamentos"); setNovoLancNonce(n => n + 1); }, variant: "outline" },
               { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => setTab("periodos"),    variant: "outline" },
             ]}
           />
@@ -544,7 +629,7 @@ function ContabilPageInner() {
   ]}
             /></TabsContent>
         <TabsContent value="periodos"     className="mt-0"><PeriodosTab /></TabsContent>
-        <TabsContent value="lancamentos"  className="mt-0"><LancamentosTab /></TabsContent>
+        <TabsContent value="lancamentos"  className="mt-0"><LancamentosTab autoNovo={novoLancNonce} /></TabsContent>
         <TabsContent value="plano_contas" className="mt-0"><PlanoContasTab /></TabsContent>
         <TabsContent value="documentos"   className="mt-0"><ModuleDocumentosTab modulo="contabil" /></TabsContent>
         <TabsContent value="automacoes"   className="mt-0"><AutomacoesContabil /></TabsContent>

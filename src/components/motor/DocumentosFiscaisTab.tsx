@@ -2,11 +2,11 @@
  * DocumentosFiscaisTab — NF-e entrada/saída + NFS-e de um cliente
  * Motor contábil: visualiza, classifica e aciona lançamentos
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FileText, Upload, RefreshCw, Loader2, AlertTriangle,
   CheckCircle2, Clock, XCircle, Filter, ChevronDown,
-  ArrowDownToLine, ArrowUpFromLine, Receipt
+  ArrowDownToLine, ArrowUpFromLine, Receipt, Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ interface DocumentoFiscal {
   numero?: string;
   serie?: string;
   chave_acesso?: string;
+  modelo?: string;
   data_emissao?: string;
   mes_referencia?: string;
   emitente_cnpj?: string;
@@ -27,6 +28,8 @@ interface DocumentoFiscal {
   valor_total?: number;
   valor_icms?: number;
   natureza_fiscal?: string;
+  natureza_operacao?: string;
+  xml_url?: string;
   gera_credito_icms?: boolean;
   valor_credito_icms?: number;
   conta_contabil_sugerida?: string;
@@ -75,6 +78,67 @@ const NATUREZA_LABEL: Record<string, string> = {
 const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtDate = (d?: string | null) => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 
+const onlyDigits = (s?: string | null) => (s ?? "").replace(/\D/g, "");
+
+/**
+ * Parseia um XML fiscal (NF-e/NFC-e layout SEFAZ; best-effort p/ NFS-e) e
+ * devolve os campos para inserir em documentos_fiscais. Roda só no cliente
+ * (chamado dentro de handler de evento, nunca no SSR).
+ */
+function parseXmlFiscal(xml: string, clienteCnpj?: string): Partial<DocumentoFiscal> & { tipo: string } {
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  const txt = (tag: string) => doc.getElementsByTagName(tag)?.[0]?.textContent?.trim() || undefined;
+  const num = (tag: string) => { const v = txt(tag); return v != null ? Number(v) : undefined; };
+
+  // --- NF-e / NFC-e (tem infNFe) ---
+  const infNFe = doc.getElementsByTagName("infNFe")?.[0];
+  if (infNFe) {
+    const chave = (infNFe.getAttribute("Id") || "").replace(/^NFe/i, "") || undefined;
+    const emitCnpj = onlyDigits(txt("CNPJ"));               // 1º CNPJ = emitente
+    const dhEmi = txt("dhEmi") || txt("dEmi");               // datetime ou date
+    const dataEmissao = dhEmi ? dhEmi.slice(0, 10) : undefined;
+    const modelo = txt("mod");
+    const cliCnpj = onlyDigits(clienteCnpj);
+    // emitente == cliente → saída; senão entrada (NFC-e mod 65 é sempre saída)
+    const tipo = modelo === "65" || (cliCnpj && emitCnpj === cliCnpj) ? "nfe_saida" : "nfe_entrada";
+    return {
+      tipo,
+      chave_acesso: chave,
+      numero: txt("nNF"),
+      serie: txt("serie"),
+      modelo,
+      data_emissao: dataEmissao,
+      mes_referencia: dataEmissao?.slice(0, 7),
+      emitente_cnpj: emitCnpj || undefined,
+      emitente_razao: txt("xNome"),
+      valor_total: num("vNF"),
+      valor_icms: num("vICMS"),
+      natureza_operacao: txt("natOp"),
+    };
+  }
+
+  // --- NFS-e (best-effort; layout varia por município) ---
+  const isNfse = doc.getElementsByTagName("Nfse")?.[0] || doc.getElementsByTagName("InfNfse")?.[0]
+    || doc.getElementsByTagName("CompNfse")?.[0];
+  if (isNfse) {
+    const prestCnpj = onlyDigits(txt("Cnpj"));
+    const cliCnpj = onlyDigits(clienteCnpj);
+    const dataEmissao = (txt("DataEmissao") || txt("Competencia"))?.slice(0, 10);
+    return {
+      tipo: cliCnpj && prestCnpj === cliCnpj ? "nfse_emitida" : "nfse_recebida",
+      numero: txt("Numero"),
+      data_emissao: dataEmissao,
+      mes_referencia: dataEmissao?.slice(0, 7),
+      emitente_cnpj: prestCnpj || undefined,
+      emitente_razao: txt("RazaoSocial"),
+      valor_total: num("ValorServicos") ?? num("ValorLiquidoNfse"),
+    };
+  }
+
+  // --- Desconhecido: guarda mesmo assim p/ classificação manual ---
+  return { tipo: "manual" };
+}
+
 interface Props {
   clienteId: string;
   clienteCnpj?: string;
@@ -84,8 +148,10 @@ interface Props {
 export function DocumentosFiscaisTab({ clienteId, clienteCnpj, mesReferencia }: Props) {
   const [docs, setDocs]         = useState<DocumentoFiscal[]>([]);
   const [loading, setLoading]   = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState<string>("todos");
   const [statusFiltro, setStatusFiltro] = useState<string>("todos");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function carregarDocs() {
     setLoading(true);
@@ -121,6 +187,78 @@ export function DocumentosFiscaisTab({ clienteId, clienteCnpj, mesReferencia }: 
     if (error) { toast.error("Erro ao confirmar"); return; }
     toast.success("Classificação confirmada");
     carregarDocs();
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // permite reenviar o mesmo arquivo
+    if (!files.length) return;
+
+    setUploading(true);
+    let ok = 0, erros = 0;
+    for (const file of files) {
+      try {
+        const xml = await file.text();
+        const parsed = parseXmlFiscal(xml, clienteCnpj);
+
+        // 1) sobe o XML cru pro storage (bucket "documentos")
+        const path = `fiscal/${clienteId}/${Date.now()}_${file.name}`;
+        const { error: upErr } = await (supabase as any).storage
+          .from("documentos").upload(path, file, { upsert: false });
+        if (upErr) throw upErr;
+        const { data: pub } = (supabase as any).storage.from("documentos").getPublicUrl(path);
+
+        // 2) cria o registro em documentos_fiscais (status recebido p/ classificar)
+        const { error: insErr } = await (supabase as any).from("documentos_fiscais").insert({
+          empresa_id: clienteId,
+          tipo: parsed.tipo,
+          numero: parsed.numero ?? null,
+          serie: parsed.serie ?? null,
+          chave_acesso: parsed.chave_acesso ?? null,
+          modelo: parsed.modelo ?? null,
+          data_emissao: parsed.data_emissao ?? null,
+          mes_referencia: parsed.mes_referencia ?? mesReferencia ?? null,
+          emitente_cnpj: parsed.emitente_cnpj ?? null,
+          emitente_razao: parsed.emitente_razao ?? null,
+          valor_total: parsed.valor_total ?? null,
+          valor_icms: parsed.valor_icms ?? null,
+          natureza_operacao: parsed.natureza_operacao ?? null,
+          xml_url: pub?.publicUrl ?? null,
+          observacoes: parsed.tipo === "manual" ? `Importado: ${file.name} (layout não reconhecido)` : null,
+          status: "recebido",
+          classificado_por: "upload_manual",
+        });
+        if (insErr) throw insErr;
+        ok++;
+      } catch (err: any) {
+        erros++;
+        // eslint-disable-next-line no-console
+        console.error("upload XML falhou:", file.name, err?.message);
+      }
+    }
+    setUploading(false);
+    if (ok)    toast.success(`${ok} documento(s) importado(s)`);
+    if (erros) toast.error(`${erros} arquivo(s) falharam (veja o console)`);
+    if (ok) carregarDocs();
+  }
+
+  async function excluirDoc(doc: DocumentoFiscal & { xml_url?: string | null }) {
+    if (!confirm(`Excluir o documento ${TIPO_LABEL[doc.tipo] ?? doc.tipo}${doc.numero ? ` nº ${doc.numero}` : ""}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      // best-effort: remove o XML do storage se houver
+      const xmlUrl = (doc as any).xml_url as string | undefined;
+      const marker = "/documentos/";
+      if (xmlUrl && xmlUrl.includes(marker)) {
+        const storagePath = decodeURIComponent(xmlUrl.split(marker)[1].split("?")[0]);
+        await (supabase as any).storage.from("documentos").remove([storagePath]);
+      }
+      const { error } = await (supabase as any).from("documentos_fiscais").delete().eq("id", doc.id);
+      if (error) throw error;
+      toast.success("Documento excluído");
+      carregarDocs();
+    } catch (e: any) {
+      toast.error("Erro ao excluir: " + e.message);
+    }
   }
 
   // KPIs rápidos
@@ -182,15 +320,24 @@ export function DocumentosFiscaisTab({ clienteId, clienteCnpj, mesReferencia }: 
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           Atualizar
         </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xml,text/xml,application/xml"
+          multiple
+          className="hidden"
+          onChange={handleUpload}
+        />
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={e => { e.stopPropagation(); toast.info("Upload de XML — em implementação"); }}
+          onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
+          disabled={uploading}
           className="h-8 gap-1.5"
         >
-          <Upload className="h-3.5 w-3.5" />
-          Upload XML
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? "Enviando…" : "Upload XML"}
         </Button>
       </div>
 
@@ -259,15 +406,25 @@ export function DocumentosFiscaisTab({ clienteId, clienteCnpj, mesReferencia }: 
                       </InlineBadge>
                     </td>
                     <td>
-                      {doc.status === "classificado_auto" && (
+                      <div className="flex items-center justify-end gap-1">
+                        {doc.status === "classificado_auto" && (
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); confirmarClassificacao(doc.id); }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-2 py-1 text-[11px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          >
+                            Confirmar
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={e => { e.stopPropagation(); confirmarClassificacao(doc.id); }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-2 py-1 text-[11px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          title="Excluir documento"
+                          onClick={e => { e.stopPropagation(); excluirDoc(doc); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-lg p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600"
                         >
-                          Confirmar
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );

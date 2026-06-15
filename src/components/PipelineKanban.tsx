@@ -372,6 +372,40 @@ export function PipelineKanban({ setor, podeAprovar = false }: { setor: string; 
     } finally { setMovendo(false); }
   };
 
+  // Aprovar todas as tarefas de uma etapa = avançá-las para a próxima etapa.
+  // Usa o endpoint real /api/pipeline/mover e reporta o resultado honesto.
+  const handleAprovarTodas = async (etapaKey: string) => {
+    if (!kanban) return;
+    const etapa = kanban.etapas.find(e => e.etapa_key === etapaKey);
+    if (!etapa || etapa.tarefas.length === 0) return;
+    const proxima = kanban.etapas
+      .filter(e => e.ordem > etapa.ordem)
+      .sort((a, b) => a.ordem - b.ordem)[0];
+    if (!proxima) { toast.info("Não há etapa seguinte para avançar."); return; }
+    if (!confirm(`Aprovar e avançar ${etapa.tarefas.length} tarefa(s) de "${etapa.etapa_label}" para "${proxima.etapa_label}"?`)) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sessão expirada");
+      setMovendo(true);
+      let okN = 0, bloqueadas = 0;
+      for (const t of etapa.tarefas) {
+        const res = await fetch("/api/pipeline/mover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ tarefa_id: t.id, etapa_destino: proxima.etapa_key, motivo: "Aprovação em lote" }),
+        });
+        if (res.ok) okN++; else bloqueadas++;
+      }
+      if (okN)         toast.success(`${okN} tarefa(s) aprovada(s) e avançada(s)`);
+      if (bloqueadas)  toast.warning(`${bloqueadas} tarefa(s) não puderam ser avançadas`);
+      await carregarKanban();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao aprovar em lote");
+    } finally { setMovendo(false); }
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center py-16">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -429,7 +463,7 @@ export function PipelineKanban({ setor, podeAprovar = false }: { setor: string; 
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onAprovar={(key) => toast.info("Aprovação em lote para '" + key + "' em breve")}
+              onAprovar={handleAprovarTodas}
               onNovaTarefa={setNovaTaskEtapa}
             />
           ))}

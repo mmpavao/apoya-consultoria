@@ -74,6 +74,46 @@ export function useLancamentos(empresaId: string, mesReferencia: string) {
   return { lancamentos, loading, totais, refresh: fetch };
 }
 
+export interface NovoLancamentoInput {
+  empresa_id: string;
+  data_lancamento: string;   // 'YYYY-MM-DD'
+  historico: string;
+  conta_debito: string;
+  conta_credito: string;
+  valor: number;
+  tipo?: string;
+}
+
+export function useCriarLancamento() {
+  const [loading, setLoading] = useState(false);
+  const criarLancamento = useCallback(async (input: NovoLancamentoInput) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const mes_referencia = input.data_lancamento.slice(0, 7); // 'YYYY-MM'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("lancamentos_contabeis").insert({
+        empresa_id:      input.empresa_id,
+        data_lancamento: input.data_lancamento,
+        data_competencia: input.data_lancamento,   // NOT NULL — usa a data do lançamento
+        mes_referencia,                            // NOT NULL
+        historico:       input.historico,
+        conta_debito:    input.conta_debito,
+        conta_credito:   input.conta_credito,
+        valor:           input.valor,
+        tipo:            input.tipo ?? null,
+        status:          "lancado",
+        created_by:      user?.id ?? null,
+      });
+      if (error) throw error;
+      toast.success("Lançamento registrado");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao criar lançamento"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { criarLancamento, loading };
+}
+
 // ─── Plano de Contas ─────────────────────────────────────────────────────────
 
 export function usePlanoContas(empresaId: string) {

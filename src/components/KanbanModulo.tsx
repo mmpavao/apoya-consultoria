@@ -67,10 +67,9 @@ const fmtData = (iso?: string | null) => {
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 function TarefaCard({
-  tarefa, hoje, onClick, onMover, fases,
+  tarefa, hoje, onMover, fases,
 }: {
   tarefa: TarefaKanban; hoje: string;
-  onClick: () => void;
   onMover: (id: string, fase: string) => void;
   fases: FaseConfig[];
 }) {
@@ -79,8 +78,7 @@ function TarefaCard({
 
   return (
     <div
-      className="rounded-xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer p-3.5 space-y-2.5 group relative"
-      onClick={onClick}
+      className="rounded-xl border bg-white shadow-sm hover:shadow-md transition-all p-3.5 space-y-2.5 group relative"
     >
       {/* Linha 1: nome + prioridade */}
       <div className="flex items-start gap-2">
@@ -406,7 +404,6 @@ export function KanbanModulo({ setor, titulo, subtitulo, fases, camposForm, tipo
                         key={t.id}
                         tarefa={t}
                         hoje={hoje}
-                        onClick={() => {}}
                         onMover={moverFase}
                         fases={fases}
                       />
