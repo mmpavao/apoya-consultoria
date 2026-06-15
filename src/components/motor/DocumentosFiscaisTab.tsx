@@ -3,6 +3,7 @@
  * Motor contábil: visualiza, classifica e aciona lançamentos
  */
 import { useState, useEffect, useRef } from "react";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import {
   FileText, Upload, RefreshCw, Loader2, AlertTriangle,
   CheckCircle2, Clock, XCircle, Filter, ChevronDown,
@@ -75,8 +76,6 @@ const NATUREZA_LABEL: Record<string, string> = {
   outro:             "Outro",
 };
 
-const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
-const fmtDate = (d?: string | null) => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 
 const onlyDigits = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 

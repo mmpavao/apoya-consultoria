@@ -36,12 +36,14 @@ export function DasGerarDialog({ open, onClose, onCreated }: Props) {
 
   async function handleSave() {
     if (!form.clienteId || !form.vencimento) { toast.error("Selecione o cliente e o vencimento"); return; }
+    // tipo (DAS/DASMEI) e regime dependem do cliente — exigir resolvido p/ não gravar guia errada.
+    if (!cliente) { toast.error("Cliente não encontrado — recarregue a página e selecione novamente"); return; }
     setSaving(true);
     const { error } = await supabase.from("das_guias").insert({
       cliente_id: form.clienteId,
-      cliente_nome: cliente?.razaoSocial ?? "",
-      cnpj: cliente?.cnpj ?? "",
-      regime: cliente?.regime ?? "",
+      cliente_nome: cliente.razaoSocial,
+      cnpj: cliente.cnpj ?? "",
+      regime: cliente.regime,
       tipo,
       competencia: form.competencia,
       vencimento: form.vencimento,
@@ -50,7 +52,7 @@ export function DasGerarDialog({ open, onClose, onCreated }: Props) {
     });
     setSaving(false);
     if (error) { toast.error("Erro ao criar guia: " + error.message); return; }
-    toast.success(`Guia ${tipo} criada para ${cliente?.razaoSocial}!`);
+    toast.success(`Guia ${tipo} criada para ${cliente.razaoSocial}!`);
     window.dispatchEvent(new Event("apoya:das:changed"));
     onCreated?.();
     onClose();

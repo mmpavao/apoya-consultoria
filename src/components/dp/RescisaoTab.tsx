@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { Eye, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RescisaoDetalheDialog } from "./RescisaoDetalheDialog";
 
-const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR",{ style:"currency", currency:"BRL" });
 
 const TIPO_BADGE: Record<TipoRescisao, { label: string; cls: string }> = {
   sem_justa_causa: { label:"Sem Justa Causa",   cls:"bg-amber-100 text-amber-700" },

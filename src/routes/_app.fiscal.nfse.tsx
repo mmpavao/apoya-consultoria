@@ -3,6 +3,7 @@
  * Integrada ao Focus NF-e via /api/nfse
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Download, FileText, Loader2,
@@ -35,10 +36,6 @@ const STATUS_LABEL: Record<string, string> = {
   rascunho: "Rascunho", processando: "Processando", emitida: "Emitida", cancelada: "Cancelada", erro: "Erro",
 };
 
-const fmtBRL = (v?: number | null) =>
-  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
-const fmtDate = (d?: string | null) =>
-  d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 
 function downloadBlob(b64: string, filename: string, mime: string) {
   const binary = atob(b64);

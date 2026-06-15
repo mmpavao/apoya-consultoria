@@ -3,6 +3,7 @@
  * Tabs: Pipeline (default) | DAS | NFS-e | SERPRO | Documentos | Automações | Configurações
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
 import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
 import {
@@ -39,8 +40,6 @@ export const Route = createFileRoute("/_app/fiscal/")({
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 const MESES   = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 // ── KPI Card ──────────────────────────────────────────────────────────────
@@ -830,7 +829,6 @@ function DashboardTab() {
   const aVencer    = obrigacoes.filter(o => o.vencimento >= hoje && !["concluida","cancelada"].includes(o.status));
   const concluidas = obrigacoes.filter(o => o.status === "concluida");
 
-  const fmtDate = (d: string) => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
   const fmtTs   = (ts: string) => ts ? new Date(ts).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
   const statusColor: Record<string, string> = {

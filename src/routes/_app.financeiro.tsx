@@ -1,4 +1,5 @@
 import { useCobrancas, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/hooks/use-cobrancas";
+import { fmtBRL } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -36,7 +37,6 @@ const ST_L: Record<CobrancaStatus, string>     = { pendente:"Pendente", paga:"Pa
 const RG_C: Record<ReguaStage, BadgeColor>     = { ok:"green", lembrete:"blue", cobranca:"amber" as BadgeColor, negativacao:"orange", suspensao:"red" };
 const RG_L: Record<ReguaStage, string>         = { ok:"Em dia", lembrete:"Lembrete", cobranca:"Cobrança", negativacao:"Negativação", suspensao:"Suspensão" };
 
-const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
 function FinanceiroPage__Inner(){
   const now = new Date();

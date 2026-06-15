@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtDate } from "@/lib/format";
 import { Plus, Check, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FeriasFormDialog } from "./FeriasFormDialog";
 
-const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
 
 const BADGE: Record<StatusFerias, { label: string; cls: string }> = {
   pendente:  { label:"Pendente",  cls:"bg-gray-100 text-gray-600" },

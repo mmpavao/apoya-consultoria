@@ -3,6 +3,7 @@
  * Tabs: Pipeline | Períodos | Lançamentos | Plano de Contas | Automações | Configurações
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -40,8 +41,6 @@ export const Route = createFileRoute("/_app/contabil")({
   head: () => ({ meta: [{ title: "Contábil · APOYA Gestão" }] }),
 });
 
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
 const MESES   = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 function CKpiCard({ label, value, icon: Icon, variant = "default", loading }: {

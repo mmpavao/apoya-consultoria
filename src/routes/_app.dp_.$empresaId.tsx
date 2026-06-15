@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { useState, useMemo } from "react";
 import { ArrowLeft, Plus, Pencil, UserX, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,8 +45,6 @@ const REGIME_BADGE: Record<string, { label: string; cls: string }> = {
   "Doméstica":        { label:"Doméstica",        cls:"bg-pink-100 text-pink-700" },
 };
 
-const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
-const fmtBRL  = (v: number)  => v.toLocaleString("pt-BR",{ style:"currency", currency:"BRL" });
 const maskCpf = (cpf: string) => cpf ? "***.***.***-**" : "—";
 
 function FuncionariosTab({

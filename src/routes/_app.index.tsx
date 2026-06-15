@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { fmtBRL } from "@/lib/format";
 import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
@@ -151,12 +152,6 @@ export const Route = createFileRoute("/_app/")({
 });
 
 /* ── Helpers ──────────────────────────────────────────────── */
-const fmtBRL = (v: number) =>
-  v > 0
-    ? v >= 1_000
-      ? `R$ ${(v / 1_000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`
-      : `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`
-    : "R$ 0";
 
 const statusCfg: Record<string, string> = {
   ativo:        "bg-emerald-50 text-emerald-700",

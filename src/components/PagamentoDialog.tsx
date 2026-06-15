@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtBRL } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import { type Cobranca } from "@/hooks/use-cobrancas";
 
 interface Props { cobranca:Cobranca|null; open:boolean; onClose:()=>void; onSaved?:()=>void; }
 const FORMAS = [{value:"PIX",label:"PIX"},{value:"BOLETO",label:"Boleto"},{value:"DEBITO",label:"Débito"},{value:"DINHEIRO",label:"Dinheiro"},{value:"CARTAO",label:"Cartão"}];
-const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
 export function PagamentoDialog({cobranca,open,onClose,onSaved}:Props) {
   const [dataPagamento,setDataPagamento] = useState(new Date().toISOString().split("T")[0]);

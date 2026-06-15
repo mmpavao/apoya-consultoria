@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { fmtBRL } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { type Rescisao } from "@/hooks/use-dp";
 
-const fmtBRL = (v: number) => v.toLocaleString("pt-BR",{ style:"currency", currency:"BRL" });
 
 type Props = { open: boolean; onClose: () => void; rescisao: Rescisao; nomeFuncionario: string };
 

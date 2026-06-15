@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
@@ -37,8 +38,6 @@ export const Route = createFileRoute("/_app/dp")({
   head: () => ({ meta: [{ title: "Dep. Pessoal · APOYA Gestão" }] }),
 });
 
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (d?: string) => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 function DKpiCard({ label, value, icon: Icon, variant = "default", loading }: {

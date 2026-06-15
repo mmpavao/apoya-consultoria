@@ -5,6 +5,7 @@
  *   Aba 2 — MCP/API:  Servidor MCP APOYA + API Keys + Logs
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { fmtDate } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntegracoes, type IntegracaoTipo } from "@/hooks/use-integracoes";
 import { useUsuarios, type UsuarioRole, ROLE_LABELS } from "@/hooks/use-usuarios";
@@ -620,7 +621,6 @@ function McpSection() {
   };
 
   const visibleKeys = keys.filter(k => showRevogadas || k.is_active);
-  const fmtDate = (s: string) => new Date(s).toLocaleDateString("pt-BR");
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@
  *   Pagamentos   → histórico de pagamentos realizados
  */
 import { toast } from "sonner";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { useState, useMemo, useCallback } from "react";
 import {
   Calendar, CheckCircle2, Clock, CreditCard, DollarSign,
@@ -26,8 +27,6 @@ import type { Cliente } from "@/hooks/use-clientes";
 import type { Cobranca } from "@/hooks/use-cobrancas";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
-const fmtDate = (d?: string | null) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 
 // ── sub-tabs ───────────────────────────────────────────────────────────────
 type FinTab = "resumo" | "cobrancas" | "honorarios" | "pagamentos" | "openfinance";

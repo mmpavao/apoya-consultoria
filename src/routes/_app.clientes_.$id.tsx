@@ -3,6 +3,7 @@
  * Tabs: Visão Geral | Fiscal | Financeiro | Contato | Histórico
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { fmtBRL } from "@/lib/format";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, Building2, Calendar, CheckCircle2, Clock, DollarSign,
@@ -62,8 +63,6 @@ const REGIME_CFG: Record<string, string> = {
   Doméstica:        "bg-teal-50 text-teal-700 border-teal-200",
 };
 
-const fmtBRL = (v?: number | null) =>
-  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 
 function Avatar({ nome, regime }: { nome: string; regime: string }) {
   const initials = nome.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();

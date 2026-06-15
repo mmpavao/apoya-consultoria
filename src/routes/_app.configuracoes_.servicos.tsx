@@ -3,6 +3,7 @@
  * Rota: /configuracoes/servicos
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { fmtBRL } from "@/lib/format";
 import { useState } from "react";
 import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Package,
@@ -24,7 +25,6 @@ export const Route = createFileRoute("/_app/configuracoes_/servicos")({
   head: () => ({ meta: [{ title: "Catálogo de Serviços · APOYA Gestão" }] }),
 });
 
-const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const CAT_LABEL: Record<string, string> = {
   mensal: "Mensal", avulso: "Avulso", anual: "Anual", eventual: "Eventual",

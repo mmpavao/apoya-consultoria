@@ -41,13 +41,15 @@ export function NfseFormDialog({ open, onClose, onCreated }: Props) {
 
   async function handleSave() {
     if (!form.clienteId || !form.valorServico) { toast.error("Preencha cliente e valor"); return; }
+    // Não fabricar dados: o cliente precisa estar resolvido (regime/CNPJ reais).
+    if (!cliente) { toast.error("Cliente não encontrado — recarregue a página e selecione novamente"); return; }
     setSaving(true);
     const hoje = new Date().toISOString().split("T")[0];
     const { error } = await supabase.from("nfse_notas").insert({
       cliente_id: form.clienteId,
-      cliente_nome: cliente?.razaoSocial ?? "",
-      cnpj: cliente?.cnpj ?? "",
-      cnpj_tomador: form.tomadorCnpj || (cliente?.cnpj ?? ""),
+      cliente_nome: cliente.razaoSocial,
+      cnpj: cliente.cnpj ?? "",
+      cnpj_tomador: form.tomadorCnpj || (cliente.cnpj ?? ""),
       competencia: form.competencia,
       valor_servico: valor,
       valor_cbs: tribCbs,
@@ -60,10 +62,10 @@ export function NfseFormDialog({ open, onClose, onCreated }: Props) {
       status: "rascunho",
       tomador_razao: form.tomadorRazao || null,
       tomador_cnpj: form.tomadorCnpj || null,
-      tomador: form.tomadorRazao || (cliente?.razaoSocial ?? ""),
+      tomador: form.tomadorRazao || cliente.razaoSocial,
       descricao_servico: form.descricaoServico,
       emissao: hoje,
-      regime: cliente?.regime ?? "Simples Nacional",
+      regime: cliente.regime,   // regime REAL do cliente, sem fallback fabricado
       serie: form.serie,
     });
     setSaving(false);

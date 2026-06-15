@@ -1,4 +1,5 @@
 import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -27,8 +28,6 @@ const S_LABEL: Partial<Record<DasStatus, string>> = {
   pendente:"Pendente", gerada:"Gerada", paga:"Paga", erro:"Erro",
 };
 
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const fmtDate = (d: string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
 function DasPage() {
   const now = new Date();

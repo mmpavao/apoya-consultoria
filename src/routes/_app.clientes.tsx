@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { fmtBRL } from "@/lib/format";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle, Ban, CheckCircle2, Clock,
@@ -35,7 +36,6 @@ const S_I: Record<Status, React.ElementType> = {
   ativo:CheckCircle2, inadimplente:AlertTriangle, suspenso:Ban, inativo:Clock, em_analise:Clock,
 };
 
-const fmtBRL = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
 /** Mini-badges de prontidão contábil exibidos nos cards da listagem */
 function ProntidaoMini({ c }: { c: Cliente }) {

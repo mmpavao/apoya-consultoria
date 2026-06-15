@@ -1,4 +1,5 @@
 import { useObrigacoes, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/hooks/use-obrigacoes";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -32,8 +33,6 @@ const TIPO_BADGE: Record<string, BadgeColor> = {
   DIRBI:"amber" as BadgeColor, DEFIS:"blue", NFSe:"green", "FGTS Digital":"indigo", eSocial:"violet",
 };
 
-const fmtBRL  = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const fmtDate = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
 function ObrigacoesPage(){
   const now = new Date();

@@ -3,6 +3,7 @@
  * Pode ser usado inline em /obrigacoes ou como aba em /fiscal.
  */
 import { useObrigacoes, calcularMulta, type Obrigacao, type ObrigacaoStatus } from "@/hooks/use-obrigacoes";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Calendar, CheckCircle2, Clock, Loader2,
@@ -30,8 +31,6 @@ const TIPO_BADGE: Record<string, BadgeColor> = {
   DIRBI:"amber" as BadgeColor, DEFIS:"blue", NFSe:"green", "FGTS Digital":"indigo", eSocial:"violet",
 };
 
-const fmtBRL  = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const fmtDate = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
 
 export function ObrigacoesContent(){
   const now = new Date();

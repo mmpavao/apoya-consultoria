@@ -3,6 +3,7 @@
  * Mostra: status, valores apurados, checklist de fechamento, ações
  */
 import { useState, useEffect } from "react";
+import { fmtBRL } from "@/lib/format";
 import {
   Calculator, CheckCircle2, Circle, ChevronDown, ChevronUp,
   Loader2, AlertTriangle, FileText, Send, Lock
@@ -43,8 +44,6 @@ const CHECKLIST_LABELS: Record<string, string> = {
   balancete_ok:         "Balancete gerado e equilibrado",
 };
 
-const fmtBRL = (v?: number | null) =>
-  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtPct = (v?: number | null) =>
   v != null ? (v * 100).toFixed(2) + "%" : "—";
 

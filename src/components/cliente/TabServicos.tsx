@@ -2,6 +2,7 @@
  * TabServicos — Serviços contratados + pagamentos do cliente
  */
 import { useState } from "react";
+import { fmtBRL } from "@/lib/format";
 import {
   Plus, Package, CreditCard, Clock, CheckCircle2, AlertTriangle,
   Ban, ChevronDown, ChevronUp, Receipt, Loader2,
@@ -14,8 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Separator } from "@/components/ui/separator";
 import { useClienteServicos, useServicoCatalogo, type ClienteServico, type ServicoPagamento } from "@/hooks/use-servicos";
 
-const fmtBRL = (v?: number | null) =>
-  v != null ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d?: string) =>
   d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 

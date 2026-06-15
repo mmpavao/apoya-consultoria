@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtBRL } from "@/lib/format";
 import { Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const fmtBRL = (v: number) => v.toLocaleString("pt-BR",{ style:"currency", currency:"BRL" });
 
 function competenciasRecentes(): string[] {
   const list: string[] = [];

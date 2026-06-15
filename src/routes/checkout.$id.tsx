@@ -4,6 +4,7 @@
  * Exibe: PIX (QR + copia-e-cola) + Boleto + Cartão (Asaas embed)
  */
 import { createFileRoute, useParams } from "@tanstack/react-router";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Copy, CheckCircle2, FileText, CreditCard, QrCode, Loader2, AlertCircle, Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -27,8 +28,6 @@ interface CheckoutData {
   linkPagamento?: string;
 }
 
-const fmtBRL  = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
 function StatusBadge({ status }: { status: string }) {
   const c = status === "paga" ? "bg-green-100 text-green-700 border-green-200"

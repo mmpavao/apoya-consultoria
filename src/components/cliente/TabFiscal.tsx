@@ -11,6 +11,7 @@
  * Filosofia: dados fixos já preenchidos, JSON nunca exposto ao usuário.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fmtBRL, fmtDate } from "@/lib/format";
 import {
   AlertTriangle, Calendar, CheckCircle2, ChevronDown, ChevronRight,
   Clock, Download, FileCode2, FileText, Hash, Info, Loader2,
@@ -35,8 +36,6 @@ import { SerproClientePanel } from "@/components/serpro/SerproClientePanel";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const fmtBRL  = (v?: number | null) => v != null ? v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
-const fmtDate = (d?: string | null) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
 
 function downloadBlob(b64: string, filename: string, mime: string) {
   const binary = atob(b64);
