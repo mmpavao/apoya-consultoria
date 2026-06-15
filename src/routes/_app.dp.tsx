@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { KanbanModulo } from "@/components/KanbanModulo";
@@ -513,6 +514,7 @@ function DpPageInner() {
   const { roles } = useAuth();
   const { funcionarios: todos, loading: funcLoading } = useFuncionarios();
   const { ferias } = useFerias();
+  const agenteAtiv = useAgenteAtividade("dp");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -557,7 +559,11 @@ function DpPageInner() {
               { label: "eSocial Pendentes",     value: ESOCIAL_EVENTOS.filter(e => e.status === "pendente").length, icon: CheckCircle2, variant: "warning" },
             ]}
             kpisLoading={funcLoading}
-            agente={{ nome: "Agente RH/DP", edge_fn: "agente-rh" }}
+            agente={agenteAtiv.status}
+            onRunAgente={agenteAtiv.executar}
+            agenteRunning={agenteAtiv.running}
+            logs={agenteAtiv.logs}
+            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Nova Folha", icon: FileText, onClick: () => {}, variant: "outline" },
               { label: "Registrar Férias", icon: Calendar, onClick: () => {}, variant: "outline" },

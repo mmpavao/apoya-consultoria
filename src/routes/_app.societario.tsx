@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { FileText, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/PagePlaceholder";
@@ -35,6 +36,7 @@ const fmtData = (iso?:string|null) => {
 
 function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
+  const agenteAtiv = useAgenteAtividade("societario");
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
   const [filtroTipo,setFiltroTipo] = useState<"todos"|TipoProcesso>("todos");
@@ -95,6 +97,11 @@ function SocietarioPage__Inner() {
               { label: "Concluídos",        value: processos.filter(p => p.fase === "concluido").length,                       icon: CheckCircle2,  variant: "success" },
               { label: "Atrasados",         value: processos.filter(p => p.prazo && p.prazo < hoje && p.fase !== "concluido").length, icon: AlertTriangle, variant: "danger" },
             ]}
+            agente={agenteAtiv.status}
+            onRunAgente={agenteAtiv.executar}
+            agenteRunning={agenteAtiv.running}
+            logs={agenteAtiv.logs}
+            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Novo Processo", icon: FileText, onClick: () => setShowNovo(true), variant: "outline" },
             ]}

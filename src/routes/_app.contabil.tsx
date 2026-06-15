@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { PipelineKanban } from "@/components/PipelineKanban";
 import { KanbanModulo } from "@/components/KanbanModulo";
@@ -468,6 +469,7 @@ function ConfigContabil() {
 function ContabilPageInner() {
   const { roles }                   = useAuth();
   const { periodos, loading: pLoad } = usePeriodosContabeis();
+  const agenteAtiv = useAgenteAtividade("contabil");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -507,7 +509,11 @@ function ContabilPageInner() {
               { label: "Com Divergência",   value: 0,          icon: AlertTriangle, variant: "default" },
             ]}
             kpisLoading={pLoad}
-            agente={{ nome: "Agente Financeiro", edge_fn: "agente-financeiro" }}
+            agente={agenteAtiv.status}
+            onRunAgente={agenteAtiv.executar}
+            agenteRunning={agenteAtiv.running}
+            logs={agenteAtiv.logs}
+            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Novo Lançamento", icon: BookOpen,      onClick: () => {}, variant: "outline" },
               { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => {}, variant: "outline" },

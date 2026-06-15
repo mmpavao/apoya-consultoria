@@ -803,13 +803,23 @@ function DashboardTab() {
       .limit(8)
       .then(({ data }: any) => { setObrigacoes(data ?? []); setLoadingOb(false); });
 
-    // Carregar logs dos agentes
-    (supabase as any)
-      .from("agente_logs")
-      .select("id,agente,acao,resultado,erro_mensagem,executado_em")
-      .order("executado_em", { ascending: false })
-      .limit(6)
-      .then(({ data }: any) => { setAgenteLog(data ?? []); setLoadingLog(false); });
+    // Carregar logs dos agentes via API server-side (a RLS bloqueia leitura
+    // direta de agente_logs pelo usuário).
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch("/api/agentes/atividade?setor=fiscal", {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        setAgenteLog((data?.logs ?? []).map((l: any) => ({
+          id: l.id, acao: l.label, agente: "Agente Fiscal",
+          resultado: l.status === "ok" ? "ok" : l.status === "erro" ? "erro" : "aviso",
+          erro_mensagem: "", executado_em: l.ts,
+        })));
+      } catch { /* mantém vazio */ }
+      finally { setLoadingLog(false); }
+    })();
   }, []);
 
   const hoje = new Date().toISOString().split("T")[0];

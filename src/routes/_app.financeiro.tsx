@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
+import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
@@ -143,6 +144,7 @@ function FinanceiroPage__Inner(){
   };
 
   const { roles } = useAuth();
+  const agenteAtiv = useAgenteAtividade("financeiro");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
@@ -488,7 +490,11 @@ function FinanceiroPage__Inner(){
               { label: "Em atraso",      value: fmtBRL(kpi.vencido), icon: AlertTriangle, variant: "danger",  hint: `${items.filter(c=>c.status==="vencida").length} cobranças` },
               { label: "Risco alto",     value: kpi.inad,             icon: ShieldAlert,   variant: "warning", hint: "negativação/suspensão" },
             ]}
-            agente={{ nome: "Agente Financeiro", edge_fn: "agente-financeiro" }}
+            agente={agenteAtiv.status}
+            onRunAgente={agenteAtiv.executar}
+            agenteRunning={agenteAtiv.running}
+            logs={agenteAtiv.logs}
+            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Nova Cobrança", icon: Plus,       onClick: () => setDialogCob(true), variant: "outline" },
             ]}

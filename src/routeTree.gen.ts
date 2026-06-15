@@ -47,6 +47,7 @@ import { Route as ApiCobrancaEmitirRouteImport } from './routes/api/cobranca/emi
 import { Route as ApiCobrancaCriarRouteImport } from './routes/api/cobranca/criar'
 import { Route as ApiCobrancaContratarServicoRouteImport } from './routes/api/cobranca/contratar-servico'
 import { Route as ApiCheckoutIdRouteImport } from './routes/api/checkout/$id'
+import { Route as ApiAgentesAtividadeRouteImport } from './routes/api/agentes/atividade'
 import { Route as ApiAdminReguaConfigRouteImport } from './routes/api/admin/regua-config'
 import { Route as ApiAdminBloquearClienteRouteImport } from './routes/api/admin/bloquear-cliente'
 import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
@@ -248,6 +249,11 @@ const ApiCheckoutIdRoute = ApiCheckoutIdRouteImport.update({
   path: '/api/checkout/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAgentesAtividadeRoute = ApiAgentesAtividadeRouteImport.update({
+  id: '/api/agentes/atividade',
+  path: '/api/agentes/atividade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminReguaConfigRoute = ApiAdminReguaConfigRouteImport.update({
   id: '/api/admin/regua-config',
   path: '/api/admin/regua-config',
@@ -328,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
+  '/api/agentes/atividade': typeof ApiAgentesAtividadeRoute
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
@@ -377,6 +384,7 @@ export interface FileRoutesByTo {
   '/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
+  '/api/agentes/atividade': typeof ApiAgentesAtividadeRoute
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
@@ -428,6 +436,7 @@ export interface FileRoutesById {
   '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
+  '/api/agentes/atividade': typeof ApiAgentesAtividadeRoute
   '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
@@ -479,6 +488,7 @@ export interface FileRouteTypes {
     | '/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
+    | '/api/agentes/atividade'
     | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
@@ -528,6 +538,7 @@ export interface FileRouteTypes {
     | '/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
+    | '/api/agentes/atividade'
     | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
@@ -578,6 +589,7 @@ export interface FileRouteTypes {
     | '/_app/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
+    | '/api/agentes/atividade'
     | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
@@ -609,6 +621,7 @@ export interface RootRouteChildren {
   CheckoutIdRoute: typeof CheckoutIdRoute
   ApiAdminBloquearClienteRoute: typeof ApiAdminBloquearClienteRoute
   ApiAdminReguaConfigRoute: typeof ApiAdminReguaConfigRoute
+  ApiAgentesAtividadeRoute: typeof ApiAgentesAtividadeRoute
   ApiCheckoutIdRoute: typeof ApiCheckoutIdRoute
   ApiCobrancaContratarServicoRoute: typeof ApiCobrancaContratarServicoRoute
   ApiCobrancaCriarRoute: typeof ApiCobrancaCriarRoute
@@ -899,6 +912,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCheckoutIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/agentes/atividade': {
+      id: '/api/agentes/atividade'
+      path: '/api/agentes/atividade'
+      fullPath: '/api/agentes/atividade'
+      preLoaderRoute: typeof ApiAgentesAtividadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/regua-config': {
       id: '/api/admin/regua-config'
       path: '/api/admin/regua-config'
@@ -1030,6 +1050,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIdRoute: CheckoutIdRoute,
   ApiAdminBloquearClienteRoute: ApiAdminBloquearClienteRoute,
   ApiAdminReguaConfigRoute: ApiAdminReguaConfigRoute,
+  ApiAgentesAtividadeRoute: ApiAgentesAtividadeRoute,
   ApiCheckoutIdRoute: ApiCheckoutIdRoute,
   ApiCobrancaContratarServicoRoute: ApiCobrancaContratarServicoRoute,
   ApiCobrancaCriarRoute: ApiCobrancaCriarRoute,
