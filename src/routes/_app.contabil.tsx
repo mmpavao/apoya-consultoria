@@ -470,6 +470,7 @@ function ContabilPageInner() {
   const { roles }                   = useAuth();
   const { periodos, loading: pLoad } = usePeriodosContabeis();
   const agenteAtiv = useAgenteAtividade("contabil");
+  const [tab, setTab] = useState("dashboard");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -489,7 +490,7 @@ function ContabilPageInner() {
       </div>
 
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
@@ -515,8 +516,8 @@ function ContabilPageInner() {
             logs={agenteAtiv.logs}
             logsLoading={agenteAtiv.loading}
             quickActions={[
-              { label: "Novo Lançamento", icon: BookOpen,      onClick: () => {}, variant: "outline" },
-              { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => {}, variant: "outline" },
+              { label: "Novo Lançamento", icon: BookOpen,      onClick: () => setTab("lancamentos"), variant: "outline" },
+              { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => setTab("periodos"),    variant: "outline" },
             ]}
           />
         </TabsContent>

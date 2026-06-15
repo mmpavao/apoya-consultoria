@@ -86,14 +86,12 @@ export function useSyncAllClientes() {
           if (regimeDepois && regimeDepois !== c.regime) {
             patch.regime = regimeDepois === "Simples" ? "Simples Nacional" : regimeDepois;
           }
-          if (r.cnaePrincipal)              patch.cnae                = r.cnaePrincipal;
+          // Só persiste colunas que EXISTEM em clientes. As do enriquecimento
+          // cnae / divida_ativa / dte_ativo / situacao_cadastral NÃO existem na
+          // tabela — gravá-las fazia o UPDATE inteiro falhar (sync quebrada).
+          // Persistir esses campos = follow-up (migration p/ criar as colunas).
           if (r.codigoServicoNfse)          patch.codigo_servico_nfse = r.codigoServicoNfse;
           if (r.aliquotaIss !== undefined)   patch.aliquota_iss        = Number(r.aliquotaIss);
-          if (r.dividaAtivaRfb !== undefined || r.dividaAtivaPgfn !== undefined) {
-            patch.divida_ativa = !!(r.dividaAtivaRfb || r.dividaAtivaPgfn);
-          }
-          if (r.dteAtivo !== undefined)      patch.dte_ativo           = r.dteAtivo;
-          if (r.situacaoCadastral)           patch.situacao_cadastral  = r.situacaoCadastral;
 
           if (Object.keys(patch).length > 0) {
             const { error: upErr } = await (supabase as any).from("clientes").update(patch).eq("id", c.id);

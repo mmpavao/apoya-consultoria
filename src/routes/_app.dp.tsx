@@ -515,6 +515,7 @@ function DpPageInner() {
   const { funcionarios: todos, loading: funcLoading } = useFuncionarios();
   const { ferias } = useFerias();
   const agenteAtiv = useAgenteAtividade("dp");
+  const [tab, setTab] = useState("dashboard");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const now = new Date();
@@ -538,7 +539,7 @@ function DpPageInner() {
       </div>
 
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
@@ -565,8 +566,8 @@ function DpPageInner() {
             logs={agenteAtiv.logs}
             logsLoading={agenteAtiv.loading}
             quickActions={[
-              { label: "Nova Folha", icon: FileText, onClick: () => {}, variant: "outline" },
-              { label: "Registrar Férias", icon: Calendar, onClick: () => {}, variant: "outline" },
+              { label: "Nova Folha", icon: FileText, onClick: () => setTab("folha"), variant: "outline" },
+              { label: "Registrar Férias", icon: Calendar, onClick: () => setTab("ferias"), variant: "outline" },
             ]}
           />
         </TabsContent>
