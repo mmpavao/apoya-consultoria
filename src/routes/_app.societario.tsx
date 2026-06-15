@@ -9,9 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { FileText, Users, CheckCircle2, AlertTriangle } from "lucide-react";
-import { PipelineKanban } from "@/components/PipelineKanban";
 import { PageHeader } from "@/components/PagePlaceholder";
-import { useAuth } from "@/hooks/use-auth";
 import {
   useSocietario, ProcessoSocietario, FaseProcesso, TipoProcesso,
   FASE_LABEL, FASE_COR, TIPO_LABEL, PRIORIDADE_COR, PRIORIDADE_LABEL, STATUS_LABEL,
@@ -37,10 +35,8 @@ const fmtData = (iso?:string|null) => {
 
 function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
-  const { roles } = useAuth();
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
-  const podeAprovar = roles.includes("admin") || roles.includes("contador");
   const [filtroTipo,setFiltroTipo] = useState<"todos"|TipoProcesso>("todos");
   const [filtroResp,setFiltroResp] = useState("todos");
   const [modalProcesso,setModalProcesso] = useState<ProcessoSocietario|null>(null);
@@ -85,8 +81,7 @@ function SocietarioPage__Inner() {
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-          <TabsTrigger value="processos">Processos</TabsTrigger>
+          <TabsTrigger value="processos">Pipeline</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
@@ -106,10 +101,9 @@ function SocietarioPage__Inner() {
           />
         </TabsContent>
 
-        <TabsContent value="pipeline" className="mt-0">
-          <PipelineKanban setor="societario" podeAprovar={podeAprovar} />
-        </TabsContent>
-
+        {/* Pipeline = kanban de processos societários (domínio real do setor).
+            O pipeline genérico (tarefas) foi removido — era duplicado; a
+            captação de clientes vive no módulo CRM. */}
         <TabsContent value="processos" className="mt-0 space-y-4">
           {/* Filtros + toggle vista */}
           <div className="flex flex-wrap items-center gap-3">
