@@ -86,10 +86,12 @@ export function useDashboard() {
       const amanha = new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10);
 
       /* ── 1. Clientes ───────────────────────────────────── */
-      const { data: clientes } = await supabase
+      const { data: clientes, error: cliErr } = await supabase
         .from("clientes")
         .select("id, razao_social, regime, status, valor_honorario, created_at")
         .order("created_at", { ascending: false });
+      // Falha aqui NÃO pode virar "0 clientes" silencioso → vira erro de verdade
+      if (cliErr) throw cliErr;
 
       const clientesArr  = clientes ?? [];
       const ativos       = clientesArr.filter(c => c.status === "ativo").length;
@@ -118,9 +120,10 @@ export function useDashboard() {
       const dasVencHoje  = dasArr.filter(d => d.vencimento === hoje || d.vencimento === amanha).length;
 
       /* ── 3. Cobranças ────────────────────────────────────── */
-      const { data: cobrancas } = await supabase
+      const { data: cobrancas, error: cobErr } = await supabase
         .from("cobrancas")
         .select("status, valor, competencia, vencimento");
+      if (cobErr) throw cobErr;
 
       const cobArr = cobrancas ?? [];
       const honorariosMes = cobArr
@@ -131,9 +134,10 @@ export function useDashboard() {
         .reduce((s, c) => s + Number(c.valor ?? 0), 0);
 
       /* ── 4. Obrigações ───────────────────────────────────── */
-      const { data: obrigacoes } = await supabase
+      const { data: obrigacoes, error: obErr } = await supabase
         .from("obrigacoes")
         .select("status, competencia, vencimento");
+      if (obErr) throw obErr;
 
       const obArr = obrigacoes ?? [];
       const obPendentes = obArr.filter(o => o.status === "pendente").length;

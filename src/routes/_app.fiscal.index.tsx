@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { PipelineKanban } from "@/components/PipelineKanban";
 import { KanbanModulo } from "@/components/KanbanModulo";
 import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
 import { useAuth } from "@/hooks/use-auth";

@@ -3,7 +3,6 @@ import { fmtBRL } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { PipelineKanban } from "@/components/PipelineKanban";
 import { KanbanModulo } from "@/components/KanbanModulo";
 import { useAuth } from "@/hooks/use-auth";
 import {
