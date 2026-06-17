@@ -8,6 +8,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const AGENTS_GATE_SECRET = Deno.env.get("AGENTS_GATE_SECRET");
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,7 @@ async function chamarAgente(slug: string): Promise<{ agente: string; success: bo
     // Chamada interna autenticada com service-role (defesa em profundidade).
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${AGENTS_GATE_SECRET ?? SUPABASE_SERVICE_ROLE_KEY}` },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -80,6 +81,15 @@ Deno.serve(async (req: Request) => {
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) as any;
+
+  // Auth via secret dedicado (fail-open enquanto o secret não estiver setado).
+  if (AGENTS_GATE_SECRET) {
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let ok = !!token && token === AGENTS_GATE_SECRET;
+    if (!ok && token) { try { const { data } = await supabase.auth.getUser(token); ok = !!data?.user; } catch (_) { /* 401 */ } }
+    if (!ok) return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
+  }
+
   const inicio = Date.now();
 
   // 1. DELEGAÇÃO — fan-out aos experts, respeitando o orçamento global de steps.

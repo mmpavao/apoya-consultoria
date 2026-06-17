@@ -4,15 +4,17 @@
 // (gate humano: etapa revisao requer aprovação). Resumo lido pelo orquestrador.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { logAgentRun, upsertPipelineTask, json } from "../_shared/agent.ts";
+import { logAgentRun, upsertPipelineTask, json, requireAuth } from "../_shared/agent.ts";
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return json({ success: false, error: "Missing Supabase configuration" }, 500);
   }
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const denied = await requireAuth(req, sb, Deno.env.get("AGENTS_GATE_SECRET"));
+  if (denied) return denied;
 
   try {
     // Períodos em aberto (status 'aberto' — valor real do schema)

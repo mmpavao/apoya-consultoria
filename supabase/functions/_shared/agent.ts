@@ -85,3 +85,18 @@ export function json(body: unknown, status = 200): Response {
     status, headers: { "Content-Type": "application/json" },
   });
 }
+
+// Auth dos agentes via SECRET DEDICADO (AGENTS_GATE_SECRET) — verificável de
+// ponta a ponta (diferente da service-role-key, que o runtime divergia).
+// Aceita: (a) token == gateSecret (orquestrador→experts e cron) OU (b) JWT de
+// usuário válido (UI). FAIL-OPEN só se o secret NÃO estiver configurado
+// (rollout seguro: se ninguém setou, nada quebra; quando setar, vira fail-closed).
+export async function requireAuth(req: Request, sb: SB, gateSecret?: string | null): Promise<Response | null> {
+  if (!gateSecret) return null; // gate desligado até o secret existir (rollout safe)
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (token && token === gateSecret) return null;        // interno (orquestrador/cron)
+  if (token) {
+    try { const { data, error } = await sb.auth.getUser(token); if (!error && data?.user) return null; } catch (_) { /* 401 */ }
+  }
+  return json({ error: "Unauthorized" }, 401);
+}
