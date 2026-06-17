@@ -1,23 +1,26 @@
 /**
  * folha-calc — cálculo de folha de pagamento (CLT).
  *
- * ⚠️ AS ALÍQUOTAS/FAIXAS MUDAM TODO ANO. As tabelas abaixo são 2024/2025 e
- * DEVEM ser confirmadas com o Marcio para a vigência atual. O motor (lógica
- * progressiva) é coberto por testes; as CONSTANTES é que precisam de validação.
+ * TABELAS: VIGÊNCIA 2026 (verificadas em jun/2026). As alíquotas/faixas mudam
+ * por ato do governo ~1×/ano — quando mudar, é trocar os números aqui (o agente
+ * agente-tabelas-tributarias monitora e propõe a atualização com gate humano).
+ * O motor (lógica progressiva + redutor) é coberto por testes.
+ * Fontes: salário mínimo 2026 R$ 1.621; teto INSS R$ 8.475,55; IRRF Lei 15.270/2025.
  *
- * Escopo v1: salário base + INSS (empregado) + IRRF + FGTS + INSS patronal.
- * Ainda NÃO trata: horas extras, adicionais (insalubridade/periculosidade),
- * vale-transporte/refeição, faltas, 13º. (próximas iterações)
+ * Escopo: salário base + INSS (empregado) + IRRF + FGTS + INSS patronal.
+ * NÃO trata: horas extras, adicionais, VT/VR, faltas, 13º mensal.
  */
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// INSS empregado — faixas progressivas (teto contribuição ≈ R$ 951,63)
+export const TABELA_COMPETENCIA = "2026";
+
+// INSS empregado 2026 — faixas progressivas (teto contribuição R$ 988,09)
 export const INSS_FAIXAS = [
-  { ate: 1518.00, aliq: 0.075 },
-  { ate: 2793.88, aliq: 0.09 },
-  { ate: 4190.83, aliq: 0.12 },
-  { ate: 8157.41, aliq: 0.14 },
+  { ate: 1621.00, aliq: 0.075 },
+  { ate: 2902.84, aliq: 0.09 },
+  { ate: 4354.27, aliq: 0.12 },
+  { ate: 8475.55, aliq: 0.14 },
 ];
 
 export function calcINSS(bruto: number): number {
@@ -29,20 +32,31 @@ export function calcINSS(bruto: number): number {
   return round2(inss); // acima do teto → contribuição máxima
 }
 
-// IRRF — base = bruto − INSS − (dependentes × dedução)
+// IRRF 2026 — tabela base (mensal) + dedução por dependente
 export const IRRF_DEDUCAO_DEPENDENTE = 189.59;
 export const IRRF_FAIXAS = [
-  { ate: 2259.20,   aliq: 0,     ded: 0 },
-  { ate: 2826.65,   aliq: 0.075, ded: 169.44 },
-  { ate: 3751.05,   aliq: 0.15,  ded: 381.44 },
-  { ate: 4664.68,   aliq: 0.225, ded: 662.77 },
-  { ate: Infinity,  aliq: 0.275, ded: 896.00 },
+  { ate: 2428.80,   aliq: 0,     ded: 0 },
+  { ate: 2826.65,   aliq: 0.075, ded: 182.16 },
+  { ate: 3751.05,   aliq: 0.15,  ded: 394.16 },
+  { ate: 4664.68,   aliq: 0.225, ded: 675.49 },
+  { ate: Infinity,  aliq: 0.275, ded: 908.73 },
 ];
+
+// Reforma 2026 (Lei 15.270/2025): isenção total até R$ 5.000; redução parcial
+// decrescente de R$ 5.000,01 a R$ 7.350 (redutor = 978,62 − 0,133145 × bruto).
+export const IRRF_ISENCAO_ATE = 5000;
+export const IRRF_REDUTOR_TETO = 7350;
 
 export function calcIRRF(bruto: number, inss: number, dependentes = 0): number {
   const base = bruto - inss - dependentes * IRRF_DEDUCAO_DEPENDENTE;
   const faixa = IRRF_FAIXAS.find(f => base <= f.ate) ?? IRRF_FAIXAS[IRRF_FAIXAS.length - 1];
-  return round2(Math.max(0, base * faixa.aliq - faixa.ded));
+  let imposto = Math.max(0, base * faixa.aliq - faixa.ded);
+  if (bruto <= IRRF_ISENCAO_ATE) {
+    imposto = 0;                                              // isento até 5.000
+  } else if (bruto <= IRRF_REDUTOR_TETO) {
+    imposto = Math.max(0, imposto - (978.62 - 0.133145 * bruto)); // redução parcial
+  }
+  return round2(imposto);
 }
 
 export const FGTS_ALIQUOTA = 0.08;
