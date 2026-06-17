@@ -12,6 +12,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUser } from "../_shared/agent.ts";
 
 const CLICKSIGN_BASE = "https://app.clicksign.com/api/v3";
 const CLICKSIGN_TOKEN = Deno.env.get("CLICKSIGN_API_TOKEN")!;
@@ -163,6 +164,10 @@ Deno.serve(async (req) => {
       },
     });
   }
+
+  // FAIL-CLOSED: exige usuário logado (antes era pública → alcançava Clicksign com a chave da empresa).
+  const denied = await requireUser(req, { "Access-Control-Allow-Origin": "*" });
+  if (denied) return denied;
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

@@ -26,9 +26,11 @@ async function computeHmac(secret: string, message: string): Promise<string> {
 }
 
 async function validateHmac(body: string, header: string | null): Promise<boolean> {
+  // FAIL-CLOSED: sem assinatura ou sem secret configurado → REJEITA.
+  // (antes retornava true "em dev" → permitia forjar evento de assinatura.)
   if (!header || !HMAC_SECRET) {
-    console.warn("HMAC header ausente ou secret não configurado — aceitando em modo dev");
-    return true; // em desenvolvimento aceitar sem HMAC
+    console.error("HMAC header ausente ou secret não configurado — REJEITANDO");
+    return false;
   }
   const expected = header.replace("sha256=", "");
   const computed = await computeHmac(HMAC_SECRET, body);

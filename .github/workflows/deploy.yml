@@ -203,6 +203,10 @@ jobs:
         run: |
           supabase functions deploy nfse-pos-pagamento  --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy sync-nfse-nfeio      --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy cnpj-enrich          --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy clicksign-envelope   --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy clicksign-webhook    --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy upload-certificate-nfeio --project-ref ajaqbdsalxfgrwpjbtbn
           # Time de agentes (reconciliado no repo — fonte de verdade)
           supabase functions deploy agente-fiscal        --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy agente-rh            --project-ref ajaqbdsalxfgrwpjbtbn

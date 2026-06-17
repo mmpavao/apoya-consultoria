@@ -7,6 +7,7 @@
  * O emitente_id é resolvido pelo CNPJ consultando GET /v1/companies
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { requireUser } from "../_shared/agent.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,9 @@ const CORS = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  // FAIL-CLOSED: exige usuário logado (antes pública → sobrescrever certificado A1 via NFE.io).
+  const denied = await requireUser(req, CORS);
+  if (denied) return denied;
 
   try {
     const { pfxBase64, password, cnpj } = await req.json();

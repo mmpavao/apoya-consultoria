@@ -1,8 +1,28 @@
 // Contrato compartilhado dos agentes APOYA (edge functions / Deno).
 // Padroniza: log de execução, criação idempotente de tarefa no pipeline e o
 // shape de resposta. Todos os experts usam estes helpers → consistência.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = any;
+
+// Exige um JWT de USUÁRIO válido (para edge functions chamadas pelo app).
+// Cria o próprio client (anon) e valida via getUser. Retorna null se ok, ou a
+// Response 401 (com CORS) para o handler devolver. A anon key NÃO passa (não é usuário).
+export async function requireUser(req: Request, cors: Record<string, string> = {}): Promise<Response | null> {
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const env = (globalThis as any).Deno?.env;
+  const url = env?.get("SUPABASE_URL");
+  const anon = env?.get("SUPABASE_ANON_KEY");
+  const unauthorized = () => new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+  if (!token || !url || !anon) return unauthorized();
+  try {
+    const sb = createClient(url, anon);
+    const { data, error } = await sb.auth.getUser(token);
+    if (!error && data?.user) return null;
+  } catch (_) { /* 401 */ }
+  return unauthorized();
+}
 
 export interface AgentResult {
   success: boolean;

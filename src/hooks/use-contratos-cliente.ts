@@ -85,6 +85,12 @@ export interface NovoContratoPayload {
 
 const SUPABASE_EF_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 const SUPABASE_ANON   = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// token do usuário logado p/ a edge function clicksign-envelope (que agora exige
+// JWT de usuário — antes mandávamos a anon key, que é pública)
+async function efToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? SUPABASE_ANON;
+}
 
 // ── Helpers de data ────────────────────────────────────────────
 /**
@@ -341,7 +347,7 @@ export function useContratosCliente(clienteId: string) {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Authorization": `Bearer ${await efToken()}`,
         },
         body: JSON.stringify({ contrato_id: contratoId }),
       });
@@ -367,7 +373,7 @@ export function useContratosCliente(clienteId: string) {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Authorization": `Bearer ${await efToken()}`,
         },
         body: JSON.stringify({ contrato_id: contratoId, action: "resend" }),
       });
@@ -392,7 +398,7 @@ export function useContratosCliente(clienteId: string) {
         method: "POST",
         headers: {
           "Content-Type":  "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Authorization": `Bearer ${await efToken()}`,
         },
         body: JSON.stringify({ contrato_id: contratoId, action: "cancel" }),
       });
