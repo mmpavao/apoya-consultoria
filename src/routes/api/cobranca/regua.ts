@@ -72,10 +72,13 @@ export const Route = createFileRoute("/api/cobranca/regua")({
         const auth  = request.headers.get("Authorization") ?? "";
         const token = auth.replace("Bearer ", "").trim();
 
-        // Para modo CRON (chamado pelo ARQUITETO), aceita token de service role
-        // Para modo manual, valida user normal
+        // Modo manual: valida user normal (sessão).
+        // Modo CRON: deve provar identidade com a SERVICE ROLE KEY real —
+        // NÃO basta um Bearer qualquer (antes `!!token` deixava qualquer token
+        // lixo rodar a régua: suspendia cliente e disparava WhatsApp). Fail-closed.
         const user = await getUserFromReq(request);
-        const isCron = !user && !!token; // CRON passa token direto
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const isCron = !user && !!token && !!serviceKey && token === serviceKey;
 
         if (!user && !isCron) return json({ error: "Unauthorized" }, 401);
 

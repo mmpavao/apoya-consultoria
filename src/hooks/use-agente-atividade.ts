@@ -61,8 +61,15 @@ export function useAgenteAtividade(setor: string) {
     setRunning(true);
     toast.loading(`Executando ${cfg.nome}…`, { id: "run-" + setor });
     try {
+      // envia o token do usuário (antes ia sem Authorization) — pré-requisito
+      // p/ as edge functions passarem a exigir auth (fail-closed) depois
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${SUPA_URL}/functions/v1/${cfg.edge}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ trigger: "manual" }),
       });
       const data = await res.json().catch(() => ({}));
