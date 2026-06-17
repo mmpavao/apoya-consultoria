@@ -22,7 +22,12 @@ select cron.schedule(
   $cron$
   select net.http_post(
     url     := 'https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-orquestrador',
-    headers := '{"Content-Type": "application/json"}'::jsonb,
+    -- O orquestrador agora é FAIL-CLOSED: exige a service role key.
+    -- Ao aplicar, substituir <<SERVICE_ROLE_KEY>> pela chave real do projeto.
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer <<SERVICE_ROLE_KEY>>'
+    ),
     body    := '{"trigger": "cron"}'::jsonb
   );
   $cron$
