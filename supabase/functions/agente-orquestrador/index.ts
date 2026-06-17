@@ -21,7 +21,7 @@ const TIME_BUDGET_MS = 90_000;  // teto de tempo do ciclo
 
 // Os 5 setores com pipeline + expert executor. Todos são EXPERT_SECTORS:
 // donos do próprio pipeline (o orquestrador não cria tarefa agregada p/ eles).
-const AGENTES = ["agente-fiscal", "agente-rh", "agente-financeiro", "agente-contabil", "agente-societario"];
+const AGENTES = ["agente-fiscal", "agente-rh", "agente-financeiro", "agente-contabil", "agente-societario", "agente-tabelas-tributarias"];
 const EXPERT_SECTORS = new Set(["FISCAL", "RH", "FINANCEIRO", "CONTABIL", "SOCIETARIO"]);
 
 async function chamarAgente(slug: string): Promise<{ agente: string; success: boolean; alertas: number; resumo: Record<string, unknown>; erro?: string }> {
@@ -70,6 +70,9 @@ function extrairAlertas(r: { agente: string; resumo: Record<string, unknown> }):
   if (r.agente === "agente-societario") {
     const at = Number(m.processos_atrasados ?? 0);
     if (at > 0) a.push({ agente: "SOCIETARIO", tipo: "PROCESSOS_ATRASADOS", mensagem: `${at} processo(s) societário(s) atrasado(s)`, prioridade: at >= 3 ? "critica" : "alta", dados: { total: at } });
+  }
+  if (r.agente === "agente-tabelas-tributarias") {
+    if (m.tabelas_desatualizadas) a.push({ agente: "TRIBUTARIO", tipo: "TABELAS_DESATUALIZADAS", mensagem: `Tabelas INSS/IRRF: folha usa ${m.vigencia}, ano atual ${m.ano_atual} — revisar`, prioridade: "alta", dados: { vigencia: m.vigencia, ano: m.ano_atual } });
   }
   return a;
 }
