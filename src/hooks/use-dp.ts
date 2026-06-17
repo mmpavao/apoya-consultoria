@@ -146,11 +146,15 @@ export function useDemitirFuncionario() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
+      // Busca o empresa_id ANTES de marcar demitido (evita crash por null e
+      // estado inconsistente: funcionário demitido sem rescisão)
+      const { data: func, error: e0 } = await db.from("funcionarios")
+        .select("empresa_id").eq("id", funcionarioId).single();
+      if (e0 || !func) throw new Error("Funcionário não encontrado");
       const { error: e1 } = await db.from("funcionarios")
         .update({ status: "demitido", data_demissao: dataDemissao, updated_at: new Date().toISOString() })
         .eq("id", funcionarioId);
       if (e1) throw e1;
-      const { data: func } = await db.from("funcionarios").select("empresa_id").eq("id", funcionarioId).single();
       const { error: e2 } = await db.from("rescisoes")
         .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao });
       if (e2) throw e2;

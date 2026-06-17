@@ -260,6 +260,10 @@ function ClienteDetailPage() {
   const f = (field: keyof Cliente) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(p => ({ ...p, [field]: e.target.value }));
 
+  // campos numéricos: grava número (antes salvava string no banco)
+  const fNum = (field: keyof Cliente) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(p => ({ ...p, [field]: e.target.value === "" ? undefined : Number(e.target.value) }));
+
   return (
     <>
     <div className="animate-fade-up space-y-5 pb-12">
@@ -659,11 +663,11 @@ function ClienteDetailPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Valor Honorário (R$)</Label>
-              <Input value={form.valorHonorario ?? ""} onChange={f("valorHonorario")} type="number" />
+              <Input value={form.valorHonorario ?? ""} onChange={fNum("valorHonorario")} type="number" />
             </div>
             <div className="space-y-1.5">
               <Label>Dia de Vencimento</Label>
-              <Input value={form.diaVencimento ?? ""} onChange={f("diaVencimento")} type="number" min={1} max={28} />
+              <Input value={form.diaVencimento ?? ""} onChange={fNum("diaVencimento")} type="number" min={1} max={28} />
             </div>
             <div className="space-y-1.5">
               <Label>Forma de Pagamento</Label>
