@@ -397,12 +397,12 @@ function EsocialTab() {
 
   return (
     <div className="space-y-4">
-      {pendentes > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center gap-2 text-sm text-amber-700">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <strong>{pendentes}</strong> eventos eSocial pendentes de transmissão
-        </div>
-      )}
+      {/* Honestidade: não há integração eSocial real conectada — os eventos abaixo
+          são REFERÊNCIA dos códigos oficiais, não status de transmissão real. */}
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center gap-2 text-sm text-amber-700">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        Integração eSocial ainda não conectada — a lista abaixo é referência dos eventos oficiais (status ilustrativo).
+      </div>
       <div className="grid grid-cols-3 gap-3">
         <DKpiCard icon={CheckCircle2} label="Transmitidos" value={ESOCIAL_EVENTOS.filter(e => e.status === "ok").length}      variant="default" />
         <DKpiCard icon={Clock}        label="Pendentes"    value={pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
@@ -614,7 +614,7 @@ function DpPageInner() {
               { label: "Funcionários Ativos",   value: ativos,      icon: Users,         variant: "default" },
               { label: "Férias Vencendo (30d)", value: feriasVenc,  icon: Calendar,      variant: feriasVenc > 0 ? "warning" : "default" },
               { label: "Rescisões do Mês",      value: demitidos,   icon: FileText,      variant: demitidos > 0 ? "danger" : "default" },
-              { label: "eSocial Pendentes",     value: ESOCIAL_EVENTOS.filter(e => e.status === "pendente").length, icon: CheckCircle2, variant: "warning" },
+              { label: "eSocial",               value: "—", icon: CheckCircle2, variant: "default" },  // sem integração real (não contar mock)
             ]}
             kpisLoading={funcLoading}
             agente={agenteAtiv.status}

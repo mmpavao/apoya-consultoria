@@ -572,7 +572,6 @@ function ContabilPageInner() {
   const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const abertos  = periodos.filter(p => p.status === "aberto").length;
   const fechados  = periodos.filter(p => p.status === "fechado").length;
-  const semPeriodo = 0; // calculado no servidor
 
   return (
     <div className="space-y-5">
@@ -599,10 +598,9 @@ function ContabilPageInner() {
         <TabsContent value="dashboard" className="mt-0">
           <ModuleDashboard
             kpis={[
-              { label: "Períodos Abertos",  value: abertos,    icon: Clock,         variant: abertos > 0 ? "warning" : "default" },
-              { label: "Períodos Fechados", value: fechados,   icon: CheckCircle2,  variant: "default" },
-              { label: "Sem Período",       value: semPeriodo, icon: BookOpen,      variant: semPeriodo > 0 ? "danger" : "default" },
-              { label: "Com Divergência",   value: 0,          icon: AlertTriangle, variant: "default" },
+              { label: "Períodos Abertos",  value: abertos,         icon: Clock,        variant: abertos > 0 ? "warning" : "default" },
+              { label: "Períodos Fechados", value: fechados,        icon: CheckCircle2, variant: "default" },
+              { label: "Total de Períodos", value: periodos.length, icon: BookOpen,     variant: "default" },
             ]}
             kpisLoading={pLoad}
             agente={agenteAtiv.status}

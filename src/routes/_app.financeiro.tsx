@@ -42,7 +42,7 @@ function FinanceiroPage__Inner(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const { cobrancas: items, loading: cobLoading, refetch: refresh } = useCobrancas();
+  const { cobrancas: items, loading: cobLoading, error: cobError, refetch: refresh } = useCobrancas();
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
@@ -477,6 +477,14 @@ function FinanceiroPage__Inner(){
 
 
 
+      {/* erro≠zero: falha ao carregar cobranças não pode virar R$0 silencioso */}
+      {cobError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar cobranças: {cobError}. Os valores podem estar incompletos.
+          <button onClick={() => refresh()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
@@ -674,11 +682,10 @@ function FinanceiroPage__Inner(){
             <a href="/configuracoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Config completa</button></a>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
+            {/* status real fica em Configurações › Integrações; não afirmar "Configurado ✓" aqui (era fixo/falso) */}
             {[
               { label: "Gateway", value: "Asaas" },
-              { label: "Ambiente", value: "Produção" },
-              { label: "Webhook", value: "Configurado ✓" },
-              { label: "Pix", value: "Ativo" },
+              { label: "Webhook / Pix", value: "Ver em Configurações › Integrações" },
             ].map((item, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                 <span className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</span>
