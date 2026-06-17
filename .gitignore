@@ -36,3 +36,6 @@ dist-ssr
 .env.production
 .env.local
 .env.*.local
+
+# Config local do Claude Code (não versionar)
+.claude/
