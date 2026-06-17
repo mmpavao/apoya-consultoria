@@ -295,16 +295,6 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
-                    className="gap-1.5 h-8"
-                    onClick={e => { e.stopPropagation(); toast.info("Geração de DAS via SERPRO em implementação"); }}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Gerar DAS
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
                     className="gap-1.5 h-8 ml-auto"
                     onClick={e => { e.stopPropagation(); fecharPeriodo(); }}
                     disabled={pctFechamento < 100}

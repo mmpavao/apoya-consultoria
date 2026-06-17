@@ -568,7 +568,7 @@ function ConfigDP() {
 // ═══════════════════════════════════════════════════════════
 function DpPageInner() {
   const { roles } = useAuth();
-  const { funcionarios: todos, loading: funcLoading } = useFuncionarios();
+  const { funcionarios: todos, loading: funcLoading, refresh: refreshFunc } = useFuncionarios();
   const { ferias } = useFerias();
   const agenteAtiv = useAgenteAtividade("dp");
   const [tab, setTab] = useState("dashboard");
@@ -590,7 +590,7 @@ function DpPageInner() {
           <h1 className="text-2xl font-bold tracking-tight">Departamento Pessoal</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Gestão centralizada de funcionários, folha e férias</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1">
+        <Button size="sm" variant="outline" className="gap-1" onClick={() => { refreshFunc(); agenteAtiv.refetch(); }}>
           <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </div>

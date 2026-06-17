@@ -224,6 +224,11 @@ function SocietarioPage__Inner() {
             onMoverFase={handleMover} onComentario={adicionarComentario} onAtualizar={atualizarProcesso} autorPadrao="Gestor"/>
         </TabsContent>
 
+        {/* Documentos — antes o gatilho existia mas não havia conteúdo (aba morta) */}
+        <TabsContent value="documentos" className="mt-0">
+          <ModuleDocumentosTab modulo="societario" />
+        </TabsContent>
+
         {/* Automações Societário */}
         <TabsContent value="automacoes" className="mt-0">
           <div className="space-y-3">

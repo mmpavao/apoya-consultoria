@@ -562,7 +562,7 @@ function ConfigContabil() {
 // ═══════════════════════════════════════════════════════════
 function ContabilPageInner() {
   const { roles }                   = useAuth();
-  const { periodos, loading: pLoad } = usePeriodosContabeis();
+  const { periodos, loading: pLoad, refresh: refreshPeriodos } = usePeriodosContabeis();
   const agenteAtiv = useAgenteAtividade("contabil");
   const [tab, setTab] = useState("dashboard");
   const [novoLancNonce, setNovoLancNonce] = useState(0);
@@ -581,7 +581,7 @@ function ContabilPageInner() {
           <h1 className="text-2xl font-bold tracking-tight">Contabilidade</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Lançamentos, períodos e fechamento mensal · competência {mesAtual.split("-").reverse().join("/")}</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1"><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+        <Button size="sm" variant="outline" className="gap-1" onClick={() => { refreshPeriodos(); agenteAtiv.refetch(); }}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
       </div>
 
 
