@@ -48,12 +48,29 @@ function FinanceiroPage__Inner(){
   const [dialogCob, setDialogCob]     = useState(false);
   const [emitindoNf,  setEmitindoNf]  = useState<string|null>(null);
   const [showReguaModal, setShowReguaModal] = useState(false);
-  const [reguaDisparos, setReguaDisparos] = useState([
-    { id: "d3",  label: "D+3",  dias: 3,  ativo: true,  canal: "WhatsApp", msg: "Olá {nome}, seu honorário de {valor} venceu há 3 dias. Por favor, regularize para evitar bloqueios." },
-    { id: "d7",  label: "D+7",  dias: 7,  ativo: true,  canal: "Email",    msg: "Prezado {nome}, identificamos que o honorário de {valor} está em atraso há 7 dias. Entre em contato conosco." },
-    { id: "d15", label: "D+15", dias: 15, ativo: true,  canal: "Ambos",    msg: "URGENTE: O honorário de {valor} da empresa {empresa} está há 15 dias em atraso. Regularize em 48h." },
-    { id: "d30", label: "D+30", dias: 30, ativo: false, canal: "WhatsApp", msg: "Comunicado: O contrato da {empresa} será suspenso por inadimplência de {valor} após 30 dias." },
-  ]);
+  // Config REAL da régua (a mesma tabela que a execução /api/cobranca/regua lê).
+  // Antes o modal editava um array decorativo salvo em pipeline_config (quebrado).
+  const [reguaCfg, setReguaCfg] = useState({
+    dias_lembrete_1: 5, dias_primeiro_contato: 1, dias_segundo_contato: 15, dias_suspensao: 45,
+    percentual_multa: 2, percentual_juros_mes: 1,
+    msg_lembrete: "", msg_vencida: "", msg_suspensao: "",
+  });
+  const [reguaLoaded, setReguaLoaded] = useState(false);
+  useEffect(() => {
+    if (!showReguaModal || reguaLoaded) return;
+    (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await (supabase as any).from("regua_cobranca_config")
+        .select("dias_lembrete_1,dias_primeiro_contato,dias_segundo_contato,dias_suspensao,percentual_multa,percentual_juros_mes,msg_lembrete,msg_vencida,msg_suspensao")
+        .eq("escritorio_id", "apoya").maybeSingle();
+      if (data) {
+        const limpo = Object.fromEntries(Object.entries(data).filter(([, v]) => v != null));
+        setReguaCfg(c => ({ ...c, ...limpo }));
+      }
+      setReguaLoaded(true);
+    })();
+  }, [showReguaModal, reguaLoaded]);
+  const setCfg = (k: string, v: string | number) => setReguaCfg(c => ({ ...c, [k]: v }));
   const [salvandoRegua, setSalvandoRegua] = useState(false);
   const [autosFin, setAutosFin] = useState([
     { id: "regua",  nome: "Régua de Cobrança",          desc: "Lembretes automáticos por WhatsApp/Email", agente: "agente-financeiro", freq: "Diária 08:00", ativo: true,  resultado: null as null|"ok"|"erro" },
@@ -84,10 +101,26 @@ function FinanceiroPage__Inner(){
     setSalvandoRegua(true);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      await (supabase as any).from("pipeline_config").upsert({
-        setor: "financeiro", tipo: "regua_cobranca",
-        config: { disparos: reguaDisparos },
-      }, { onConflict: "setor,tipo" });
+      const db = supabase as any;
+      const payload = {
+        dias_lembrete_1:       Number(reguaCfg.dias_lembrete_1),
+        dias_primeiro_contato: Number(reguaCfg.dias_primeiro_contato),
+        dias_segundo_contato:  Number(reguaCfg.dias_segundo_contato),
+        dias_suspensao:        Number(reguaCfg.dias_suspensao),
+        percentual_multa:      Number(reguaCfg.percentual_multa),
+        percentual_juros_mes:  Number(reguaCfg.percentual_juros_mes),
+        msg_lembrete:          reguaCfg.msg_lembrete || null,
+        msg_vencida:           reguaCfg.msg_vencida || null,
+        msg_suspensao:         reguaCfg.msg_suspensao || null,
+        updated_at:            new Date().toISOString(),
+      };
+      // grava na tabela REAL que a execução lê (escritorio_id="apoya"); update-or-insert
+      const { data: existing } = await db.from("regua_cobranca_config")
+        .select("id").eq("escritorio_id", "apoya").maybeSingle();
+      const { error } = existing
+        ? await db.from("regua_cobranca_config").update(payload).eq("escritorio_id", "apoya")
+        : await db.from("regua_cobranca_config").insert({ escritorio_id: "apoya", ...payload });
+      if (error) throw error;
       toast.success("Régua salva com sucesso!");
       setShowReguaModal(false);
     } catch (e: any) {
@@ -801,21 +834,13 @@ function FinanceiroPage__Inner(){
             ))}
           </div>
           <div className="rounded-lg border bg-muted/30 p-4">
-            <p className="text-xs font-semibold mb-3 uppercase tracking-wide text-muted-foreground">Régua de Cobrança</p>
-            <div className="space-y-2">
-              {reguaDisparos.map((d, i) => (
-                <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg border bg-background">
-                  <button onClick={() => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, ativo: !x.ativo } : x))} className={d.ativo ? "text-emerald-600" : "text-muted-foreground/40"}>
-                    {d.ativo ? <ToggleRight className="h-5 w-5"/> : <ToggleLeft className="h-5 w-5"/>}
-                  </button>
-                  <span className="text-xs font-bold text-foreground w-8">{d.label}</span>
-                  <span className="text-xs text-muted-foreground flex-1">{d.canal}</span>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setShowReguaModal(true)}>Editar</Button>
-                </div>
-              ))}
-            </div>
-            <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs" onClick={() => setShowReguaModal(true)}>
-              <Settings2 className="h-3.5 w-3.5"/> Configurar Régua Completa
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wide text-muted-foreground">Régua de Cobrança</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Lembrete, contatos de cobrança, negativação e suspensão automáticos por atraso.
+              Os prazos (dias) e mensagens são configuráveis e usados pela execução automática.
+            </p>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setShowReguaModal(true)}>
+              <Settings2 className="h-3.5 w-3.5"/> Configurar Régua
             </Button>
           </div>
         </div>
@@ -836,39 +861,58 @@ function FinanceiroPage__Inner(){
                 <X className="h-4 w-4"/>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-              {reguaDisparos.map((d, i) => (
-                <div key={d.id} className="rounded-xl border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, ativo: !x.ativo } : x))} className={d.ativo ? "text-emerald-600" : "text-muted-foreground/40"}>
-                      {d.ativo ? <ToggleRight className="h-6 w-6"/> : <ToggleLeft className="h-6 w-6"/>}
-                    </button>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{d.label} — {d.ativo ? "Ativo" : "Inativo"}</p>
-                      <p className="text-xs text-muted-foreground">Disparo após {d.dias} dias do vencimento</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Dias após vencimento</label>
-                      <Input type="number" min={1} max={90} className="h-8 text-sm" value={d.dias} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, dias: Number(e.target.value) } : x))} />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Canal</label>
-                      <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={d.canal} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, canal: e.target.value } : x))}>
-                        <option value="WhatsApp">WhatsApp</option>
-                        <option value="Email">Email</option>
-                        <option value="Ambos">Ambos</option>
-                      </select>
-                    </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              {!reguaLoaded && <p className="text-xs text-muted-foreground">Carregando configuração…</p>}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Prazos (dias)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Lembrete (dias antes do venc.)</label>
+                    <Input type="number" min={0} max={30} className="h-8 text-sm" value={reguaCfg.dias_lembrete_1} onChange={e => setCfg("dias_lembrete_1", Number(e.target.value))} />
                   </div>
                   <div>
-                    <label className="text-xs font-medium mb-1 block">Mensagem template</label>
-                    <textarea rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" placeholder="Use {nome}, {empresa}, {valor}, {dias}" value={d.msg} onChange={e => setReguaDisparos(r => r.map((x, j) => j === i ? { ...x, msg: e.target.value } : x))} />
-                    <p className="text-[11px] text-muted-foreground mt-1">Variáveis: {"{nome}"} {"{empresa}"} {"{valor}"} {"{dias}"} {"{vencimento}"}</p>
+                    <label className="text-xs font-medium mb-1 block">1º contato (dias após venc.)</label>
+                    <Input type="number" min={1} max={90} className="h-8 text-sm" value={reguaCfg.dias_primeiro_contato} onChange={e => setCfg("dias_primeiro_contato", Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Negativação (dias após venc.)</label>
+                    <Input type="number" min={1} max={180} className="h-8 text-sm" value={reguaCfg.dias_segundo_contato} onChange={e => setCfg("dias_segundo_contato", Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Suspensão (dias após venc.)</label>
+                    <Input type="number" min={1} max={365} className="h-8 text-sm" value={reguaCfg.dias_suspensao} onChange={e => setCfg("dias_suspensao", Number(e.target.value))} />
                   </div>
                 </div>
-              ))}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Encargos</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Multa (%)</label>
+                    <Input type="number" min={0} step="0.1" className="h-8 text-sm" value={reguaCfg.percentual_multa} onChange={e => setCfg("percentual_multa", Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Juros ao mês (%)</label>
+                    <Input type="number" min={0} step="0.1" className="h-8 text-sm" value={reguaCfg.percentual_juros_mes} onChange={e => setCfg("percentual_juros_mes", Number(e.target.value))} />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mensagens</p>
+                {[
+                  { k: "msg_lembrete",  label: "Lembrete (antes do vencimento)" },
+                  { k: "msg_vencida",   label: "Cobrança (após vencimento)" },
+                  { k: "msg_suspensao", label: "Suspensão" },
+                ].map(m => (
+                  <div key={m.k}>
+                    <label className="text-xs font-medium mb-1 block">{m.label}</label>
+                    <textarea rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                      placeholder="Use {nome}, {empresa}, {valor}, {dias}, {vencimento}"
+                      value={(reguaCfg as any)[m.k] ?? ""} onChange={e => setCfg(m.k, e.target.value)} />
+                  </div>
+                ))}
+                <p className="text-[11px] text-muted-foreground">Variáveis: {"{nome}"} {"{empresa}"} {"{valor}"} {"{dias}"} {"{vencimento}"}</p>
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-muted/20">
               <Button variant="ghost" size="sm" onClick={() => setShowReguaModal(false)}>Cancelar</Button>
