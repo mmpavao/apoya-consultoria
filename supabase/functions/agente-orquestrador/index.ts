@@ -80,6 +80,18 @@ Deno.serve(async (req: Request) => {
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) as any;
+
+  // Auth FAIL-CLOSED: service-role-key (cron / chamadas internas) OU JWT de
+  // usuário (dashboard). Antes era público (verify_jwt=false, sem checagem).
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  let autorizado = !!token && token === SUPABASE_SERVICE_ROLE_KEY;
+  if (!autorizado && token) {
+    try { const { data } = await supabase.auth.getUser(token); autorizado = !!data?.user; } catch (_) { /* 401 */ }
+  }
+  if (!autorizado) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
+  }
+
   const inicio = Date.now();
 
   // 1. DELEGAÇÃO — fan-out aos experts, respeitando o orçamento global de steps.

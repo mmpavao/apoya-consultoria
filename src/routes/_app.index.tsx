@@ -56,10 +56,16 @@ const AGENTE_DEFAULT: AgenteStatus = {
   executado_em: "", loading: false, error: null,
 };
 
+// envia o token do usuário logado (as edge functions agora exigem auth — fail-closed)
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
 async function fetchAgenteFiscal(): Promise<AgenteStatus> {
   const resp = await fetch(
     "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-fiscal",
-    { method: "POST" }
+    { method: "POST", headers: await authHeaders() }
   );
   const result = await resp.json();
   if (!result.success) throw new Error(result.error ?? "Erro no agente");
@@ -77,7 +83,7 @@ async function fetchAgenteFiscal(): Promise<AgenteStatus> {
 async function fetchOrquestrador(): Promise<{ fiscal: number; rh: number; financeiro: number; ts: string }> {
   const resp = await fetch(
     "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-orquestrador",
-    { method: "POST" }
+    { method: "POST", headers: await authHeaders() }
   );
   const r = await resp.json();
   return {
