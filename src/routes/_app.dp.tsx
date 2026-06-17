@@ -291,7 +291,7 @@ function FolhaTab({ autoNovo = 0 }: { autoNovo?: number }) {
             <div>
               <Label className="text-xs font-medium mb-1 block">Competência</Label>
               <Input type="month" value={novaForm.competencia} onChange={e => setNovaForm(f => ({ ...f, competencia: e.target.value }))} />
-              <p className="text-[11px] text-muted-foreground mt-1">A folha será aberta com os funcionários ativos da empresa.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Calcula INSS/IRRF/FGTS dos funcionários ativos. <strong>Valores estimados</strong> — confira as tabelas (alíquotas) vigentes.</p>
             </div>
           </div>
           <DialogFooter>

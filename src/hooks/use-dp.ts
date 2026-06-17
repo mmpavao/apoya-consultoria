@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { calcFolhaTotais } from "@/lib/folha-calc";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -189,13 +190,19 @@ export function useCreateFolha() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      const { count } = await db.from("funcionarios")
-        .select("id", { count: "exact", head: true })
+      // Busca os ativos e CALCULA a folha (antes a folha nascia zerada)
+      const { data: funcs } = await db.from("funcionarios")
+        .select("salario_base, dependentes")
         .eq("empresa_id", empresaId).eq("status", "ativo");
-      const { error } = await db.from("folha_mensal")
-        .insert({ empresa_id: empresaId, competencia, total_funcionarios: count ?? 0, status: "aberta" });
+      const totais = calcFolhaTotais((funcs ?? []) as { salario_base: number; dependentes?: number | null }[]);
+      const { error } = await db.from("folha_mensal").insert({
+        empresa_id: empresaId,
+        competencia,
+        status: "aberta",
+        ...totais,
+      });
       if (error) throw error;
-      toast.success(`Folha ${competencia} aberta`);
+      toast.success(`Folha ${competencia} aberta — ${totais.total_funcionarios} funcionário(s)`);
       return true;
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao criar folha"); return false; }
     finally { setLoading(false); }
