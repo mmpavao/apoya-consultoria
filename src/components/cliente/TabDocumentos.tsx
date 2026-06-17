@@ -130,7 +130,7 @@ function PastaView({ pasta, clienteId, onBack }: { pasta: DocumentoPasta; client
   }, [pasta.id, uploadArquivo]);
 
   const handleDownload = async (arq: DocumentoArquivo) => {
-    const url = await getSignedUrl(arq.storage_path);
+    const url = await getSignedUrl(arq.storage_path, arq.bucket);
     if (url) window.open(url, "_blank");
   };
 

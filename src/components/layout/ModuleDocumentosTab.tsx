@@ -101,16 +101,18 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
   const loadTudo = useCallback(async () => {
     setLoading(true);
     try {
+      // Cliente é a fonte canônica: além dos docs do módulo, inclui o drive do
+      // cliente (modulo IS NULL) pra não haver silo entre as telas.
       const [{ data: ps }, { data: arqs }] = await Promise.all([
         (supabase as any)
           .from("documento_pasta")
           .select("*")
-          .eq("modulo", modulo)
+          .or(`modulo.eq.${modulo},modulo.is.null`)
           .order("nome"),
         (supabase as any)
           .from("documento_arquivo")
           .select("*")
-          .eq("modulo", modulo)
+          .or(`modulo.eq.${modulo},modulo.is.null`)
           .order("created_at", { ascending: false })
           .limit(500),
       ]);
@@ -166,6 +168,7 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
           tamanho_bytes: file.size,
           storage_path: path,
           storage_url: urlData?.publicUrl ?? null,
+          bucket: "documentos",
           pasta_id: pastaSel ?? null,
           cliente_id: clienteSel !== "todos" ? clienteSel : null,
           modulo,
@@ -213,13 +216,23 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
   async function excluirArquivo(arq: Arquivo) {
     if (!confirm(`Excluir "${arq.nome}"?`)) return;
     try {
-      await (supabase as any).storage.from("documentos").remove([arq.storage_path]);
+      await (supabase as any).storage.from((arq as any).bucket ?? "documentos").remove([arq.storage_path]);
       await (supabase as any).from("documento_arquivo").delete().eq("id", arq.id);
       setArquivos(prev => prev.filter(a => a.id !== arq.id));
       toast.success("Arquivo excluído");
     } catch (e: any) {
       toast.error("Erro: " + e.message);
     }
+  }
+
+  /* ── Abrir/baixar (signed URL do bucket da linha — robusto p/ bucket privado) ── */
+  async function abrirArquivo(arq: Arquivo, download = false) {
+    const bucket = (arq as any).bucket ?? "documentos";
+    const { data, error } = await (supabase as any).storage
+      .from(bucket)
+      .createSignedUrl(arq.storage_path, 3600, download ? { download: arq.nome } : undefined);
+    if (error || !data?.signedUrl) { toast.error("Não foi possível abrir o arquivo"); return; }
+    window.open(data.signedUrl, "_blank");
   }
 
   /* ── KPIs ─────────────────────────────────────────── */
@@ -422,27 +435,22 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                            {arq.storage_url && (
-                              <a
-                                href={arq.storage_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                title="Visualizar"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                            {arq.storage_url && (
-                              <a
-                                href={arq.storage_url}
-                                download={arq.nome}
-                                className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                title="Download"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </a>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => abrirArquivo(arq)}
+                              className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Visualizar"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => abrirArquivo(arq, true)}
+                              className="grid h-7 w-7 place-items-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Download"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               onClick={() => excluirArquivo(arq)}
                               className="grid h-7 w-7 place-items-center rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"

@@ -29,10 +29,13 @@ export type DocumentoArquivo = {
   tamanho_bytes?: number;
   storage_path: string;
   storage_url?: string;
+  bucket?: string;        // qual bucket guarda o arquivo (canônico do cliente = 'documentos-clientes')
   tags: string[];
   created_at: string;
   updated_at: string;
 };
+
+const CLIENTE_BUCKET = "documentos-clientes";
 
 export function useDocumentosCliente(clienteId: string) {
   const [pastas, setPastas] = useState<DocumentoPasta[]>([]);
@@ -98,7 +101,7 @@ export function useDocumentosCliente(clienteId: string) {
     // Deletar arquivos no storage primeiro
     const arqsDaPasta = arquivos.filter(a => a.pasta_id === id);
     for (const arq of arqsDaPasta) {
-      await supabase.storage.from("documentos-clientes").remove([arq.storage_path]);
+      await supabase.storage.from(arq.bucket ?? CLIENTE_BUCKET).remove([arq.storage_path]);
     }
     const { error } = await supabase.from("documento_pasta").delete().eq("id", id);
     if (error) { toast.error("Erro ao excluir pasta"); throw error; }
@@ -123,7 +126,9 @@ export function useDocumentosCliente(clienteId: string) {
         .from("documentos-clientes")
         .getPublicUrl(path);
 
-      const { error: dbErr } = await supabase.from("documento_arquivo").insert({
+      // `bucket` é coluna real (migration 031); types.ts foi gerado antes dela,
+      // por isso o cast — regenerar os tipos depois remove o `as any`.
+      const { error: dbErr } = await (supabase.from("documento_arquivo") as any).insert({
         pasta_id: pastaId,
         cliente_id: clienteId,
         nome: file.name,
@@ -132,6 +137,7 @@ export function useDocumentosCliente(clienteId: string) {
         tamanho_bytes: file.size,
         storage_path: path,
         storage_url: urlData?.publicUrl ?? null,
+        bucket: CLIENTE_BUCKET,
       });
       if (dbErr) { toast.error("Erro ao registrar arquivo"); throw dbErr; }
       toast.success(`"${file.name}" enviado!`);
@@ -142,16 +148,16 @@ export function useDocumentosCliente(clienteId: string) {
   }, [clienteId, load]);
 
   const excluirArquivo = useCallback(async (arquivo: DocumentoArquivo) => {
-    await supabase.storage.from("documentos-clientes").remove([arquivo.storage_path]);
+    await supabase.storage.from(arquivo.bucket ?? CLIENTE_BUCKET).remove([arquivo.storage_path]);
     const { error } = await supabase.from("documento_arquivo").delete().eq("id", arquivo.id);
     if (error) { toast.error("Erro ao excluir arquivo"); throw error; }
     toast.success("Arquivo removido.");
     await load();
   }, [load]);
 
-  const getSignedUrl = useCallback(async (storagePath: string, expiresIn = 3600) => {
+  const getSignedUrl = useCallback(async (storagePath: string, bucket = CLIENTE_BUCKET, expiresIn = 3600) => {
     const { data, error } = await supabase.storage
-      .from("documentos-clientes")
+      .from(bucket)
       .createSignedUrl(storagePath, expiresIn);
     if (error) { toast.error("Não foi possível gerar link"); return null; }
     return data.signedUrl;
