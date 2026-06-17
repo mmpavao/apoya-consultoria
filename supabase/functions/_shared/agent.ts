@@ -85,18 +85,3 @@ export function json(body: unknown, status = 200): Response {
     status, headers: { "Content-Type": "application/json" },
   });
 }
-
-// Auth FAIL-CLOSED para as edge functions dos agentes.
-// Aceita: (a) a SERVICE ROLE KEY (chamadas internas — orquestrador e cron) OU
-// (b) um JWT de usuário válido (botão "Executar" da UI). Caso contrário → 401.
-// Retorna null se autorizado, ou a Response 401 para o handler devolver.
-export async function requireAuth(req: Request, sb: SB, serviceKey: string): Promise<Response | null> {
-  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!token) return json({ error: "Unauthorized" }, 401);
-  if (serviceKey && token === serviceKey) return null;           // interno
-  try {
-    const { data, error } = await sb.auth.getUser(token);        // usuário logado?
-    if (!error && data?.user) return null;
-  } catch (_) { /* cai no 401 */ }
-  return json({ error: "Unauthorized" }, 401);
-}

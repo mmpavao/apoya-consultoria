@@ -5,7 +5,7 @@
 // (etapas de aprovação do pipeline). Mantém o resumo lido pelo orquestrador.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { logAgentRun, upsertPipelineTask, json, requireAuth } from "../_shared/agent.ts";
+import { logAgentRun, upsertPipelineTask, json } from "../_shared/agent.ts";
 
 const fmtBRL = (v: number) => "R$ " + Number(v ?? 0).toFixed(2);
 
@@ -17,15 +17,13 @@ function etapaPorAtraso(dias: number): string {
   return "negociacao";                       // atraso relevante
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(async (_req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return json({ success: false, error: "Missing Supabase configuration" }, 500);
   }
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const denied = await requireAuth(req, sb, SUPABASE_SERVICE_ROLE_KEY);
-  if (denied) return denied;
 
   try {
     const hoje    = new Date().toISOString().slice(0, 10);
