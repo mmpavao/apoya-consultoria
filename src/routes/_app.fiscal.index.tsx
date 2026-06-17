@@ -797,12 +797,12 @@ function DashboardTab() {
 
   useEffect(() => {
     // Carregar obrigações recentes
-    (supabase as any)
+    supabase
       .from("obrigacoes")
-      .select("id,tipo,cliente_nome,vencimento,status,valor_estimado")
+      .select("id,tipo,cliente_nome,vencimento,status")  // sem valor_estimado (coluna não existe → quebrava a query)
       .order("vencimento", { ascending: true })
       .limit(8)
-      .then(({ data }: any) => { setObrigacoes(data ?? []); setLoadingOb(false); });
+      .then(({ data }) => { setObrigacoes(data ?? []); setLoadingOb(false); });
 
     // Carregar logs dos agentes via API server-side (a RLS bloqueia leitura
     // direta de agente_logs pelo usuário).

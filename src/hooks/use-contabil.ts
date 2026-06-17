@@ -29,10 +29,12 @@ export interface PeriodoContabil {
 }
 
 export interface ExtratoBancario {
-  id: string; empresa_id: string; competencia: string;
-  data_movimento: string; descricao: string; valor: number;
-  tipo: "credito" | "debito"; conciliado: boolean;
-  lancamento_id?: string; created_at: string;
+  id: string; empresa_id: string; mes_referencia: string;
+  data_linha: string; historico_banco: string; valor: number;
+  tipo: string;                       // 'credito' | 'debito'
+  status?: string | null;
+  conciliado_em?: string | null;      // preenchido = conciliado
+  lancamento_id?: string | null; created_at?: string | null;
 }
 
 export interface TotaisLancamentos {
@@ -128,7 +130,8 @@ export function usePlanoContas(empresaId: string) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
           .from("plano_contas")
-          .select("*")
+          // a coluna real é `descricao`; a UI/tipo usa `nome` → alias
+          .select("*, nome:descricao")
           .or(`empresa_id.eq.${empresaId},empresa_id.is.null`)
           .eq("ativo", true)
           .order("codigo");
@@ -220,7 +223,7 @@ export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
         .select("*")
         .eq("empresa_id", empresaId)
         .eq("mes_referencia", mesReferencia)
-        .order("data_movimento");
+        .order("data_linha");   // coluna real (era data_movimento, inexistente)
       if (error) throw error;
       setExtratos(data ?? []);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar extratos"); }
@@ -229,8 +232,9 @@ export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const conciliados = extratos.filter(e => e.conciliado).length;
-  const pendentes   = extratos.filter(e => !e.conciliado).length;
+  // "conciliado" não é coluna booleana — é conciliado_em preenchido
+  const conciliados = extratos.filter(e => !!e.conciliado_em).length;
+  const pendentes   = extratos.filter(e => !e.conciliado_em).length;
 
   return { extratos, loading, conciliados, pendentes, refresh: fetch };
 }

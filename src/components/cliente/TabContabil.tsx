@@ -14,7 +14,7 @@ import { AlertTriangle, Plus, CheckSquare, Printer, CheckCircle2, XCircle, Clock
 import { toast } from "sonner";
 import {
   useLancamentos, usePeriodosContabeis, usePlanoContas,
-  useAbrirPeriodo, useFecharPeriodo, useExtratosBancarios,
+  useAbrirPeriodo, useFecharPeriodo, useExtratosBancarios, useCriarLancamento,
   type Lancamento,
 } from "@/hooks/use-contabil";
 
@@ -123,33 +123,27 @@ function SubAbaPeriodo({ clienteId, temEmpregados }: { clienteId: string; temEmp
 }
 
 // ─── Dialog Novo Lançamento ───────────────────────────────────────────────────
-function NovoLancDialog({ open, onClose, clienteId, competencia, contas, onOk }:
-  { open:boolean; onClose:()=>void; clienteId:string; competencia:string; contas:{id:string;codigo:string;nome:string}[]; onOk:()=>void }) {
+function NovoLancDialog({ open, onClose, clienteId, contas, onOk }:
+  { open:boolean; onClose:()=>void; clienteId:string; contas:{id:string;codigo:string;nome:string}[]; onOk:()=>void }) {
   const [form, setForm] = useState({ data:"", historico:"", conta_debito:"", conta_credito:"", valor:"" });
   const s = (k:string,v:string)=>setForm(p=>({...p,[k]:v}));
-  const [saving, setSaving] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { supabase: _sb } = { supabase: null }; // unused
+  // Usa o hook único (grava data_competencia/mes_referencia NOT NULL + created_by
+  // corretos); antes havia um insert divergente que gravava colunas inexistentes.
+  const { criarLancamento, loading: saving } = useCriarLancamento();
   const submit = async () => {
     if (!form.data||!form.historico||!form.conta_debito||!form.conta_credito||!form.valor) {
       toast.error("Preencha todos os campos"); return;
     }
-    setSaving(true);
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data:{user} } = await supabase.auth.getUser();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("lancamentos_contabeis").insert({
-        empresa_id: clienteId, data_lancamento: form.data, historico: form.historico,
-        conta_debito: form.conta_debito, conta_credito: form.conta_credito,
-        valor: parseFloat(form.valor), competencia, tipo: "manual",
-        criado_por: user?.email, criado_por_tipo: "humano",
-      });
-      if (error) throw error;
-      toast.success("Lançamento criado"); onOk(); onClose();
-    } catch(e) { toast.error(e instanceof Error?e.message:"Erro ao salvar"); }
-    finally { setSaving(false); }
+    const ok = await criarLancamento({
+      empresa_id: clienteId,
+      data_lancamento: form.data,
+      historico: form.historico,
+      conta_debito: form.conta_debito,
+      conta_credito: form.conta_credito,
+      valor: parseFloat(form.valor),
+      tipo: "manual",
+    });
+    if (ok) { onOk(); onClose(); }
   };
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -254,7 +248,7 @@ function SubAbaLancamentos({ clienteId }: { clienteId: string }) {
         </table>
       </div>
       <NovoLancDialog open={novoOpen} onClose={()=>setNovoOpen(false)}
-        clienteId={clienteId} competencia={comp} contas={contas} onOk={refresh}/>
+        clienteId={clienteId} contas={contas} onOk={refresh}/>
     </div>
   );
 }
@@ -323,8 +317,10 @@ function SubAbaConciliacao({ clienteId }: { clienteId: string }) {
 
   const conciliar = async (extratoId: string) => {
     const { supabase } = await import("@/integrations/supabase/client");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from("extrato_bancario").update({ conciliado:true }).eq("id",extratoId);
+    // marca conciliado_em (não existe coluna booleana `conciliado`)
+    const { error } = await supabase.from("extrato_bancario")
+      .update({ status:"conciliado", conciliado_em: new Date().toISOString() })
+      .eq("id",extratoId);
     if (!error) { toast.success("Conciliado"); refresh(); }
     else toast.error("Erro ao conciliar");
   };
@@ -349,24 +345,27 @@ function SubAbaConciliacao({ clienteId }: { clienteId: string }) {
           <thead><tr><th>Data</th><th>Descrição</th><th className="text-right">Valor</th><th>Tipo</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {extratos.length===0&&<tr><td colSpan={6} className="text-center text-muted-foreground py-8">Nenhum extrato para {COMP_LABEL(comp)}</td></tr>}
-            {extratos.map(e=>(
-              <tr key={e.id} className={!e.conciliado?"bg-yellow-50/30":""}>
-                <td className="text-xs">{FMT_DATE(e.data_movimento)}</td>
-                <td>{e.descricao}</td>
+            {extratos.map(e=>{
+              const conc = !!e.conciliado_em;
+              return (
+              <tr key={e.id} className={!conc?"bg-yellow-50/30":""}>
+                <td className="text-xs">{FMT_DATE(e.data_linha)}</td>
+                <td>{e.historico_banco}</td>
                 <td className="text-right font-medium">{FMT_BRL(e.valor)}</td>
                 <td><Badge variant={e.tipo==="credito"?"default":"secondary"}>{e.tipo==="credito"?"Crédito":"Débito"}</Badge></td>
                 <td>
-                  {e.conciliado
+                  {conc
                     ?<span className="flex items-center gap-1 text-green-600 text-xs"><CheckCircle2 className="h-3 w-3"/>Conciliado</span>
                     :<span className="flex items-center gap-1 text-yellow-600 text-xs"><Clock className="h-3 w-3"/>Pendente</span>}
                 </td>
                 <td>
-                  {!e.conciliado&&<Button size="sm" variant="ghost" onClick={()=>conciliar(e.id)}>
+                  {!conc&&<Button size="sm" variant="ghost" onClick={()=>conciliar(e.id)}>
                     <CheckCircle2 className="h-4 w-4"/>
                   </Button>}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

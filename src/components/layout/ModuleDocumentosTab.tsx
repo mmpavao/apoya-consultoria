@@ -184,13 +184,18 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
   /* ── Criar pasta ──────────────────────────────────── */
   async function criarPasta() {
     if (!novaPastaName.trim()) return;
+    // cliente_id é NOT NULL — exigir um cliente selecionado (antes gravava null e quebrava)
+    if (clienteSel === "todos") {
+      toast.error("Selecione um cliente específico para criar a pasta");
+      return;
+    }
     setCriandoPasta(true);
     try {
       const { error } = await (supabase as any).from("documento_pasta").insert({
         nome: novaPastaName.trim(),
         cor: novaPastaCor,
         modulo,
-        cliente_id: clienteSel !== "todos" ? clienteSel : null,
+        cliente_id: clienteSel,
       });
       if (error) throw error;
       toast.success("Pasta criada!");

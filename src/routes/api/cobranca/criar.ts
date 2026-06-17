@@ -117,7 +117,6 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           regua_stage:  "ok",
           dias_atraso:  0,
           recorrente,
-          created_by:   user.id,
         }).select().single();
 
         if (iErr) return json({ error: iErr.message }, 500);

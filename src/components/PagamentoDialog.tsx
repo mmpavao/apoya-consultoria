@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,17 +16,16 @@ const FORMAS = [{value:"PIX",label:"PIX"},{value:"BOLETO",label:"Boleto"},{value
 export function PagamentoDialog({cobranca,open,onClose,onSaved}:Props) {
   const [dataPagamento,setDataPagamento] = useState(new Date().toISOString().split("T")[0]);
   const [forma,setForma] = useState("PIX");
-  const [observacao,setObservacao] = useState("");
   const [salvando,setSalvando] = useState(false);
 
   async function handleSalvar() {
     if (!cobranca) return;
     setSalvando(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const {error} = await (supabase as any).from("cobrancas").update({
+      // tipado (sem `as any`): tsc valida as colunas contra o schema real.
+      // `cobrancas` não tem coluna de observação — não gravar campo inexistente.
+      const {error} = await supabase.from("cobrancas").update({
         status:"paga", pago_em:dataPagamento, forma,
-        ...(observacao?{observacoes:observacao}:{}),
       }).eq("id",cobranca.id);
       if (error) throw error;
       toast.success(`Pagamento registrado — ${fmtBRL(cobranca.valor)}`);
@@ -65,10 +63,6 @@ export function PagamentoDialog({cobranca,open,onClose,onSaved}:Props) {
               <SelectTrigger><SelectValue/></SelectTrigger>
               <SelectContent>{FORMAS.map(f=><SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Observação (opcional)</Label>
-            <Textarea placeholder="Ex: comprovante enviado por email..." rows={2} value={observacao} onChange={e=>setObservacao(e.target.value)}/>
           </div>
         </div>
         <DialogFooter>
