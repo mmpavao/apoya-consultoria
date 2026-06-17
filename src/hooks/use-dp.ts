@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { calcFolhaTotais } from "@/lib/folha-calc";
+import { calcRescisao } from "@/lib/rescisao-calc";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -146,19 +147,27 @@ export function useDemitirFuncionario() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
-      // Busca o empresa_id ANTES de marcar demitido (evita crash por null e
+      // Busca os dados ANTES de marcar demitido (evita crash por null e
       // estado inconsistente: funcionário demitido sem rescisão)
       const { data: func, error: e0 } = await db.from("funcionarios")
-        .select("empresa_id").eq("id", funcionarioId).single();
+        .select("empresa_id, salario_base, dependentes, data_admissao").eq("id", funcionarioId).single();
       if (e0 || !func) throw new Error("Funcionário não encontrado");
       const { error: e1 } = await db.from("funcionarios")
         .update({ status: "demitido", data_demissao: dataDemissao, updated_at: new Date().toISOString() })
         .eq("id", funcionarioId);
       if (e1) throw e1;
+      // CALCULA as verbas rescisórias (antes a rescisão nascia zerada)
+      const verbas = calcRescisao({
+        salarioBase: Number(func.salario_base) || 0,
+        dependentes: func.dependentes ?? 0,
+        dataAdmissao: func.data_admissao,
+        dataDemissao,
+        tipo: tipo as any,
+      });
       const { error: e2 } = await db.from("rescisoes")
-        .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao });
+        .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao, ...verbas });
       if (e2) throw e2;
-      toast.success("Funcionário demitido e rescisão registrada");
+      toast.success("Funcionário demitido — rescisão calculada (valores estimados, confira)");
       return true;
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao demitir"); return false; }
     finally { setLoading(false); }
