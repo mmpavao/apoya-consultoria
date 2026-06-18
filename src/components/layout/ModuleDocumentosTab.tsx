@@ -146,6 +146,18 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files?.length) return;
+    // cliente_id e pasta_id são NOT NULL no banco — exigir antes do upload
+    // (antes gravava null e o insert quebrava calado).
+    if (clienteSel === "todos" || !clienteSel) {
+      toast.error("Selecione um cliente específico antes de enviar");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    if (!pastaSel) {
+      toast.error("Selecione (ou crie) uma pasta antes de enviar");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setUploading(true);
     const toastId = "doc-upload";
     toast.loading(`Enviando ${files.length} arquivo(s)…`, { id: toastId });
@@ -169,8 +181,8 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
           storage_path: path,
           storage_url: urlData?.publicUrl ?? null,
           bucket: "documentos",
-          pasta_id: pastaSel ?? null,
-          cliente_id: clienteSel !== "todos" ? clienteSel : null,
+          pasta_id: pastaSel,
+          cliente_id: clienteSel,
           modulo,
         });
       }

@@ -10,7 +10,7 @@
 // Governança: tarefa com requer_aprovacao=true + log em agente_logs + idempotência.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { logAgentRun, upsertPipelineTask, json, requireAuth } from "../_shared/agent.ts";
+import { logAgentRun, upsertPipelineTask, json, requireAuth, CORS } from "../_shared/agent.ts";
 
 // Vigência das tabelas embutidas em src/lib/folha-calc.ts. Ao atualizar a folha,
 // bump aqui também (este agente é o lembrete robusto da virada de ano).
@@ -18,6 +18,7 @@ const VIGENCIA = "2026";
 const FONTES = "Salário mínimo + INSS: gov.br/Receita Federal; IRRF: Lei 15.270/2025.";
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {

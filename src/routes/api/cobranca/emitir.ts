@@ -175,7 +175,6 @@ export const Route = createFileRoute("/api/cobranca/emitir")({
               status:        "pendente",
               regua_stage:   "ok",
               dias_atraso:   0,
-              created_by:    user.id,
             });
             novasGeradas++;
           }

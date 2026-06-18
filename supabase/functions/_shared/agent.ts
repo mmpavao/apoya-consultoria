@@ -5,6 +5,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = any;
 
+// CORS padrão dos agentes — o dashboard chama via browser (preflight OPTIONS).
+// Sem isso o navegador bloqueia a resposta mesmo com 200.
+export const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 // Exige um JWT de USUÁRIO válido (para edge functions chamadas pelo app).
 // Cria o próprio client (anon) e valida via getUser. Retorna null se ok, ou a
 // Response 401 (com CORS) para o handler devolver. A anon key NÃO passa (não é usuário).
@@ -102,7 +110,7 @@ export async function upsertPipelineTask(
 
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status, headers: { "Content-Type": "application/json" },
+    status, headers: { ...CORS, "Content-Type": "application/json" },
   });
 }
 

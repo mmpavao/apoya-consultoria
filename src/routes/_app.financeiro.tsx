@@ -148,12 +148,13 @@ function FinanceiroPage__Inner(){
     if (!novaAuto.nome.trim()) { toast.error("Nome obrigatório"); return; }
     setSalvandoAuto(true);
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      await (supabase as any).from("pipeline_config").insert({
-        setor: "financeiro", tipo: "automacao_custom",
-        config: { ...novaAuto, criada_em: new Date().toISOString() },
-      });
-      setAutosFin(a => [...a, { id: "custom-" + Date.now(), nome: novaAuto.nome, desc: "Freq: " + novaAuto.freq_tipo, agente: novaAuto.agente_edge_fn, freq: novaAuto.freq_tipo, ativo: novaAuto.ativo, resultado: null }]);
+      // Persiste em departamento_config (jsonb) — pipeline_config é a tabela do
+      // kanban (setor+etapas); gravar automação ali poluiria os estágios.
+      const nova = { id: "custom-" + Date.now(), ...novaAuto, criada_em: new Date().toISOString() };
+      const atuais = Array.isArray((depConfig as any).automacoes_custom) ? (depConfig as any).automacoes_custom : [];
+      const ok = await saveDepConfig({ ...depConfig, automacoes_custom: [...atuais, nova] });
+      if (!ok) { toast.error("Erro ao salvar automação"); return; }
+      setAutosFin(a => [...a, { id: nova.id, nome: novaAuto.nome, desc: "Freq: " + novaAuto.freq_tipo, agente: novaAuto.agente_edge_fn, freq: novaAuto.freq_tipo, ativo: novaAuto.ativo, resultado: null }]);
       toast.success("Automação criada!");
       setNovaAuto({ nome: "", agente_edge_fn: "agente-financeiro", freq_tipo: "diaria", horario: "08:00", ativo: true });
       setShowNovaAuto(false);
