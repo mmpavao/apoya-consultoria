@@ -39,3 +39,11 @@ verify_jwt = false
 # Webhook do Clicksign — público (Clicksign chama), mas FAIL-CLOSED por HMAC.
 [functions.clicksign-webhook]
 verify_jwt = false
+
+# sync-nfse-nfeio — auth via requireUser no corpo (era pública alcançando NFE.io).
+[functions.sync-nfse-nfeio]
+verify_jwt = false
+
+# send-invite — auth própria (Bearer do usuário + checagem de role admin).
+[functions.send-invite]
+verify_jwt = false

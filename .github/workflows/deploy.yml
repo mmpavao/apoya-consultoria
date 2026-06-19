@@ -207,6 +207,7 @@ jobs:
           supabase functions deploy clicksign-envelope   --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy clicksign-webhook    --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy upload-certificate-nfeio --project-ref ajaqbdsalxfgrwpjbtbn
+          supabase functions deploy send-invite          --project-ref ajaqbdsalxfgrwpjbtbn
           # Time de agentes (reconciliado no repo — fonte de verdade)
           supabase functions deploy agente-fiscal        --project-ref ajaqbdsalxfgrwpjbtbn
           supabase functions deploy agente-rh            --project-ref ajaqbdsalxfgrwpjbtbn
@@ -222,7 +223,9 @@ jobs:
   # ── apoya-mcp ──────────────────────────────────────────────────────────────
   deploy-mcp:
     name: apoya-mcp → ${{ needs.resolve-env.outputs.worker_mcp }}
-    needs: resolve-env
+    # depende de deploy-gestao p/ herdar o gate de testes (npm test): se os testes
+    # falharem em tag de produção, o MCP NÃO é publicado (antes ia sozinho).
+    needs: [resolve-env, deploy-gestao]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

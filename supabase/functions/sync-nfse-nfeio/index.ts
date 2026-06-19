@@ -6,6 +6,7 @@
  * e insere/atualiza na tabela nfse_emitida.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUser } from "../_shared/agent.ts";
 
 const NFEIO_KEY    = Deno.env.get("NFEIO_API_KEY_NFSE")!;
 const EMITENTE_ID  = "d8e1f4b5f4674fdaaaf034e5a837b85d"; // APOYA
@@ -18,6 +19,10 @@ Deno.serve(async (req) => {
     "Access-Control-Allow-Headers": "authorization, content-type",
   };
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  // FAIL-CLOSED: era pública → anon key alcançava NFE.io (API paga) e gravava
+  // nfse_emitida via service-role. Exige JWT de usuário.
+  const denied = await requireUser(req, corsHeaders);
+  if (denied) return denied;
 
   try {
     const { cliente_id, cnpj } = await req.json();
