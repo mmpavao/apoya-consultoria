@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mesesTrabalhados, calcRescisao } from "@/lib/rescisao-calc";
+import { calcINSS, calcIRRF } from "@/lib/folha-calc";
 
 describe("mesesTrabalhados", () => {
   it("conta meses completos", () => {
@@ -36,6 +37,19 @@ describe("calcRescisao — sem justa causa", () => {
   });
   it("líquido = bruto - INSS - IRRF", () => {
     expect(base.total_liquido).toBeCloseTo(base.total_bruto - base.inss_desconto - base.irrf_desconto, 2);
+  });
+  it("13º tem tributação separada do saldo (bases distintas, não somadas)", () => {
+    // INSS/IRRF do saldo e do 13º calculados em bases separadas (exclusiva na fonte)
+    const inssSaldo  = calcINSS(base.saldo_salario);
+    const inssDecimo = calcINSS(base.decimo_proporcional);
+    const esperadoInss = Math.round((inssSaldo + inssDecimo + Number.EPSILON) * 100) / 100;
+    expect(base.inss_desconto).toBeCloseTo(esperadoInss, 2);
+    // e é MENOR que a base única (que empurraria a faixa)
+    expect(base.inss_desconto).toBeLessThanOrEqual(calcINSS(base.saldo_salario + base.decimo_proporcional) + 0.01);
+    const irrfSaldo  = calcIRRF(base.saldo_salario, inssSaldo, 0);
+    const irrfDecimo = calcIRRF(base.decimo_proporcional, inssDecimo, 0);
+    const esperadoIrrf = Math.round((irrfSaldo + irrfDecimo + Number.EPSILON) * 100) / 100;
+    expect(base.irrf_desconto).toBeCloseTo(esperadoIrrf, 2);
   });
 });
 

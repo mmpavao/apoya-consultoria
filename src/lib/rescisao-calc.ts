@@ -85,10 +85,15 @@ export function calcRescisao(input: RescisaoInput): RescisaoResultado {
   const fgtsSaldo = round2(input.fgtsSaldo ?? salario * 0.08 * mesesTotais);
   const multaFgts = semJusta ? round2(fgtsSaldo * 0.40) : 0;
 
-  // Descontos — incidência simplificada sobre saldo + 13º
-  const baseInss = saldoSalario + decimoProporcional;
-  const inss = calcINSS(baseInss);
-  const irrf = calcIRRF(baseInss, inss, dep);
+  // Descontos — o 13º tem tributação EXCLUSIVA na fonte (base separada do saldo
+  // de salário); juntar tudo numa base só empurra a faixa marginal e desconta a
+  // mais. Calcula INSS/IRRF separadamente para saldo e para o 13º.
+  const inssSaldo  = calcINSS(saldoSalario);
+  const irrfSaldo  = calcIRRF(saldoSalario, inssSaldo, dep);
+  const inssDecimo = decimoProporcional > 0 ? calcINSS(decimoProporcional) : 0;
+  const irrfDecimo = decimoProporcional > 0 ? calcIRRF(decimoProporcional, inssDecimo, dep) : 0;
+  const inss = round2(inssSaldo + inssDecimo);
+  const irrf = round2(irrfSaldo + irrfDecimo);
 
   const totalBruto = round2(saldoSalario + decimoProporcional + feriasProporcionais + feriasVencidas + multaFgts);
   const totalLiquido = round2(totalBruto - inss - irrf);

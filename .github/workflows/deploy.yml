@@ -200,25 +200,25 @@ jobs:
 
       - name: Deploy Edge Functions (produção)
         if: needs.resolve-env.outputs.target == 'production'
+        # Deploya TODAS as funções; se QUALQUER uma falhar, o job falha no fim
+        # (antes era continue-on-error: falha de deploy passava como verde e o
+        # fix nunca chegava em prod — achado da re-auditoria).
         run: |
-          supabase functions deploy nfse-pos-pagamento  --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy sync-nfse-nfeio      --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy cnpj-enrich          --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy clicksign-envelope   --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy clicksign-webhook    --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy upload-certificate-nfeio --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy send-invite          --project-ref ajaqbdsalxfgrwpjbtbn
-          # Time de agentes (reconciliado no repo — fonte de verdade)
-          supabase functions deploy agente-fiscal        --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-rh            --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-financeiro    --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-contabil      --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-societario    --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-tabelas-tributarias --project-ref ajaqbdsalxfgrwpjbtbn
-          supabase functions deploy agente-orquestrador  --project-ref ajaqbdsalxfgrwpjbtbn
+          set +e
+          fail=0
+          for fn in \
+            nfse-pos-pagamento sync-nfse-nfeio cnpj-enrich clicksign-envelope \
+            clicksign-webhook upload-certificate-nfeio send-invite \
+            agente-fiscal agente-rh agente-financeiro agente-contabil \
+            agente-societario agente-tabelas-tributarias agente-orquestrador; do
+            echo "::group::deploy $fn"
+            supabase functions deploy "$fn" --project-ref ajaqbdsalxfgrwpjbtbn || { echo "❌ falhou: $fn"; fail=1; }
+            echo "::endgroup::"
+          done
+          [ "$fail" = "0" ] && echo "✅ todas as functions deployadas" || echo "❌ uma ou mais functions falharam"
+          exit $fail
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        continue-on-error: true
 
   # ── apoya-mcp ──────────────────────────────────────────────────────────────
   deploy-mcp:

@@ -187,11 +187,9 @@ function PastaView({ pasta, clienteId, onBack }: { pasta: DocumentoPasta; client
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Download" onClick={() => handleDownload(arq)}>
                   <Download className="h-3.5 w-3.5" />
                 </Button>
-                {arq.storage_url && (
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Abrir" asChild>
-                    <a href={arq.storage_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
-                  </Button>
-                )}
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Abrir" onClick={() => handleDownload(arq)}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-600" title="Excluir" onClick={() => excluirArquivo(arq)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

@@ -163,10 +163,12 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
       };
 
       if (cert.id) {
-        await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
+        const { error: upErr } = await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
+        if (upErr) throw upErr;
       } else {
-        const { data: ins } = await (supabase as any)
+        const { data: ins, error: insErr } = await (supabase as any)
           .from("cliente_certificado").insert(row).select().single();
+        if (insErr) throw insErr;
         if (ins) row.id = (ins as any).id;
       }
 
@@ -227,10 +229,12 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
         procuracao_validade: cert.procuracaoValidade || null,
       };
       if (cert.id) {
-        await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
+        const { error: upErr } = await (supabase as any).from("cliente_certificado").update(row).eq("id", cert.id);
+        if (upErr) throw upErr;
       } else {
-        const { data: ins } = await (supabase as any)
+        const { data: ins, error: insErr } = await (supabase as any)
           .from("cliente_certificado").insert(row).select().single();
+        if (insErr) throw insErr;
         if (ins) setCert(p => ({ ...p, id: (ins as any).id }));
       }
       await (supabase as any).from("clientes")

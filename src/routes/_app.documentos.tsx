@@ -205,11 +205,9 @@ function ClienteDrive({ clienteId, clienteNome }: { clienteId: string; clienteNo
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {arq.storage_url && (
-                            <DropdownMenuItem onClick={() => window.open(arq.storage_url!, "_blank")}>
-                              <Eye size={13} className="mr-2" /> Visualizar
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem onClick={async () => { const u = await getSignedUrl(arq.storage_path); if (u) window.open(u, "_blank"); }}>
+                            <Eye size={13} className="mr-2" /> Visualizar
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDownload(arq.storage_path, arq.nome)}>
                             <Download size={13} className="mr-2" /> Download
                           </DropdownMenuItem>

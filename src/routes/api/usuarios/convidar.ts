@@ -62,12 +62,13 @@ export const Route = createFileRoute("/api/usuarios/convidar")({
         const userId = invited?.user?.id;
 
         if (userId) {
-          // Inserir profile se não existir
-          await db.from("profiles").upsert({
+          // Inserir profile se não existir (coluna real é `nome`, não full_name)
+          const { error: profErr } = await db.from("profiles").upsert({
             id: userId,
             email,
-            full_name: nome ?? "",
+            nome: nome ?? "",
           }, { onConflict: "id", ignoreDuplicates: false });
+          if (profErr) return json({ ok: false, error: "Convite enviado, mas falhou ao gravar o profile: " + profErr.message }, 500);
 
           // Inserir role
           await db.from("user_roles").upsert({
