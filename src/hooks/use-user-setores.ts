@@ -11,6 +11,7 @@
  */
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 // Slugs de todos os módulos com rota protegida
 export const SETOR_SLUGS = [
@@ -38,6 +39,10 @@ export interface UserSetoresState {
 }
 
 export function useUserSetores(): UserSetoresState {
+  // Deriva do useAuth (sessão gerenciada via onAuthStateChange) em vez de chamar
+  // getUser() de rede no mount — isso evitava o /unauthorized em refresh/deep-link
+  // de rota com setor: a query rodava antes do auth assentar e negava acesso.
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [setores, setSetores] = useState<Set<string>>(new Set());
@@ -45,13 +50,14 @@ export function useUserSetores(): UserSetoresState {
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    // Enquanto o auth não assentou, fica carregando (SectorGuard mostra spinner,
+    // NÃO redireciona). Sem usuário após assentar → acesso vazio.
+    if (authLoading) { setLoading(true); return; }
+    if (!user) { setIsAdmin(false); setSetores(new Set()); setLoading(false); return; }
+
+    (async () => {
       setLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) { setLoading(false); return; }
-
-        // 1. Verificar role
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db = supabase as any;
         const { data: roleRow } = await db
@@ -60,47 +66,29 @@ export function useUserSetores(): UserSetoresState {
           .eq("user_id", user.id)
           .eq("role", "admin")
           .maybeSingle();
-
-        const admin = !!roleRow;
         if (cancelled) return;
+        const admin = !!roleRow;
 
         if (admin) {
-          // Admin: todos os setores
-          const { data: allSetores } = await db
-            .from("setores")
-            .select("slug")
-            .eq("ativo", true);
-          const slugs = new Set<string>((allSetores ?? []).map((s: { slug: string }) => s.slug));
+          const { data: allSetores } = await db.from("setores").select("slug").eq("ativo", true);
+          if (cancelled) return;
           setIsAdmin(true);
-          setSetores(slugs);
+          setSetores(new Set<string>((allSetores ?? []).map((s: { slug: string }) => s.slug)));
         } else {
-          // Buscar setores do usuário
-          const { data: rows } = await db
-            .from("user_setores")
-            .select("setor_slug")
-            .eq("user_id", user.id);
-          const slugs = new Set<string>((rows ?? []).map((r: { setor_slug: string }) => r.setor_slug));
+          const { data: rows } = await db.from("user_setores").select("setor_slug").eq("user_id", user.id);
+          if (cancelled) return;
           setIsAdmin(false);
-          setSetores(slugs);
+          setSetores(new Set<string>((rows ?? []).map((r: { setor_slug: string }) => r.setor_slug)));
         }
       } catch {
         // Falha silenciosa — usuário fica com Set vazio (acesso negado)
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
+    })();
 
-    load();
-    // Re-executar quando auth mudar
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      if (!cancelled) load();
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [authLoading, user?.id]);
 
   const inSetor = useCallback(
     (slug: string) => isAdmin || setores.has(slug),
