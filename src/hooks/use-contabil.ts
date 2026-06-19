@@ -116,33 +116,123 @@ export function useCriarLancamento() {
   return { criarLancamento, loading };
 }
 
+export function useEditarLancamento() {
+  const [loading, setLoading] = useState(false);
+  const editarLancamento = useCallback(async (id: string, input: NovoLancamentoInput) => {
+    setLoading(true);
+    try {
+      const mes_referencia = input.data_lancamento.slice(0, 7);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("lancamentos_contabeis").update({
+        data_lancamento:  input.data_lancamento,
+        data_competencia: input.data_lancamento,
+        mes_referencia,
+        historico:        input.historico,
+        conta_debito:     input.conta_debito,
+        conta_credito:    input.conta_credito,
+        valor:            input.valor,
+        tipo:             input.tipo ?? null,
+      }).eq("id", id);
+      if (error) throw error;
+      toast.success("Lançamento atualizado");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao editar lançamento"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { editarLancamento, loading };
+}
+
+export function useDeletarLancamento() {
+  const [loading, setLoading] = useState(false);
+  const deletarLancamento = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("lancamentos_contabeis").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Lançamento excluído");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao excluir lançamento"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { deletarLancamento, loading };
+}
+
 // ─── Plano de Contas ─────────────────────────────────────────────────────────
 
 export function usePlanoContas(empresaId: string) {
   const [contas, setContas] = useState<PlanoContas[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = useCallback(async () => {
     if (!empresaId) return;
-    (async () => {
-      setLoading(true);
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase as any)
-          .from("plano_contas")
-          // a coluna real é `descricao`; a UI/tipo usa `nome` → alias
-          .select("*, nome:descricao")
-          .or(`empresa_id.eq.${empresaId},empresa_id.is.null`)
-          .eq("ativo", true)
-          .order("codigo");
-        if (error) throw error;
-        setContas(data ?? []);
-      } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar plano de contas"); }
-      finally { setLoading(false); }
-    })();
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("plano_contas")
+        // a coluna real é `descricao`; a UI/tipo usa `nome` → alias
+        .select("*, nome:descricao")
+        .or(`empresa_id.eq.${empresaId},empresa_id.is.null`)
+        .eq("ativo", true)
+        .order("codigo");
+      if (error) throw error;
+      setContas(data ?? []);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar plano de contas"); }
+    finally { setLoading(false); }
   }, [empresaId]);
 
-  return { contas, loading };
+  useEffect(() => { refetch(); }, [refetch]);
+
+  return { contas, loading, refetch };
+}
+
+export interface PlanoContaInput { codigo: string; nome: string; tipo: string; nivel?: number; }
+
+export function useSalvarPlanoConta() {
+  const [loading, setLoading] = useState(false);
+  // cria (sem id) ou edita (com id). A coluna real é `descricao` (UI usa `nome`).
+  const salvarConta = useCallback(async (empresaId: string, input: PlanoContaInput, id?: string) => {
+    setLoading(true);
+    try {
+      const row = {
+        empresa_id: empresaId,
+        codigo:     input.codigo,
+        descricao:  input.nome,
+        tipo:       input.tipo,
+        nivel:      input.nivel ?? input.codigo.split(".").length,
+        ativo:      true,
+      };
+      const q = id
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? (supabase as any).from("plano_contas").update(row).eq("id", id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : (supabase as any).from("plano_contas").insert(row);
+      const { error } = await q;
+      if (error) throw error;
+      toast.success(id ? "Conta atualizada" : "Conta criada");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao salvar conta"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { salvarConta, loading };
+}
+
+export function useDeletarPlanoConta() {
+  const [loading, setLoading] = useState(false);
+  // soft-delete (ativo=false) — preserva integridade com lançamentos que usam o código
+  const deletarConta = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("plano_contas").update({ ativo: false }).eq("id", id);
+      if (error) throw error;
+      toast.success("Conta removida");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao remover conta"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { deletarConta, loading };
 }
 
 // ─── Períodos Contábeis ──────────────────────────────────────────────────────

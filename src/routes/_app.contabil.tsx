@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   AlertTriangle, BookOpen, CheckCircle2, Clock, Download,
   FileText, Loader2, Plus, RefreshCw, Search, ToggleLeft, ToggleRight, Zap,
+  Pencil, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +32,8 @@ import { Pagination } from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
 import {
   useLancamentos, usePlanoContas, usePeriodosContabeis, useAbrirPeriodo, useFecharPeriodo,
-  useCriarLancamento,
+  useCriarLancamento, useEditarLancamento, useDeletarLancamento,
+  useSalvarPlanoConta, useDeletarPlanoConta,
   type Lancamento, type PlanoContas, type PeriodoContabil,
 } from "@/hooks/use-contabil";
 import { useAuth } from "@/hooks/use-auth";
@@ -162,6 +164,9 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
   const comp = `${ano}-${String(mes).padStart(2, "0")}`;
   const { lancamentos, loading, totais, refresh } = useLancamentos(empresaId, comp);
   const { criarLancamento, loading: criando } = useCriarLancamento();
+  const { editarLancamento, loading: editando } = useEditarLancamento();
+  const { deletarLancamento } = useDeletarLancamento();
+  const [editId, setEditId] = useState<string | null>(null);
   const PAGE_SIZE = 20;
 
   const hoje = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -170,7 +175,7 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
   const [form, setForm] = useState(emptyForm);
 
   // quickAction do dashboard abre o modal (com a empresa já selecionada)
-  useEffect(() => { if (autoNovo > 0) setShowNovo(true); }, [autoNovo]);
+  useEffect(() => { if (autoNovo > 0) { setEditId(null); setForm(emptyForm); setShowNovo(true); } }, [autoNovo]);
 
   async function salvarLancamento() {
     if (!empresaId) { toast.error("Selecione a empresa primeiro"); return; }
@@ -178,7 +183,7 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
     if (!form.historico.trim() || !form.conta_debito.trim() || !form.conta_credito.trim() || !(valorNum > 0)) {
       toast.error("Preencha histórico, contas débito/crédito e um valor válido"); return;
     }
-    const ok = await criarLancamento({
+    const payload = {
       empresa_id: empresaId,
       data_lancamento: form.data_lancamento,
       historico: form.historico.trim(),
@@ -186,8 +191,19 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
       conta_credito: form.conta_credito.trim(),
       valor: valorNum,
       tipo: form.tipo,
-    });
-    if (ok) { setShowNovo(false); setForm(emptyForm); refresh(); }
+    };
+    const ok = editId ? await editarLancamento(editId, payload) : await criarLancamento(payload);
+    if (ok) { setShowNovo(false); setForm(emptyForm); setEditId(null); refresh(); }
+  }
+
+  function abrirEdicao(l: Lancamento) {
+    setEditId(l.id);
+    setForm({ data_lancamento: l.data_lancamento, historico: l.historico, conta_debito: l.conta_debito, conta_credito: l.conta_credito, valor: String(l.valor), tipo: l.tipo });
+    setShowNovo(true);
+  }
+  async function excluirLancamento(l: Lancamento) {
+    if (!confirm(`Excluir o lançamento "${l.historico}"?`)) return;
+    if (await deletarLancamento(l.id)) refresh();
   }
 
   const filtered = useMemo(() => {
@@ -206,6 +222,16 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
     { key: "credito", header: "Conta Crédito", headerClassName: "hidden md:table-cell font-mono", className: "hidden md:table-cell text-xs font-mono", cell: l => l.conta_credito },
     { key: "valor", header: "Valor", headerClassName: "text-right", className: "text-right tabular-nums font-semibold", cell: l => fmtBRL(l.valor) },
     { key: "tipo", header: "Tipo", cell: l => <InlineBadge color={l.tipo === "debito" ? "red" : "green"} dot>{l.tipo}</InlineBadge> },
+    { key: "acoes", header: "", className: "text-right whitespace-nowrap", cell: l => (
+      <div className="flex items-center justify-end gap-1">
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Editar" onClick={() => abrirEdicao(l)}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-600" title="Excluir" onClick={() => excluirLancamento(l)}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    ) },
   ];
 
   return (
@@ -228,7 +254,7 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
           </Select>
           <TableSearch value={query} onChange={setQuery} placeholder="Buscar histórico…" />
         </div>
-        <Button size="sm" className="h-8 text-xs gap-1" onClick={() => setShowNovo(true)}>
+        <Button size="sm" className="h-8 text-xs gap-1" onClick={() => { setEditId(null); setForm(emptyForm); setShowNovo(true); }}>
           <Plus className="h-3 w-3" /> Novo Lançamento
         </Button>
       </div>
@@ -258,9 +284,9 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
         </>
       )}
 
-      <Dialog open={showNovo} onOpenChange={setShowNovo}>
+      <Dialog open={showNovo} onOpenChange={o => { setShowNovo(o); if (!o) { setEditId(null); setForm(emptyForm); } }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Novo Lançamento Contábil</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? "Editar Lançamento Contábil" : "Novo Lançamento Contábil"}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div>
               <Label className="text-xs font-medium mb-1 block">Empresa</Label>
@@ -306,7 +332,7 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNovo(false)}>Cancelar</Button>
-            <Button disabled={criando} onClick={salvarLancamento}>{criando ? "Salvando…" : "Salvar Lançamento"}</Button>
+            <Button disabled={criando || editando} onClick={salvarLancamento}>{(criando || editando) ? "Salvando…" : (editId ? "Salvar Alterações" : "Salvar Lançamento")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -383,27 +409,55 @@ function ContaRow({ conta, depth }: { conta: ContaNode; depth: number }) {
 function PlanoContasTab() {
   const { clientes }              = useClientes();
   const [empresaId, setEmpresaId] = useState("");
-  const { contas: planoContas, loading }  = usePlanoContas(empresaId);
+  const { contas: planoContas, loading, refetch }  = usePlanoContas(empresaId);
+  const { salvarConta, loading: salvando } = useSalvarPlanoConta();
+  const { deletarConta }          = useDeletarPlanoConta();
   const [query, setQuery]         = useState("");
+
+  const emptyConta = { codigo: "", nome: "", tipo: "analitica" };
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId]     = useState<string | null>(null);
+  const [form, setForm]         = useState(emptyConta);
 
   // Se não tem plano personalizado, usar o padrão
   const hasCustom = planoContas.length > 0;
+  const podeEditar = !!empresaId; // o plano CFC padrão (sem empresa) é template read-only
+
+  function novaConta() { setEditId(null); setForm(emptyConta); setShowForm(true); }
+  function editarConta(c: PlanoContas) { setEditId(c.id); setForm({ codigo: c.codigo, nome: c.nome, tipo: c.tipo }); setShowForm(true); }
+  async function salvar() {
+    if (!form.codigo.trim() || !form.nome.trim()) { toast.error("Preencha código e nome"); return; }
+    const ok = await salvarConta(empresaId, { codigo: form.codigo.trim(), nome: form.nome.trim(), tipo: form.tipo }, editId ?? undefined);
+    if (ok) { setShowForm(false); setEditId(null); setForm(emptyConta); refetch(); }
+  }
+  async function excluir(c: PlanoContas) {
+    if (!confirm(`Remover a conta "${c.codigo} — ${c.nome}"?`)) return;
+    if (await deletarConta(c.id)) refetch();
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Select value={empresaId} onValueChange={setEmpresaId}>
-          <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Plano padrão (CFC)" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Plano padrão (CFC)</SelectItem>
-            {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar conta…" className="pl-9 h-8 text-sm w-56" />
+      <div className="flex items-center gap-2 flex-wrap justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={empresaId} onValueChange={setEmpresaId}>
+            <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Plano padrão (CFC)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Plano padrão (CFC)</SelectItem>
+              {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar conta…" className="pl-9 h-8 text-sm w-56" />
+          </div>
         </div>
+        <Button size="sm" className="h-8 text-xs gap-1" disabled={!podeEditar} title={podeEditar ? "" : "Selecione uma empresa para personalizar o plano"} onClick={novaConta}>
+          <Plus className="h-3 w-3" /> Nova Conta
+        </Button>
       </div>
+      {!podeEditar && (
+        <p className="text-xs text-muted-foreground">Mostrando o plano padrão (CFC) — selecione uma empresa para criar/editar contas próprias.</p>
+      )}
       <div className="rounded-lg border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -411,11 +465,12 @@ function PlanoContasTab() {
               <th className="px-4 py-2.5 text-left">Conta</th>
               <th className="px-4 py-2.5 text-left">Tipo</th>
               <th className="px-4 py-2.5 text-center">Nível</th>
+              {podeEditar && hasCustom && <th className="px-4 py-2.5 text-right">Ações</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
             {loading ? (
-              <tr><td colSpan={3} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+              <tr><td colSpan={4} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
             ) : hasCustom ? (
               planoContas.filter((c: PlanoContas) => !query || c.nome.toLowerCase().includes(query.toLowerCase()) || c.codigo.includes(query)).map((c: PlanoContas) => (
                 <tr key={c.id} className="hover:bg-muted/20">
@@ -425,6 +480,12 @@ function PlanoContasTab() {
                   </td>
                   <td className="px-4 py-2"><InlineBadge color={c.tipo === "analitica" ? "blue" : "gray"}>{c.tipo}</InlineBadge></td>
                   <td className="px-4 py-2 text-center text-xs">{c.nivel}</td>
+                  {podeEditar && (
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Editar" onClick={() => editarConta(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-600" title="Remover" onClick={() => excluir(c)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
@@ -433,6 +494,39 @@ function PlanoContasTab() {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={showForm} onOpenChange={o => { setShowForm(o); if (!o) { setEditId(null); setForm(emptyConta); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{editId ? "Editar Conta" : "Nova Conta"}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Código</Label>
+                <Input placeholder="Ex: 1.1.1" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs font-medium mb-1 block">Tipo</Label>
+                <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sintetica">Sintética</SelectItem>
+                    <SelectItem value="analitica">Analítica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Nome da conta</Label>
+              <Input placeholder="Ex: Caixa e Equivalentes" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">O nível é derivado do código (pontos). Ex.: "1.1.1" = nível 3.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button disabled={salvando} onClick={salvar}>{salvando ? "Salvando…" : (editId ? "Salvar Alterações" : "Criar Conta")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -251,9 +251,11 @@ export function useFerias(empresaId?: string) {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // Traz TODOS os status — a FeriasTab filtra client-side (pendente/vencida/
+      // agendada/paga). Antes filtrava só pendente/vencida, então férias recém
+      // AGENDADA (status inicial) ou marcada PAGA sumia da tela na hora.
       let q = (supabase as any).from("ferias")
         .select("*, funcionario:funcionario_id(nome, cargo)")
-        .in("status", ["pendente", "vencida"])
         .order("periodo_aquisitivo_fim");
       if (empresaId) q = q.eq("empresa_id", empresaId);
       const { data, error } = await q;

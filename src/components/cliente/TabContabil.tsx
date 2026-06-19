@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertTriangle, Plus, CheckSquare, Printer, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { AlertTriangle, Plus, CheckSquare, Printer, CheckCircle2, XCircle, Clock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   useLancamentos, usePeriodosContabeis, usePlanoContas,
@@ -325,6 +325,15 @@ function SubAbaConciliacao({ clienteId }: { clienteId: string }) {
     else toast.error("Erro ao conciliar");
   };
 
+  const desconciliar = async (extratoId: string) => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { error } = await supabase.from("extrato_bancario")
+      .update({ status:"pendente", conciliado_em: null })
+      .eq("id",extratoId);
+    if (!error) { toast.success("Conciliação desfeita"); refresh(); }
+    else toast.error("Erro ao desfazer conciliação");
+  };
+
   if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
@@ -359,9 +368,13 @@ function SubAbaConciliacao({ clienteId }: { clienteId: string }) {
                     :<span className="flex items-center gap-1 text-yellow-600 text-xs"><Clock className="h-3 w-3"/>Pendente</span>}
                 </td>
                 <td>
-                  {!conc&&<Button size="sm" variant="ghost" onClick={()=>conciliar(e.id)}>
-                    <CheckCircle2 className="h-4 w-4"/>
-                  </Button>}
+                  {conc
+                    ?<Button size="sm" variant="ghost" title="Desfazer conciliação" onClick={()=>desconciliar(e.id)}>
+                      <RotateCcw className="h-4 w-4"/>
+                    </Button>
+                    :<Button size="sm" variant="ghost" title="Conciliar" onClick={()=>conciliar(e.id)}>
+                      <CheckCircle2 className="h-4 w-4"/>
+                    </Button>}
                 </td>
               </tr>
               );
