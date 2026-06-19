@@ -10,7 +10,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useClientes } from "@/hooks/use-clientes";
 import { supabase } from "@/integrations/supabase/client";
 
-type Props = { open: boolean; onClose: () => void; onCreated?: () => void; };
+export type CobrancaEdit = {
+  id: string; clienteId: string; descricao?: string; valor: number;
+  forma?: string; vencimento: string; competencia?: string;
+};
+type Props = { open: boolean; onClose: () => void; onCreated?: () => void; cobranca?: CobrancaEdit | null };
 
 const now = new Date();
 const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -19,8 +23,9 @@ const nextMonth10 = (() => {
   return d.toISOString().split("T")[0];
 })();
 
-export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
+export function CobrancaFormDialog({ open, onClose, onCreated, cobranca }: Props) {
   const { clientes } = useClientes();
+  const isEdit = !!cobranca;
   // Apenas clientes ativos ou inadimplentes
   const ativos = clientes.filter(c => c.status === "ativo" || c.status === "inadimplente");
   const [saving, setSaving]           = useState(false);
@@ -34,12 +39,23 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
     competencia: thisMonth,
   });
 
-  // Reset ao abrir
+  // Reset/prefill ao abrir
   useEffect(() => {
     if (!open) return;
-    setForm(f => ({ ...f, clienteId: "", valor: "" }));
+    if (cobranca) {
+      setForm({
+        clienteId:   cobranca.clienteId,
+        descricao:   cobranca.descricao ?? "Mensalidade APOYA",
+        valor:       String(cobranca.valor ?? ""),
+        forma:       (cobranca.forma as "PIX" | "BOLETO" | "UNDEFINED") ?? "UNDEFINED",
+        vencimento:  cobranca.vencimento,
+        competencia: cobranca.competencia ?? thisMonth,
+      });
+    } else {
+      setForm(f => ({ ...f, clienteId: "", valor: "" }));
+    }
     setSemContrato(false);
-  }, [open]);
+  }, [open, cobranca]);
 
   // Preenche valor do honorário ao selecionar cliente + verifica contrato
   useEffect(() => {
@@ -67,8 +83,28 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
       toast.error("Preencha os campos obrigatórios");
       return;
     }
-    if (semContrato) {
+    if (!isEdit && semContrato) {
       toast.error("Este cliente não possui contrato ativo. Assine o contrato antes de gerar cobrança.");
+      return;
+    }
+
+    // EDIÇÃO: update direto (sem passar pelo gateway)
+    if (isEdit && cobranca) {
+      setSaving(true);
+      try {
+        const { error } = await supabase.from("cobrancas").update({
+          valor:       parseFloat(form.valor),
+          descricao:   form.descricao,
+          forma:       form.forma,
+          vencimento:  form.vencimento,
+          competencia: form.competencia,
+        } as any).eq("id", cobranca.id);
+        if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+        toast.success("Cobrança atualizada");
+        window.dispatchEvent(new Event("apoya:cobrancas:changed"));
+        onCreated?.();
+        onClose();
+      } finally { setSaving(false); }
       return;
     }
 
@@ -119,13 +155,13 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Cobrança</DialogTitle>
-          <DialogDescription>Crie uma cobrança de honorários para um cliente.</DialogDescription>
+          <DialogTitle>{isEdit ? "Editar Cobrança" : "Nova Cobrança"}</DialogTitle>
+          <DialogDescription>{isEdit ? "Ajuste os dados da cobrança." : "Crie uma cobrança de honorários para um cliente."}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5">
             <Label>Cliente *</Label>
-            <Select value={form.clienteId} onValueChange={v => up("clienteId", v)}>
+            <Select value={form.clienteId} onValueChange={v => up("clienteId", v)} disabled={isEdit}>
               <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
               <SelectContent>
                 {ativos.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}
@@ -178,9 +214,9 @@ export function CobrancaFormDialog({ open, onClose, onCreated }: Props) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || semContrato}>
+          <Button onClick={handleSave} disabled={saving || (!isEdit && semContrato)}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar cobrança
+            {isEdit ? "Salvar alterações" : "Salvar cobrança"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -87,15 +87,30 @@ export function useCobrancas(competencia?: string) {
   useRealtimeTable("cobrancas", fetch);
   const updateCobranca = useCallback(async (id: string, patch: Partial<{
     asaasId: string; linkPagamento: string; ultimoEnvioWhatsapp: string; status: CobrancaStatus;
+    valor: number; vencimento: string; descricao: string; competencia: string; forma: string;
   }>) => {
     const dbPatch: Record<string, unknown> = {};
     if (patch.asaasId             !== undefined) dbPatch.asaas_id              = patch.asaasId;
     if (patch.linkPagamento       !== undefined) dbPatch.link_pagamento        = patch.linkPagamento;
     if (patch.ultimoEnvioWhatsapp !== undefined) dbPatch.ultimo_envio_whatsapp = patch.ultimoEnvioWhatsapp;
     if (patch.status              !== undefined) dbPatch.status                = patch.status;
+    if (patch.valor               !== undefined) dbPatch.valor                 = patch.valor;
+    if (patch.vencimento          !== undefined) dbPatch.vencimento            = patch.vencimento;
+    if (patch.descricao           !== undefined) dbPatch.descricao             = patch.descricao;
+    if (patch.competencia         !== undefined) dbPatch.competencia           = patch.competencia;
+    if (patch.forma               !== undefined) dbPatch.forma                 = patch.forma;
 
     const { error: err } = await supabase.from("cobrancas").update(dbPatch as any).eq("id", id);
-    if (err) toast.error("Erro ao atualizar cobrança: " + err.message);
+    if (err) { toast.error("Erro ao atualizar cobrança: " + err.message); return false; }
+    toast.success("Cobrança atualizada");
+    return true;
+  }, []);
+
+  const deletarCobranca = useCallback(async (id: string) => {
+    const { error: err } = await supabase.from("cobrancas").delete().eq("id", id);
+    if (err) { toast.error("Erro ao excluir cobrança: " + err.message); return false; }
+    toast.success("Cobrança excluída");
+    return true;
   }, []);
 
   const kpi = {
@@ -106,5 +121,5 @@ export function useCobrancas(competencia?: string) {
     count:   cobrancas.length,
   };
 
-  return { cobrancas, loading, error, refetch: fetch, updateCobranca, kpi };
+  return { cobrancas, loading, error, refetch: fetch, updateCobranca, deletarCobranca, kpi };
 }

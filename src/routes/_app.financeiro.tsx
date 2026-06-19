@@ -10,7 +10,7 @@ import {
   AlertTriangle, CheckCircle2, DollarSign,
   Link2, Loader2, MessageCircle, ShieldAlert, Wallet, Plus,
   RefreshCw, Zap, ExternalLink, TrendingDown, FileCheck2, ReceiptText, FileClock,
-  ToggleLeft, ToggleRight, Settings2, X, Save} from "lucide-react";
+  ToggleLeft, ToggleRight, Settings2, X, Save, Pencil, Trash2} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,13 @@ function FinanceiroPage__Inner(){
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth()+1);
-  const { cobrancas: items, loading: cobLoading, error: cobError, refetch: refresh } = useCobrancas();
+  const { cobrancas: items, loading: cobLoading, error: cobError, refetch: refresh, deletarCobranca } = useCobrancas();
+  const [editCob, setEditCob] = useState<Cobranca | null>(null);
+  async function excluirCobranca(c: Cobranca) {
+    if (c.asaasId || c.status === "paga") { toast.error("Não dá pra excluir cobrança paga ou já enviada ao gateway"); return; }
+    if (!confirm(`Excluir a cobrança de ${c.clienteNome} (${fmtBRL(c.valor)})?`)) return;
+    if (await deletarCobranca(c.id)) refresh();
+  }
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
@@ -473,6 +479,17 @@ function FinanceiroPage__Inner(){
         }
         return <span className="text-[11px] text-muted-foreground">—</span>;
       },
+    },
+    {
+      key:"acoes", header:"", className:"text-right whitespace-nowrap",
+      cell: c=>(
+        <div className="flex items-center justify-end gap-1">
+          <button title="Editar" onClick={()=>setEditCob(c)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary"><Pencil className="h-3.5 w-3.5"/></button>
+          {!c.asaasId && c.status !== "paga" && (
+            <button title="Excluir" onClick={()=>excluirCobranca(c)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-600"><Trash2 className="h-3.5 w-3.5"/></button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -927,7 +944,17 @@ function FinanceiroPage__Inner(){
       <CobrancaFormDialog
         open={dialogCob}
         onClose={() => setDialogCob(false)}
-        onCreated={() => {}}
+        onCreated={() => refresh()}
+      />
+      <CobrancaFormDialog
+        open={!!editCob}
+        onClose={() => setEditCob(null)}
+        onCreated={() => refresh()}
+        cobranca={editCob ? {
+          id: editCob.id, clienteId: editCob.clienteId, descricao: editCob.descricao,
+          valor: editCob.valor, forma: editCob.forma, vencimento: editCob.vencimento,
+          competencia: editCob.competencia,
+        } : null}
       />
       <PagamentoDialog
         cobranca={pagDialog}
