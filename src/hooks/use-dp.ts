@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { calcFolhaTotais } from "@/lib/folha-calc";
+import { calcFolhaTotais, calcFolhaFuncionario } from "@/lib/folha-calc";
 import { calcRescisao } from "@/lib/rescisao-calc";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export function useUpdateFuncionario() {
 
 export function useDemitirFuncionario() {
   const [loading, setLoading] = useState(false);
-  const demitir = useCallback(async (funcionarioId: string, dataDemissao: string, tipo: TipoRescisao) => {
+  const demitir = useCallback(async (funcionarioId: string, dataDemissao: string, tipo: TipoRescisao, observacoes?: string) => {
     setLoading(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,7 +165,7 @@ export function useDemitirFuncionario() {
         tipo: tipo as any,
       });
       const { error: e2 } = await db.from("rescisoes")
-        .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao, ...verbas });
+        .insert({ funcionario_id: funcionarioId, empresa_id: func.empresa_id, tipo, data_demissao: dataDemissao, observacoes: observacoes?.trim() || null, ...verbas });
       if (e2) throw e2;
       toast.success("Funcionário demitido — rescisão calculada (valores estimados, confira)");
       return true;
@@ -205,16 +205,31 @@ export function useCreateFolha() {
       const db = supabase as any;
       // Busca os ativos e CALCULA a folha (antes a folha nascia zerada)
       const { data: funcs } = await db.from("funcionarios")
-        .select("salario_base, dependentes")
+        .select("id, salario_base, dependentes")
         .eq("empresa_id", empresaId).eq("status", "ativo");
-      const totais = calcFolhaTotais((funcs ?? []) as { salario_base: number; dependentes?: number | null }[]);
-      const { error } = await db.from("folha_mensal").insert({
+      const ativos = (funcs ?? []) as { id: string; salario_base: number; dependentes?: number | null }[];
+      const totais = calcFolhaTotais(ativos);
+      const { data: folha, error } = await db.from("folha_mensal").insert({
         empresa_id: empresaId,
         competencia,
         status: "aberta",
         ...totais,
-      });
+      }).select("id").single();
       if (error) throw error;
+      // Gera uma LINHA por funcionário (detalhe proventos/descontos/líquido).
+      if (folha?.id && ativos.length) {
+        const linhas = ativos.map(f => {
+          const r = calcFolhaFuncionario(Number(f.salario_base) || 0, f.dependentes ?? 0);
+          return {
+            folha_id: folha.id, funcionario_id: f.id,
+            salario_base: Number(f.salario_base) || 0,
+            proventos: r.bruto, inss: r.inss, irrf: r.irrf, fgts: r.fgts,
+            descontos: r.descontos, liquido: r.liquido,
+          };
+        });
+        const { error: eLinhas } = await db.from("folha_linha").insert(linhas);
+        if (eLinhas) throw eLinhas;
+      }
       toast.success(`Folha ${competencia} aberta — ${totais.total_funcionarios} funcionário(s)`);
       return true;
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao criar folha"); return false; }
@@ -240,6 +255,67 @@ export function useFecharFolha() {
     finally { setLoading(false); }
   }, []);
   return { fecharFolha, loading };
+}
+
+export interface FolhaLinha {
+  id: string; folha_id: string; funcionario_id: string;
+  salario_base: number; proventos: number; inss: number; irrf: number;
+  fgts: number; descontos: number; liquido: number; observacoes?: string | null;
+  funcionario?: { nome: string; cargo?: string } | null;
+}
+
+export function useFolhaLinhas(folhaId?: string) {
+  const [linhas, setLinhas] = useState<FolhaLinha[]>([]);
+  const [loading, setLoading] = useState(false);
+  const fetch = useCallback(async () => {
+    if (!folhaId) { setLinhas([]); return; }
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("folha_linha")
+        .select("*, funcionario:funcionario_id(nome, cargo)")
+        .eq("folha_id", folhaId)
+        .order("created_at");
+      if (error) throw error;
+      setLinhas((data ?? []) as FolhaLinha[]);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar detalhe da folha"); }
+    finally { setLoading(false); }
+  }, [folhaId]);
+  useEffect(() => { fetch(); }, [fetch]);
+  return { linhas, loading, refresh: fetch };
+}
+
+export function useEditarFolhaLinha() {
+  const [loading, setLoading] = useState(false);
+  const editarLinha = useCallback(async (id: string, patch: Partial<Pick<FolhaLinha, "proventos" | "inss" | "irrf" | "fgts" | "descontos" | "liquido" | "observacoes">>) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("folha_linha").update(patch).eq("id", id);
+      if (error) throw error;
+      toast.success("Linha atualizada");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao editar linha"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { editarLinha, loading };
+}
+
+export function useSalvarFolhaObs() {
+  const [loading, setLoading] = useState(false);
+  const salvarObs = useCallback(async (folhaId: string, observacoes: string) => {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("folha_mensal")
+        .update({ observacoes, updated_at: new Date().toISOString() }).eq("id", folhaId);
+      if (error) throw error;
+      toast.success("Observações salvas");
+      return true;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao salvar observações"); return false; }
+    finally { setLoading(false); }
+  }, []);
+  return { salvarObs, loading };
 }
 
 // ─── Férias ──────────────────────────────────────────────────────────────────

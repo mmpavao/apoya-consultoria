@@ -29,7 +29,7 @@ export function DemissaoDialog({ open, onClose, funcionario, onDemitido }: Props
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await demitir(funcionario.id, dataDemissao, tipo);
+    const ok = await demitir(funcionario.id, dataDemissao, tipo, obs);
     if (ok) { onDemitido?.(); onClose(); }
   }
 

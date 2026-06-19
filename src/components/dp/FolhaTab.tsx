@@ -1,16 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmtBRL } from "@/lib/format";
-import { Loader2, ChevronDown } from "lucide-react";
+import { Loader2, ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   useFuncionarios, useFolhaMensal, useCreateFolha, useFecharFolha,
+  useFolhaLinhas, useEditarFolhaLinha, useSalvarFolhaObs, type FolhaLinha,
 } from "@/hooks/use-dp";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const numBR = (s: string) => Number(String(s).replace(",", ".")) || 0;
 
 
 function competenciasRecentes(): string[] {
@@ -49,12 +54,40 @@ export function FolhaTab({ empresaId }: Props) {
   const { folha, loading, refresh: refetch } = useFolhaMensal(empresaId, competencia);
   const { createFolha: criar, loading: criando } = useCreateFolha();
   const { fecharFolha: fechar, loading: fechando } = useFecharFolha();
+  const { linhas, loading: loadingLinhas, refresh: refreshLinhas } = useFolhaLinhas(folha?.id);
+  const { editarLinha, loading: salvandoLinha } = useEditarFolhaLinha();
+  const { salvarObs, loading: salvandoObs } = useSalvarFolhaObs();
 
   const ativos = funcionarios.filter(f => f.status === "ativo");
+  const podeEditar = folha?.status === "aberta";
+
+  // Observações controladas (antes a textarea não salvava)
+  const [obs, setObs] = useState("");
+  useEffect(() => { setObs(folha?.observacoes ?? ""); }, [folha?.id, folha?.observacoes]);
+
+  // Editar linha
+  const [editLinha, setEditLinha] = useState<FolhaLinha | null>(null);
+  const [linhaForm, setLinhaForm] = useState({ proventos: "", inss: "", irrf: "", fgts: "", observacoes: "" });
+  function abrirEditarLinha(l: FolhaLinha) {
+    setEditLinha(l);
+    setLinhaForm({ proventos: String(l.proventos), inss: String(l.inss), irrf: String(l.irrf), fgts: String(l.fgts), observacoes: l.observacoes ?? "" });
+  }
+  async function salvarLinha() {
+    if (!editLinha) return;
+    const proventos = numBR(linhaForm.proventos), inss = numBR(linhaForm.inss), irrf = numBR(linhaForm.irrf), fgts = numBR(linhaForm.fgts);
+    const descontos = inss + irrf;
+    const ok = await editarLinha(editLinha.id, { proventos, inss, irrf, fgts, descontos, liquido: proventos - descontos, observacoes: linhaForm.observacoes.trim() || null });
+    if (ok) { setEditLinha(null); refreshLinhas(); }
+  }
 
   async function handleAbrirFolha() {
     const ok = await criar(empresaId, competencia);
-    if (ok) refetch();
+    if (ok) { refetch(); refreshLinhas(); }
+  }
+
+  async function handleSalvarObs() {
+    if (!folha) return;
+    if (await salvarObs(folha.id, obs)) refetch();
   }
 
   async function handleFecharFolha() {
@@ -129,23 +162,38 @@ export function FolhaTab({ empresaId }: Props) {
             ))}
           </div>
 
-          {/* Tabela de funcionários */}
+          {/* Tabela de funcionários (detalhe por pessoa) */}
           <div className="surface-card overflow-hidden">
             <table className="ft-table w-full">
               <thead><tr>
                 <th>Funcionário</th><th>Cargo</th><th>Salário Base</th>
-                <th>Proventos</th><th>Descontos</th><th>Líquido</th><th>FGTS</th>
+                <th>Proventos</th><th>Descontos</th><th>Líquido</th><th>FGTS</th><th></th>
               </tr></thead>
               <tbody>
-                {ativos.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-muted-foreground py-6 text-sm">Nenhum funcionário ativo</td></tr>
+                {loadingLinhas && (
+                  <tr><td colSpan={8} className="text-center py-6"><Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" /></td></tr>
                 )}
-                {ativos.map(func => (
-                  <tr key={func.id}>
-                    <td className="font-medium">{func.nome}</td>
-                    <td className="text-muted-foreground">{func.cargo ?? "—"}</td>
-                    <td>{fmtBRL(func.salario_base)}</td>
-                    <td>—</td><td>—</td><td>—</td><td>—</td>
+                {!loadingLinhas && linhas.length === 0 && (
+                  <tr><td colSpan={8} className="text-center text-muted-foreground py-6 text-sm">
+                    Sem detalhe por funcionário {ativos.length > 0 ? "(folha aberta antes da atualização — reabra para gerar)" : "— nenhum funcionário ativo"}
+                  </td></tr>
+                )}
+                {linhas.map(l => (
+                  <tr key={l.id}>
+                    <td className="font-medium">{l.funcionario?.nome ?? "—"}</td>
+                    <td className="text-muted-foreground">{l.funcionario?.cargo ?? "—"}</td>
+                    <td>{fmtBRL(l.salario_base)}</td>
+                    <td>{fmtBRL(l.proventos)}</td>
+                    <td className="text-red-600">{fmtBRL(l.descontos)}</td>
+                    <td className="font-semibold">{fmtBRL(l.liquido)}</td>
+                    <td className="text-muted-foreground">{fmtBRL(l.fgts)}</td>
+                    <td className="text-right">
+                      {podeEditar && (
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Editar linha" onClick={() => abrirEditarLinha(l)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -155,7 +203,14 @@ export function FolhaTab({ empresaId }: Props) {
           {/* Observações */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Observações da Folha</p>
-            <Textarea defaultValue={folha.observacoes ?? ""} rows={2} placeholder="Notas sobre esta competência..." disabled={folha.status !== "aberta"} />
+            <Textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Notas sobre esta competência..." disabled={!podeEditar} />
+            {podeEditar && (
+              <div className="flex justify-end mt-1.5">
+                <Button size="sm" variant="outline" disabled={salvandoObs || obs === (folha.observacoes ?? "")} onClick={handleSalvarObs}>
+                  {salvandoObs ? "Salvando…" : "Salvar Observações"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Ações */}
@@ -174,6 +229,28 @@ export function FolhaTab({ empresaId }: Props) {
           </div>
         </div>
       )}
+
+      {/* Editar linha da folha */}
+      <Dialog open={!!editLinha} onOpenChange={o => { if (!o) setEditLinha(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar — {editLinha?.funcionario?.nome ?? "Funcionário"}</DialogTitle>
+            <DialogDescription>Ajuste manual dos valores desta linha. Descontos e líquido são recalculados (proventos − INSS − IRRF).</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <div><Label className="text-xs mb-1 block">Proventos (R$)</Label><Input inputMode="decimal" value={linhaForm.proventos} onChange={e => setLinhaForm(f => ({ ...f, proventos: e.target.value }))} /></div>
+            <div><Label className="text-xs mb-1 block">FGTS (R$)</Label><Input inputMode="decimal" value={linhaForm.fgts} onChange={e => setLinhaForm(f => ({ ...f, fgts: e.target.value }))} /></div>
+            <div><Label className="text-xs mb-1 block">INSS (R$)</Label><Input inputMode="decimal" value={linhaForm.inss} onChange={e => setLinhaForm(f => ({ ...f, inss: e.target.value }))} /></div>
+            <div><Label className="text-xs mb-1 block">IRRF (R$)</Label><Input inputMode="decimal" value={linhaForm.irrf} onChange={e => setLinhaForm(f => ({ ...f, irrf: e.target.value }))} /></div>
+            <div className="col-span-2"><Label className="text-xs mb-1 block">Observação</Label><Input value={linhaForm.observacoes} onChange={e => setLinhaForm(f => ({ ...f, observacoes: e.target.value }))} /></div>
+            <p className="col-span-2 text-xs text-muted-foreground">Líquido: <strong>{fmtBRL(numBR(linhaForm.proventos) - numBR(linhaForm.inss) - numBR(linhaForm.irrf))}</strong></p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLinha(null)}>Cancelar</Button>
+            <Button disabled={salvandoLinha} onClick={salvarLinha}>{salvandoLinha ? "Salvando…" : "Salvar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm fechar */}
       <Dialog open={confirmClose} onOpenChange={setConfirmClose}>
