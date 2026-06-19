@@ -25,6 +25,7 @@ import { KanbanModulo } from "@/components/KanbanModulo";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
 import { useClientes } from "@/hooks/use-clientes";
+import { useEsocial } from "@/hooks/use-esocial";
 import {
   useFuncionarios, useFolhaMensal, useFerias, useRescisoes, useCreateFolha, useFecharFolha,
   type Funcionario, type FolhaMensal, type Ferias, type Rescisao,
@@ -371,71 +372,113 @@ function FeriasTab() {
 // ═══════════════════════════════════════════════════════════
 // TAB — eSocial
 // ═══════════════════════════════════════════════════════════
-type EsocialEvento = { codigo: string; nome: string; descricao: string; status: "ok"|"pendente"|"erro"; ultima_transmissao?: string };
-
-const ESOCIAL_EVENTOS: EsocialEvento[] = [
-  { codigo: "S-1000", nome: "Inf. do Empregador",     descricao: "Dados cadastrais da empresa e do estabelecimento",          status: "ok",      ultima_transmissao: "2026-06-01" },
-  { codigo: "S-1005", nome: "Tabela de Est.",          descricao: "Informações dos estabelecimentos",                          status: "ok",      ultima_transmissao: "2026-06-01" },
-  { codigo: "S-1020", nome: "Tabela de Lotações",      descricao: "Informações de lotações tributárias",                      status: "ok",      ultima_transmissao: "2026-06-01" },
-  { codigo: "S-1070", nome: "Processos Adm./Jud.",     descricao: "Processos administrativos e judiciais",                    status: "pendente" },
-  { codigo: "S-2200", nome: "Cad. Inicial Trab.",      descricao: "Cadastramento inicial do vínculo empregatício",            status: "ok",      ultima_transmissao: "2026-06-10" },
-  { codigo: "S-2205", nome: "Alt. Cadastral Trab.",    descricao: "Alterações nos dados cadastrais do trabalhador",           status: "ok",      ultima_transmissao: "2026-05-15" },
-  { codigo: "S-2206", nome: "Alt. Contratual Trab.",   descricao: "Alterações nos dados contratuais",                        status: "pendente" },
-  { codigo: "S-2230", nome: "Afastamento Temp.",       descricao: "Afastamentos temporários (doença, licença, etc.)",        status: "ok",      ultima_transmissao: "2026-05-20" },
-  { codigo: "S-2299", nome: "Desligamento",            descricao: "Comunicação de desligamento do trabalhador",              status: "ok",      ultima_transmissao: "2026-06-05" },
-  { codigo: "S-1200", nome: "Remuneração Trab.",       descricao: "Remuneração de trabalhadores vinculados ao empregador",   status: "pendente" },
-  { codigo: "S-1210", nome: "Pagamentos/Rendimentos",  descricao: "Pagamentos de rendimentos tributados pelo IRRF",          status: "pendente" },
-  { codigo: "S-1299", nome: "Fechamento Ev. Periód.",  descricao: "Fechamento dos eventos periódicos do mês",               status: "pendente" },
+// Catálogo dos eventos oficiais eSocial (referência fixa); o STATUS é por
+// empresa+competência, vindo do banco (esocial_evento), marcado à mão.
+type EsocialEventoCat = { codigo: string; nome: string; descricao: string };
+const ESOCIAL_CATALOGO: EsocialEventoCat[] = [
+  { codigo: "S-1000", nome: "Inf. do Empregador",     descricao: "Dados cadastrais da empresa e do estabelecimento" },
+  { codigo: "S-1005", nome: "Tabela de Est.",          descricao: "Informações dos estabelecimentos" },
+  { codigo: "S-1020", nome: "Tabela de Lotações",      descricao: "Informações de lotações tributárias" },
+  { codigo: "S-1070", nome: "Processos Adm./Jud.",     descricao: "Processos administrativos e judiciais" },
+  { codigo: "S-2200", nome: "Cad. Inicial Trab.",      descricao: "Cadastramento inicial do vínculo empregatício" },
+  { codigo: "S-2205", nome: "Alt. Cadastral Trab.",    descricao: "Alterações nos dados cadastrais do trabalhador" },
+  { codigo: "S-2206", nome: "Alt. Contratual Trab.",   descricao: "Alterações nos dados contratuais" },
+  { codigo: "S-2230", nome: "Afastamento Temp.",       descricao: "Afastamentos temporários (doença, licença, etc.)" },
+  { codigo: "S-2299", nome: "Desligamento",            descricao: "Comunicação de desligamento do trabalhador" },
+  { codigo: "S-1200", nome: "Remuneração Trab.",       descricao: "Remuneração de trabalhadores vinculados ao empregador" },
+  { codigo: "S-1210", nome: "Pagamentos/Rendimentos",  descricao: "Pagamentos de rendimentos tributados pelo IRRF" },
+  { codigo: "S-1299", nome: "Fechamento Ev. Periód.",  descricao: "Fechamento dos eventos periódicos do mês" },
 ];
 
-function EsocialTab() {
-  const [filtro, setFiltro] = useState<"todos"|"pendente"|"ok"|"erro">("todos");
+function competenciasEsocial(): string[] {
+  const list: string[] = []; const now = new Date();
+  for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); list.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`); }
+  return list;
+}
+function fmtComp(c: string) { const [y,m]=c.split("-"); const M=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]; return `${M[+m-1]}/${y}`; }
 
-  const filtrados = ESOCIAL_EVENTOS.filter(e => filtro === "todos" || e.status === filtro);
-  const pendentes = ESOCIAL_EVENTOS.filter(e => e.status === "pendente").length;
-  const erros     = ESOCIAL_EVENTOS.filter(e => e.status === "erro").length;
+function EsocialTab() {
+  const { clientes } = useClientes();
+  const now = new Date();
+  const [empresaId, setEmpresaId]   = useState("");
+  const [competencia, setCompetencia] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);
+  const [filtro, setFiltro] = useState<"todos"|"pendente"|"transmitido"|"erro">("todos");
+  const { registros, loading, marcar } = useEsocial(empresaId, competencia);
+
+  const eventos = ESOCIAL_CATALOGO.map(c => {
+    const r = registros[c.codigo];
+    return { ...c, status: (r?.status ?? "pendente") as "pendente"|"transmitido"|"erro", transmitido_em: r?.transmitido_em, observacoes: r?.observacoes };
+  });
+  const filtrados   = eventos.filter(e => filtro === "todos" || e.status === filtro);
+  const transmitidos = eventos.filter(e => e.status === "transmitido").length;
+  const pendentes   = eventos.filter(e => e.status === "pendente").length;
+  const erros       = eventos.filter(e => e.status === "erro").length;
+  const podeMarcar  = !!empresaId;
 
   return (
     <div className="space-y-4">
-      {/* Honestidade: não há integração eSocial real conectada — os eventos abaixo
-          são REFERÊNCIA dos códigos oficiais, não status de transmissão real. */}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center gap-2 text-sm text-amber-700">
+      {/* Controle MANUAL — não transmite ao gov; é o acompanhamento interno do escritório. */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-center gap-2 text-sm text-blue-700">
         <AlertTriangle className="h-4 w-4 shrink-0" />
-        Integração eSocial ainda não conectada — a lista abaixo é referência dos eventos oficiais (status ilustrativo).
+        Controle manual do eSocial (status por empresa/competência). A transmissão ao gov é feita à parte — aqui você acompanha o que já foi enviado.
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={empresaId} onValueChange={setEmpresaId}>
+          <SelectTrigger className="h-8 w-56 text-xs"><SelectValue placeholder="Selecionar empresa…" /></SelectTrigger>
+          <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={competencia} onValueChange={setCompetencia}>
+          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>{competenciasEsocial().map(c => <SelectItem key={c} value={c}>{fmtComp(c)}</SelectItem>)}</SelectContent>
+        </Select>
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+
       <div className="grid grid-cols-3 gap-3">
-        <DKpiCard icon={CheckCircle2} label="Transmitidos" value={ESOCIAL_EVENTOS.filter(e => e.status === "ok").length}      variant="default" />
-        <DKpiCard icon={Clock}        label="Pendentes"    value={pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
-        <DKpiCard icon={AlertTriangle} label="Com erro"    value={erros}        variant={erros > 0 ? "danger" : "default"} />
+        <DKpiCard icon={CheckCircle2}  label="Transmitidos" value={transmitidos} variant="default" />
+        <DKpiCard icon={Clock}         label="Pendentes"    value={pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
+        <DKpiCard icon={AlertTriangle} label="Com erro"     value={erros}        variant={erros > 0 ? "danger" : "default"} />
       </div>
+
       <div className="flex gap-1">
-        {(["todos","ok","pendente","erro"] as const).map(f => (
+        {(["todos","transmitido","pendente","erro"] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             className={cn("px-3 py-1 text-xs rounded-full border transition-colors",
               filtro === f ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground/40"
-            )}>{f === "todos" ? "Todos" : f === "ok" ? "Transmitidos" : f === "pendente" ? "Pendentes" : "Erros"}</button>
+            )}>{f === "todos" ? "Todos" : f === "transmitido" ? "Transmitidos" : f === "pendente" ? "Pendentes" : "Erros"}</button>
         ))}
       </div>
+
+      {!empresaId && <p className="text-xs text-muted-foreground">Selecione uma empresa para acompanhar e marcar os eventos.</p>}
+
       <div className="space-y-2">
         {filtrados.map(ev => (
           <div key={ev.codigo} className="rounded-lg border bg-card px-4 py-3 flex items-start gap-4">
-            <div className={cn("mt-0.5 shrink-0 h-2.5 w-2.5 rounded-full", ev.status === "ok" ? "bg-emerald-500" : ev.status === "erro" ? "bg-red-500" : "bg-amber-500")} />
+            <div className={cn("mt-0.5 shrink-0 h-2.5 w-2.5 rounded-full", ev.status === "transmitido" ? "bg-emerald-500" : ev.status === "erro" ? "bg-red-500" : "bg-amber-500")} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{ev.codigo}</span>
                 <p className="text-sm font-medium">{ev.nome}</p>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{ev.descricao}</p>
-              {ev.ultima_transmissao && <p className="text-[11px] text-muted-foreground mt-1">Última transmissão: {fmtDate(ev.ultima_transmissao)}</p>}
+              {ev.transmitido_em && <p className="text-[11px] text-muted-foreground mt-1">Transmitido em: {fmtDate(ev.transmitido_em)}</p>}
             </div>
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
               <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium border",
-                ev.status === "ok"      ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                ev.status === "erro"    ? "bg-red-50 text-red-700 border-red-200" :
+                ev.status === "transmitido" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                ev.status === "erro"        ? "bg-red-50 text-red-700 border-red-200" :
                 "bg-amber-50 text-amber-700 border-amber-200"
               )}>
-                {ev.status === "ok" ? "Transmitido" : ev.status === "erro" ? "Erro" : "Pendente"}
+                {ev.status === "transmitido" ? "Transmitido" : ev.status === "erro" ? "Erro" : "Pendente"}
               </span>
+              {podeMarcar && (
+                <div className="flex gap-1">
+                  {ev.status !== "transmitido" && <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-emerald-700" onClick={() => marcar(ev.codigo, "transmitido")}>Transmitido</Button>}
+                  {ev.status !== "erro"        && <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-red-600" onClick={() => marcar(ev.codigo, "erro")}>Erro</Button>}
+                  {ev.status !== "pendente"    && <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px] text-muted-foreground" onClick={() => marcar(ev.codigo, "pendente")}>Pendente</Button>}
+                </div>
+              )}
             </div>
           </div>
         ))}
