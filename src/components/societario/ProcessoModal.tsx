@@ -36,9 +36,11 @@ export function ProcessoModal({processo,open,onClose,onMoverFase,onComentario,on
   const [editando,setEditando]     = useState(false);
   const [prazoEdit,setPrazoEdit]   = useState("");
   const [respEdit,setRespEdit]     = useState("");
+  const [descEdit,setDescEdit]     = useState("");
+  const [obsEdit,setObsEdit]       = useState("");
 
   useEffect(()=>{
-    if (processo){ setPrazoEdit(processo.prazo??""); setRespEdit(processo.responsavel??""); }
+    if (processo){ setPrazoEdit(processo.prazo??""); setRespEdit(processo.responsavel??""); setDescEdit(processo.descricao??""); setObsEdit(processo.observacoes??""); }
   },[processo?.id]);
 
   async function handleComentario() {
@@ -51,7 +53,7 @@ export function ProcessoModal({processo,open,onClose,onMoverFase,onComentario,on
 
   async function handleSalvar() {
     if (!processo) return;
-    await onAtualizar(processo.id,{prazo:prazoEdit||null,responsavel:respEdit||null});
+    await onAtualizar(processo.id,{prazo:prazoEdit||null,responsavel:respEdit||null,descricao:descEdit||null,observacoes:obsEdit||null});
     setEditando(false);
   }
 
@@ -99,6 +101,16 @@ export function ProcessoModal({processo,open,onClose,onMoverFase,onComentario,on
               {processo.dataConclusao && <div className="flex justify-between"><span className="text-muted-foreground">Conclusão:</span><span className="text-emerald-600">{fmtData(processo.dataConclusao)}</span></div>}
             </div>
             <div><Label className="text-xs text-muted-foreground uppercase mb-1 block"><Clock className="h-3 w-3 inline mr-1"/>Tempo na fase</Label><p className="text-sm font-medium">{processo.diasNaFase}d</p></div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-1 block">Descrição</Label>
+              {editando ? <Textarea rows={2} value={descEdit} onChange={e=>setDescEdit(e.target.value)} className="text-sm" placeholder="Descrição do processo…"/>
+                : <p className="text-sm whitespace-pre-wrap">{processo.descricao || <span className="text-muted-foreground italic">—</span>}</p>}
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider mb-1 block">Observações</Label>
+              {editando ? <Textarea rows={2} value={obsEdit} onChange={e=>setObsEdit(e.target.value)} className="text-sm" placeholder="Notas internas…"/>
+                : <p className="text-sm whitespace-pre-wrap">{processo.observacoes || <span className="text-muted-foreground italic">—</span>}</p>}
+            </div>
             {/* Documentos pendentes */}
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Documentos Pendentes</p>

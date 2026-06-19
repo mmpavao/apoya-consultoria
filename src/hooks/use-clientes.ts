@@ -191,7 +191,14 @@ export function useClientes() {
 
   const deleteCliente = useCallback(async (id: string) => {
     const { error: err } = await supabase.from("clientes").delete().eq("id", id);
-    if (err) { toast.error("Erro ao excluir: " + err.message); return false; }
+    if (err) {
+      // 23503 = foreign_key_violation — cliente tem registros vinculados
+      const fk = (err as { code?: string }).code === "23503" || /foreign key|viola/i.test(err.message);
+      toast.error(fk
+        ? "Não dá pra excluir: este cliente tem registros vinculados (cobranças, contratos, documentos…). Remova-os ou inative o cliente."
+        : "Erro ao excluir: " + err.message);
+      return false;
+    }
     return true;
   }, []);
 
