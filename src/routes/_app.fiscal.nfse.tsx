@@ -24,7 +24,7 @@ import { useClientes } from "@/hooks/use-clientes";
 import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
 
 export const Route = createFileRoute("/_app/fiscal/nfse")({
-  component: NfsePage,
+  component: NfseContent,
   head: () => ({ meta: [{ title: "NFS-e · APOYA Gestão" }] }),
 });
 
@@ -55,7 +55,7 @@ function downloadText(content: string, filename: string) {
 }
 
 
-function NfsePage() {
+export function NfseContent() {
   const now = new Date();
   const { clientes } = useClientes();
   const { loading, listarEmitidas, listarRecebidas, cancelar, obterPdf, obterXml } = useNfse();
@@ -352,6 +352,3 @@ function NfsePage() {
     </div>
   );
 }
-
-// Export para uso inline na aba do módulo fiscal
-export { NfsePage as NfseContent };
