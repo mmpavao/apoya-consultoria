@@ -13,6 +13,7 @@ const AGENTS_GATE_SECRET = Deno.env.get("AGENTS_GATE_SECRET");
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // Orçamento GLOBAL do time (não por agente).
@@ -27,10 +28,11 @@ const EXPERT_SECTORS = new Set(["FISCAL", "RH", "FINANCEIRO", "CONTABIL", "SOCIE
 async function chamarAgente(slug: string): Promise<{ agente: string; success: boolean; alertas: number; resumo: Record<string, unknown>; erro?: string }> {
   const url = `${SUPABASE_URL}/functions/v1/${slug}`;
   try {
-    // Chamada interna autenticada com service-role (defesa em profundidade).
+    // Chamada interna autenticada com o gate secret (os experts são fail-closed
+    // e REJEITAM a service-role; sem fallback p/ não 401 silencioso).
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${AGENTS_GATE_SECRET ?? SUPABASE_SERVICE_ROLE_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${AGENTS_GATE_SECRET ?? ""}` },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();

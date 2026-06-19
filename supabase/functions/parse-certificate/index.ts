@@ -6,14 +6,21 @@
  * Retorna: { ok, nomeRazao, cnpj, serial, validoAte, tipo }
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { requireUser } from "../_shared/agent.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ⚠️ INERTE em prod: depende de subprocess openssl, bloqueado pelo Edge Runtime
+// (sempre 500). NÃO está no deploy.yml. Antes de usar, trocar openssl por um
+// parser PKCS12 em WASM/JS. Guard requireUser já posto p/ não nascer oráculo
+// público de senha de certificado quando/se for deployada.
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const denied = await requireUser(req, CORS);
+  if (denied) return denied;
 
   try {
     const { pfxBase64, password } = await req.json();
