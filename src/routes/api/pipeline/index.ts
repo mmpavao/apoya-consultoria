@@ -8,13 +8,12 @@
  *    Disciplina F1.1: agentes chamam o MCP diretamente com sua API key de agente.
  */
 import { createFileRoute } from "@tanstack/react-router";
-
-// Token server-side — nunca exposto ao browser (bundle do CF Worker)
-const MCP_API_KEY = "apoya-gestao-worker-44993fcc52d20535c97de6be366ad1f0";
-function getMcpKey(): string { return MCP_API_KEY; }
-
-const MCP_URL = "https://apoya-mcp.talkzzbot.workers.dev/mcp";
-const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
+import {
+  SUPABASE_URL,
+  getApoyaServiceToken,
+  getMcpUrl,
+  getSupabaseAnonKey,
+} from "@/lib/worker-env";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -30,13 +29,9 @@ async function autenticarSessao(
   if (!authHeader.startsWith("Bearer ")) return json({ error: "Nao autenticado" }, 401);
   const token = authHeader.slice(7).trim();
 
-  // Anon key eh publica (sem segredo)
-  const anonKey =
-    (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-    (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+  const anonKey = getSupabaseAnonKey();
 
-  const resp = await fetch(`${SUPA_URL}/auth/v1/user`, {
+  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: anonKey },
   });
   if (!resp.ok) return json({ error: "Sessao invalida" }, 401);
@@ -47,8 +42,8 @@ async function autenticarSessao(
 }
 
 async function callMcp(tool: string, args: unknown): Promise<unknown> {
-  const apiKey = getMcpKey();
-  const res = await fetch(MCP_URL, {
+  const apiKey = getApoyaServiceToken();
+  const res = await fetch(getMcpUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -80,7 +75,7 @@ async function checkUserSetor(
 ): Promise<boolean> {
   // Verificar role admin
   const roleResp = await fetch(
-    `${SUPA_URL}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=role&limit=1`,
+    `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=role&limit=1`,
     { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
   );
   if (roleResp.ok) {
@@ -90,7 +85,7 @@ async function checkUserSetor(
 
   // Verificar user_setores
   const setorResp = await fetch(
-    `${SUPA_URL}/rest/v1/user_setores?user_id=eq.${userId}&setor_slug=eq.${setor}&select=setor_slug&limit=1`,
+    `${SUPABASE_URL}/rest/v1/user_setores?user_id=eq.${userId}&setor_slug=eq.${setor}&select=setor_slug&limit=1`,
     { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
   );
   if (!setorResp.ok) return false;
@@ -110,10 +105,7 @@ export const Route = createFileRoute("/api/pipeline/")({
         const clienteId = url.searchParams.get("cliente_id");
 
         // B2: Guard — 403 se o usuário não tem o setor pedido
-        const anonKey =
-          (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-          (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM";
+        const anonKey = getSupabaseAnonKey();
         const userToken = request.headers.get("authorization")!.slice(7).trim();
         const hasSetor = await checkUserSetor(auth.userId, anonKey, userToken, setor);
         if (!hasSetor) {

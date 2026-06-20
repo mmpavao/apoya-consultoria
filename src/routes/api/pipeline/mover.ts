@@ -12,19 +12,13 @@
  * Body esperado: { tarefa_id, etapa_destino, motivo? }
  */
 import { createFileRoute } from "@tanstack/react-router";
-
-// Token server-side — nunca exposto ao browser (bundle do CF Worker)
-const MCP_API_KEY = "apoya-gestao-worker-44993fcc52d20535c97de6be366ad1f0";
-function getMcpKey(): string { return MCP_API_KEY; }
-
-function getSvcKey(): string {
-  if (typeof process !== "undefined" && process.env?.SUPABASE_SERVICE_ROLE_KEY)
-    return process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return (globalThis as any).__env__?.SUPABASE_SERVICE_ROLE_KEY ?? "";
-}
-
-const MCP_URL = "https://apoya-mcp.talkzzbot.workers.dev/mcp";
-const SUPA_URL = "https://ajaqbdsalxfgrwpjbtbn.supabase.co";
+import {
+  SUPABASE_URL,
+  getApoyaServiceToken,
+  getMcpUrl,
+  getSupabaseAnonKey,
+  getSupabaseServiceRoleKey,
+} from "@/lib/worker-env";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -34,11 +28,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 function anonKey(): string {
-  return (
-    (typeof process !== "undefined" && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
-    (globalThis as any).__env__?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYXFiZHNhbHhmZ3J3cGpidGJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDgzMjMsImV4cCI6MjA5NDg4NDMyM30.QI9pwP1W3x6jFzOPsI_8lTGCY8Moup0AIhcsoG6jDQM"
-  );
+  return getSupabaseAnonKey();
 }
 
 async function autenticarSessao(
@@ -48,7 +38,7 @@ async function autenticarSessao(
   if (!authHeader.startsWith("Bearer ")) return json({ error: "Nao autenticado" }, 401);
   const token = authHeader.slice(7).trim();
 
-  const resp = await fetch(`${SUPA_URL}/auth/v1/user`, {
+  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: anonKey() },
   });
   if (!resp.ok) return json({ error: "Sessao invalida" }, 401);
@@ -58,8 +48,8 @@ async function autenticarSessao(
 }
 
 async function callMcp(tool: string, args: unknown): Promise<unknown> {
-  const apiKey = getMcpKey();
-  const res = await fetch(MCP_URL, {
+  const apiKey = getApoyaServiceToken();
+  const res = await fetch(getMcpUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -89,7 +79,7 @@ async function checkUserSetor(
   setor: string
 ): Promise<boolean> {
   const roleResp = await fetch(
-    `${SUPA_URL}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=role&limit=1`,
+    `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&role=eq.admin&select=role&limit=1`,
     { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
   );
   if (roleResp.ok) {
@@ -97,7 +87,7 @@ async function checkUserSetor(
     if (roles.length > 0) return true;
   }
   const setorResp = await fetch(
-    `${SUPA_URL}/rest/v1/user_setores?user_id=eq.${userId}&setor_slug=eq.${setor}&select=setor_slug&limit=1`,
+    `${SUPABASE_URL}/rest/v1/user_setores?user_id=eq.${userId}&setor_slug=eq.${setor}&select=setor_slug&limit=1`,
     { headers: { apikey: anonKey, Authorization: `Bearer ${userToken}` } }
   );
   if (!setorResp.ok) return false;
@@ -127,11 +117,11 @@ export const Route = createFileRoute("/api/pipeline/mover")({
         // 2b. B2 isolamento (escrita) — setor lido direto do Supabase (service role),
         //     NUNCA do payload (anti-spoof). Fail-closed: qualquer falha → 403/50x.
         {
-          const svcKey = getSvcKey();
+          const svcKey = getSupabaseServiceRoleKey();
           let tSetor: string | undefined;
           try {
             const r = await fetch(
-              `${SUPA_URL}/rest/v1/tarefas?id=eq.${encodeURIComponent(tarefa_id)}&select=setor&limit=1`,
+              `${SUPABASE_URL}/rest/v1/tarefas?id=eq.${encodeURIComponent(tarefa_id)}&select=setor&limit=1`,
               { headers: { apikey: svcKey, Authorization: `Bearer ${svcKey}` } }
             );
             if (!r.ok) return json({ error: "Falha ao validar tarefa" }, 502);
