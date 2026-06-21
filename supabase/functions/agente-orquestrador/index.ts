@@ -10,12 +10,7 @@ import { requireAuth, CORS } from "../_shared/agent.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const AGENTS_GATE_SECRET = Deno.env.get("AGENTS_GATE_SECRET");
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// CORS vem de _shared/agent.ts (importado acima) — não redeclarar.
 
 // Orçamento GLOBAL do time (não por agente).
 const MAX_STEPS = 8;            // teto de invocações de agente por ciclo
