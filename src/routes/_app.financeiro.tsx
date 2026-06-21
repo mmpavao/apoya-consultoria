@@ -51,7 +51,6 @@ function FinanceiroPage__Inner(){
   const [query, setQuery]   = useState("");
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
-  const [emitindoNf,  setEmitindoNf]  = useState<string|null>(null);
   const [showReguaModal, setShowReguaModal] = useState(false);
   // Config REAL da régua (a mesma tabela que a execução /api/cobranca/regua lê).
   // Antes o modal editava um array decorativo salvo em pipeline_config (quebrado).
@@ -125,38 +124,12 @@ function FinanceiroPage__Inner(){
   }
 
 
-  const emitirNfManual = async (cobrancaId: string) => {
-    setEmitindoNf(cobrancaId);
-    try {
-      const { data: { session } } = await (await import('@/integrations/supabase/client')).supabase.auth.getSession();
-      const token = session?.access_token ?? '';
-      const res = await fetch('/api/nfse/emitir-cobranca', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ cobranca_id: cobrancaId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data?.error ?? 'Erro ao emitir NFS-e');
-      } else {
-        toast.success(`NFS-e nº ${data.numero} emitida com sucesso!`);
-        refresh();
-      }
-    } catch (e: any) {
-      toast.error('Erro ao emitir NFS-e: ' + (e?.message ?? ''));
-    } finally {
-      setEmitindoNf(null);
-    }
-  };
-
   const { roles } = useAuth();
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
-  const [executandoRegua, setExecRegua] = useState(false);
   const [stage, setStage]   = useState<"todos"|ReguaStage>("todos");
   const [sel, setSel]       = useState<Set<string>>(new Set());
-  const [busy, setBusy]     = useState(false);
   const comp = `${ano}-${mes.toString().padStart(2,"0")}`;
 
   useEffect(()=>{
@@ -197,118 +170,6 @@ function FinanceiroPage__Inner(){
   const toggleAll=()=>setSel(sel.size===filtered.length?new Set():new Set(filtered.map(c=>c.id)));
   const toggleOne=(id:string)=>{ const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
 
-  async function gerarAsaas(){
-    const ids=filtered.filter(c=>sel.has(c.id)&&!c.asaasId).map(c=>c.id);
-    if(!ids.length){ toast.error("Selecione cobranças sem link de pagamento"); return; }
-    setBusy(true);
-    toast.loading(`Emitindo ${ids.length} cobrança(s) no Asaas…`,{id:"fin-asaas"});
-    try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", {id:"fin-asaas"}); return; }
-      let emitidas = 0; let erros = 0;
-      for (const cobId of ids) {
-        const res = await fetch("/api/cobranca/emitir", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-          body: JSON.stringify({ mode: "individual", cobranca_id: cobId }),
-        });
-        const data = await res.json() as any;
-        if (data.ok && data.emitidas > 0) emitidas++;
-        else erros++;
-      }
-      await refresh();
-      if (erros === 0) toast.success(`${emitidas} cobrança(s) emitida(s) no Asaas! 🎉`,{id:"fin-asaas"});
-      else toast.warning(`${emitidas} emitida(s) · ${erros} com erro`,{id:"fin-asaas"});
-      setSel(new Set());
-    } catch(e:any) {
-      toast.error("Erro Asaas: " + (e?.message ?? "Tente novamente"), {id:"fin-asaas"});
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function enviarWpp(){
-    const cobs=filtered.filter(c=>sel.has(c.id)&&c.linkPagamento);
-    if(!cobs.length){ toast.error("Selecione cobranças com link de pagamento gerado"); return; }
-    setBusy(true);
-    toast.loading(`Enviando ${cobs.length} mensagem(ns) WhatsApp…`,{id:"fin-wpp"});
-    try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", {id:"fin-wpp"}); return; }
-      let enviadas = 0; let erros = 0;
-      for (const cob of cobs) {
-        const fmtBRLv = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-        const fmtDt   = (d:string) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR");
-        const nome    = cob.clienteNome.split(" ")[0];
-        const msg     = cob.diasAtraso > 0
-          ? `❗ ${nome}, sua mensalidade APOYA de ${fmtBRLv(cob.valor)} está *vencida há ${cob.diasAtraso} dia(s)*.
-🔗 Regularize: ${cob.linkPagamento}`
-          : `💰 Olá ${nome}! Sua mensalidade APOYA de ${fmtBRLv(cob.valor)} vence em *${fmtDt(cob.vencimento)}*.
-🔗 Pague: ${cob.linkPagamento}`;
-        const res = await fetch("/api/wa/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-          // telefone resolvido no backend a partir do cliente_id (cadastro)
-          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: cob.clienteId }),
-        });
-        const data = await res.json() as any;
-        if (data.ok) enviadas++; else erros++;
-      }
-      await refresh();
-      if (erros === 0) toast.success(`${enviadas} mensagem(ns) enviada(s)! 📱`,{id:"fin-wpp"});
-      else toast.warning(`${enviadas} enviada(s) · ${erros} com erro`,{id:"fin-wpp"});
-      setSel(new Set());
-    } catch(e:any) {
-      toast.error("Erro WhatsApp: " + (e?.message ?? "Tente novamente"), {id:"fin-wpp"});
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function gerarMensal(){
-    setBusy(true);
-    toast.loading("Gerando cobranças mensais e emitindo no Asaas…",{id:"fin-mensal"});
-    try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", {id:"fin-mensal"}); return; }
-      const res = await fetch("/api/cobranca/emitir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: "gerar_mensal", competencia: comp }),
-      });
-      const data = await res.json() as any;
-      await refresh();
-      if (data.ok) {
-        toast.success(`${data.geradas ?? 0} cobranças geradas · ${data.emitidas ?? 0} emitidas no Asaas 🎉`,{id:"fin-mensal"});
-      } else {
-        toast.error(data.error ?? "Erro ao gerar cobranças",{id:"fin-mensal"});
-      }
-    } catch(e:any) {
-      toast.error("Erro: " + (e?.message ?? "Tente novamente"), {id:"fin-mensal"});
-    } finally {
-      setBusy(false);
-    }
-  }
-
-
-  async function executarRegua() {
-    setExecRegua(true);
-    toast.loading("Executando régua…", { id: "fin-regua" });
-    try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", { id:"fin-regua" }); return; }
-      const res = await fetch("/api/cobranca/regua", {
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},
-        body: JSON.stringify({ mode:"manual" }),
-      });
-      const data = await res.json() as Record<string,unknown>;
-      await refresh();
-      if (data.ok) toast.success(`Régua executada: ${data.processadas ?? 0} cobrança(s)`, { id:"fin-regua" });
-      else toast.error(String(data.error??"Erro"), { id:"fin-regua" });
-    } catch(e) {
-      toast.error("Erro: " + (e instanceof Error ? e.message : "Tente novamente"), { id:"fin-regua" });
-    } finally { setExecRegua(false); }
-  }
 
   // ── Dados de inadimplência ────────────────────────────────────────────────
   const hoje = new Date().toISOString().split("T")[0];
@@ -381,62 +242,6 @@ function FinanceiroPage__Inner(){
       ),
     },
     {
-      key:"nfse", header:"NFS-e",
-      headerClassName:"hidden md:table-cell", className:"hidden md:table-cell",
-      cell: (c) => {
-        const st = c.nfseStatus;
-        if (st === "emitida") {
-          return (
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold">
-              <FileCheck2 className="h-3.5 w-3.5" /> Emitida
-            </span>
-          );
-        }
-        if (st === "processando") {
-          return (
-            <span className="inline-flex items-center gap-1 text-[11px] text-blue-600">
-              <FileClock className="h-3.5 w-3.5 animate-pulse" /> Processando
-            </span>
-          );
-        }
-        if (st === "erro") {
-          return (
-            <div className="space-y-1">
-              <span className="inline-flex items-center gap-1 text-[11px] text-red-600 font-medium">
-                <ReceiptText className="h-3.5 w-3.5" /> Erro
-              </span>
-              {c.status === "paga" && (
-                <button
-                  onClick={() => emitirNfManual(c.id)}
-                  disabled={emitindoNf === c.id}
-                  className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-50"
-                >
-                  {emitindoNf === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                  Retentar
-                </button>
-              )}
-            </div>
-          );
-        }
-        // Sem nota: mostrar botão apenas se paga
-        if (c.status === "paga") {
-          return (
-            <button
-              onClick={() => emitirNfManual(c.id)}
-              disabled={emitindoNf === c.id}
-              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium disabled:opacity-50 hover:underline"
-            >
-              {emitindoNf === c.id
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Emitindo…</>
-                : <><ReceiptText className="h-3.5 w-3.5" /> Emitir NF</>
-              }
-            </button>
-          );
-        }
-        return <span className="text-[11px] text-muted-foreground">—</span>;
-      },
-    },
-    {
       key:"acoes", header:"", className:"text-right whitespace-nowrap",
       cell: c=>(
         <div className="flex items-center justify-end gap-1">
@@ -464,14 +269,8 @@ function FinanceiroPage__Inner(){
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground"
                 onClick={()=>{let m=mes+1,a=ano;if(m>12){m=1;a++;}setMes(m);setAno(a);}}>›</Button>
             </div>
-            <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={gerarMensal} disabled={busy}>
-              {busy?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<Zap className="h-3.5 w-3.5"/>}Emitir cobranças
-            </Button>
             <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={() => setShowReguaModal(true)}>
               <Settings2 className="h-3.5 w-3.5"/>Configurar Régua
-            </Button>
-            <Button variant="ghost" size="sm" className="rounded-xl gap-1 text-xs" onClick={executarRegua} disabled={executandoRegua}>
-              {executandoRegua?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<RefreshCw className="h-3.5 w-3.5"/>}Executar Régua
             </Button>
             <Button size="sm" onClick={() => setDialogCob(true)} className="rounded-xl gap-1.5">
               <Plus className="h-4 w-4" /> Nova Cobrança
@@ -500,7 +299,6 @@ function FinanceiroPage__Inner(){
           <TabsTrigger value="inadimplencia">
             Inadimplência{inadimplentes.length > 0 && <span className="ml-1.5 text-[10px] font-bold bg-red-100 text-red-600 px-1.5 rounded-full">{inadimplentes.length}</span>}
           </TabsTrigger>
-          <TabsTrigger value="gateway">Gateway</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
@@ -611,23 +409,6 @@ function FinanceiroPage__Inner(){
 
         <TabsContent value="cobrancas" className="mt-0">
       <div>
-      {/* Barra de ações em lote */}
-      {sel.size>0 && (
-        <div className="flex items-center gap-3 rounded-xl border bg-primary/5 px-4 py-2.5">
-          <span className="text-sm font-medium">{sel.size} selecionada(s)</span>
-          <div className="ml-auto flex gap-2">
-            <Button size="sm" variant="outline" className="h-7 rounded-xl text-xs gap-1" disabled={busy} onClick={gerarAsaas}>
-              {busy?<Loader2 className="h-3 w-3 animate-spin"/>:<Link2 className="h-3 w-3"/>} Gerar Asaas
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 rounded-xl text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-              disabled={busy} onClick={enviarWpp}>
-              <MessageCircle className="h-3 w-3"/> WhatsApp
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 rounded-xl text-xs" onClick={()=>setSel(new Set())}>Cancelar</Button>
-          </div>
-        </div>
-      )}
-
       <DataTable
         rows={pageRows}
         cols={cols}
@@ -673,29 +454,6 @@ function FinanceiroPage__Inner(){
       </div>
         </TabsContent>
 
-        <TabsContent value="gateway" className="mt-0">
-        <div className="rounded-xl border bg-card p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold">Gateway de Pagamento</h3>
-              <p className="text-sm text-muted-foreground">Asaas — configuração e status</p>
-            </div>
-            <a href="/configuracoes"><button className="text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted">Config completa</button></a>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {/* status real fica em Configurações › Integrações; não afirmar "Configurado ✓" aqui (era fixo/falso) */}
-            {[
-              { label: "Gateway", value: "Asaas" },
-              { label: "Webhook / Pix", value: "Ver em Configurações › Integrações" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</span>
-                <span className="text-sm font-medium">{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        </TabsContent>
 
 
         <TabsContent value="config" className="mt-0">
