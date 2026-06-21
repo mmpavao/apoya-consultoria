@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
-import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type BadgeColor } from "@/components/DataTable";
@@ -78,15 +77,6 @@ function FinanceiroPage__Inner(){
   }, [showReguaModal, reguaLoaded]);
   const setCfg = (k: string, v: string | number) => setReguaCfg(c => ({ ...c, [k]: v }));
   const [salvandoRegua, setSalvandoRegua] = useState(false);
-  const [autosFin, setAutosFin] = useState([
-    { id: "regua",  nome: "Régua de Cobrança",          desc: "Lembretes automáticos por WhatsApp/Email", agente: "agente-financeiro", freq: "Diária 08:00", ativo: true,  resultado: null as null|"ok"|"erro" },
-    { id: "inadim", nome: "Alerta Inadimplência",        desc: "Notifica após 5 dias de atraso",           agente: "agente-financeiro", freq: "Diária 09:00", ativo: true,  resultado: null as null|"ok"|"erro" },
-    { id: "nfse",   nome: "NFS-e pós-pagamento",         desc: "Emite nota após confirmar pagamento",      agente: "agente-financeiro", freq: "Imediato",     ativo: false, resultado: null as null|"ok"|"erro" },
-  ]);
-  const [novaAuto, setNovaAuto] = useState({ nome: "", agente_edge_fn: "agente-financeiro", freq_tipo: "diaria", horario: "08:00", ativo: true });
-  const [showNovaAuto, setShowNovaAuto] = useState(false);
-  const [salvandoAuto, setSalvandoAuto] = useState(false);
-  const [runningAutoId, setRunningAutoId] = useState<string|null>(null);
   const { config: depConfig, saving: savingCfg, save: saveDepConfig } = useDepartamentoConfig("financeiro");
   const [configsFin, setConfigsFin] = useState([
     { key: "nfse_auto",    label: "Emitir NFS-e após pagamento",     enabled: false },
@@ -134,39 +124,6 @@ function FinanceiroPage__Inner(){
     } finally { setSalvandoRegua(false); }
   }
 
-  async function executarAutoFin(id: string, agente: string) {
-    const { session } = (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data;
-    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
-    setRunningAutoId(id);
-    toast.loading("Executando…", { id: "auto-fin-" + id });
-    try {
-      const res = await fetch("https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/" + agente, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-        body: JSON.stringify({ trigger: "manual" }),
-      });
-      if (res.ok) { toast.success("Executado!", { id: "auto-fin-" + id }); setAutosFin(a => a.map(x => x.id === id ? { ...x, resultado: "ok" } : x)); }
-      else { toast.error("Erro na execução", { id: "auto-fin-" + id }); setAutosFin(a => a.map(x => x.id === id ? { ...x, resultado: "erro" } : x)); }
-    } catch (e: any) { toast.error(e?.message, { id: "auto-fin-" + id }); }
-    finally { setRunningAutoId(null); }
-  }
-
-  async function criarNovaAutomacao() {
-    if (!novaAuto.nome.trim()) { toast.error("Nome obrigatório"); return; }
-    setSalvandoAuto(true);
-    try {
-      // Persiste em departamento_config (jsonb) — pipeline_config é a tabela do
-      // kanban (setor+etapas); gravar automação ali poluiria os estágios.
-      const nova = { id: "custom-" + Date.now(), ...novaAuto, criada_em: new Date().toISOString() };
-      const atuais = Array.isArray((depConfig as any).automacoes_custom) ? (depConfig as any).automacoes_custom : [];
-      const ok = await saveDepConfig({ ...depConfig, automacoes_custom: [...atuais, nova] });
-      if (!ok) { toast.error("Erro ao salvar automação"); return; }
-      setAutosFin(a => [...a, { id: nova.id, nome: novaAuto.nome, desc: "Freq: " + novaAuto.freq_tipo, agente: novaAuto.agente_edge_fn, freq: novaAuto.freq_tipo, ativo: novaAuto.ativo, resultado: null }]);
-      toast.success("Automação criada!");
-      setNovaAuto({ nome: "", agente_edge_fn: "agente-financeiro", freq_tipo: "diaria", horario: "08:00", ativo: true });
-      setShowNovaAuto(false);
-    } catch (e: any) { toast.error("Erro: " + (e?.message ?? "")); }
-    finally { setSalvandoAuto(false); }
-  }
 
   const emitirNfManual = async (cobrancaId: string) => {
     setEmitindoNf(cobrancaId);
@@ -193,7 +150,6 @@ function FinanceiroPage__Inner(){
   };
 
   const { roles } = useAuth();
-  const agenteAtiv = useAgenteAtividade("financeiro");
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
 
   const [pagDialog, setPagDialog]      = useState<Cobranca | null>(null);
@@ -546,7 +502,6 @@ function FinanceiroPage__Inner(){
           </TabsTrigger>
           <TabsTrigger value="gateway">Gateway</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
@@ -558,11 +513,6 @@ function FinanceiroPage__Inner(){
               { label: "Em atraso",      value: fmtBRL(kpi.vencido), icon: AlertTriangle, variant: "danger",  hint: `${items.filter(c=>c.status==="vencida").length} cobranças` },
               { label: "Risco alto",     value: kpi.inad,             icon: ShieldAlert,   variant: "warning", hint: "negativação/suspensão" },
             ]}
-            agente={agenteAtiv.status}
-            onRunAgente={agenteAtiv.executar}
-            agenteRunning={agenteAtiv.running}
-            logs={agenteAtiv.logs}
-            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Nova Cobrança", icon: Plus,       onClick: () => setDialogCob(true), variant: "outline" },
             ]}
@@ -747,89 +697,6 @@ function FinanceiroPage__Inner(){
         </div>
         </TabsContent>
 
-        <TabsContent value="automacoes" className="mt-0">
-        <div className="rounded-xl border bg-card p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Automações Financeiras</h3>
-            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => setShowNovaAuto(v => !v)}>
-              <Plus className="h-3.5 w-3.5"/> Nova Automação
-            </Button>
-          </div>
-          {showNovaAuto && (
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Nova Automação</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="text-xs font-medium mb-1 block">Nome</label>
-                  <Input className="h-8 text-sm" placeholder="Ex: Cobrança D+3" value={novaAuto.nome} onChange={e => setNovaAuto(a => ({ ...a, nome: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Agente (Edge Fn)</label>
-                  <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={novaAuto.agente_edge_fn} onChange={e => setNovaAuto(a => ({ ...a, agente_edge_fn: e.target.value }))}>
-                    <option value="agente-financeiro">agente-financeiro</option>
-                    <option value="agente-fiscal">agente-fiscal</option>
-                    <option value="agente-orquestrador">agente-orquestrador</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block">Frequência</label>
-                  <select className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm" value={novaAuto.freq_tipo} onChange={e => setNovaAuto(a => ({ ...a, freq_tipo: e.target.value }))}>
-                    <option value="manual">Manual</option>
-                    <option value="diaria">Diária</option>
-                    <option value="semanal">Semanal</option>
-                    <option value="mensal">Mensal</option>
-                  </select>
-                </div>
-                {novaAuto.freq_tipo !== "manual" && (
-                  <div>
-                    <label className="text-xs font-medium mb-1 block">Horário</label>
-                    <Input type="time" className="h-8 text-sm" value={novaAuto.horario} onChange={e => setNovaAuto(a => ({ ...a, horario: e.target.value }))} />
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setNovaAuto(a => ({ ...a, ativo: !a.ativo }))}>
-                    {novaAuto.ativo ? <ToggleRight className="h-5 w-5 text-emerald-600"/> : <ToggleLeft className="h-5 w-5 text-muted-foreground/40"/>}
-                  </button>
-                  <span className="text-xs">{novaAuto.ativo ? "Ativa" : "Inativa"}</span>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => setShowNovaAuto(false)}>Cancelar</Button>
-                <Button size="sm" className="gap-1.5" onClick={criarNovaAutomacao} disabled={salvandoAuto}>
-                  {salvandoAuto ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : <Save className="h-3.5 w-3.5"/>} Salvar
-                </Button>
-              </div>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Automações do Sistema</p>
-          {autosFin.map(a => (
-            <div key={a.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
-              <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${a.ativo ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">{a.nome}</p>
-                  {a.resultado === "ok"   && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500"/>}
-                  {a.resultado === "erro" && <AlertTriangle className="h-3.5 w-3.5 text-red-500"/>}
-                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded ml-auto">Sistema</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
-                <div className="flex gap-3 mt-1 text-[11px] text-muted-foreground">
-                  <span>Agente: <code className="text-foreground">{a.agente}</code></span>
-                  <span>Freq: <strong className="text-foreground">{a.freq}</strong></span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningAutoId === a.id} onClick={() => executarAutoFin(a.id, a.agente)}>
-                  {runningAutoId === a.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <Zap className="h-3 w-3"/>} Executar
-                </Button>
-                <button onClick={() => setAutosFin(list => list.map(x => x.id === a.id ? { ...x, ativo: !x.ativo } : x))} className={`p-1 rounded ${a.ativo ? "text-emerald-600" : "text-muted-foreground/40"}`}>
-                  {a.ativo ? <ToggleRight className="h-5 w-5"/> : <ToggleLeft className="h-5 w-5"/>}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        </TabsContent>
 
         <TabsContent value="config" className="mt-0">
         <div className="rounded-xl border bg-card p-6 space-y-5">

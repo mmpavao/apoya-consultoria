@@ -209,9 +209,7 @@ jobs:
           fail=0
           for fn in \
             nfse-pos-pagamento sync-nfse-nfeio cnpj-enrich clicksign-envelope \
-            clicksign-webhook upload-certificate-nfeio send-invite \
-            agente-fiscal agente-rh agente-financeiro agente-contabil \
-            agente-societario agente-tabelas-tributarias agente-orquestrador; do
+            clicksign-webhook upload-certificate-nfeio send-invite; do
             echo "::group::deploy $fn"
             supabase functions deploy "$fn" --project-ref ajaqbdsalxfgrwpjbtbn || { echo "❌ falhou: $fn"; fail=1; }
             echo "::endgroup::"
@@ -220,21 +218,6 @@ jobs:
           exit $fail
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Secrets Edge Functions (produção)
-        if: needs.resolve-env.outputs.target == 'production'
-        run: |
-          if [ -z "${{ secrets.AGENTS_GATE_SECRET }}" ]; then
-            echo "⚠️ AGENTS_GATE_SECRET não configurado no GitHub — agentes retornarão 401"
-            exit 0
-          fi
-          supabase secrets set \
-            AGENTS_GATE_SECRET="${{ secrets.AGENTS_GATE_SECRET }}" \
-            --project-ref ajaqbdsalxfgrwpjbtbn
-          echo "✅ AGENTS_GATE_SECRET sincronizado no Supabase"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        continue-on-error: true
 
   # ── apoya-mcp ──────────────────────────────────────────────────────────────
   deploy-mcp:

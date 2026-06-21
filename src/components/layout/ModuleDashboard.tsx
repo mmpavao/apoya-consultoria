@@ -6,7 +6,7 @@
  */
 import React from "react";
 import { cn } from "@/lib/utils";
-import { LucideIcon, Bot, CheckCircle2, AlertTriangle, Clock, XCircle, Play, Loader2 } from "lucide-react";
+import { LucideIcon, CheckCircle2, AlertTriangle, Clock, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /* ── Types ────────────────────────────────────────────── */
@@ -16,14 +16,6 @@ export interface ModuleKpi {
   icon: LucideIcon;
   variant?: "default" | "success" | "warning" | "danger" | "info";
   hint?: string;
-}
-
-export interface ModuleAgentStatus {
-  nome: string;
-  edge_fn: string;
-  ultima_execucao?: string | null;
-  ultimo_resultado?: "ok" | "erro" | "aviso" | null;
-  total_alertas?: number;
 }
 
 export interface ModuleQuickAction {
@@ -44,9 +36,6 @@ export interface ModuleLogEntry {
 interface Props {
   kpis: ModuleKpi[];
   kpisLoading?: boolean;
-  agente?: ModuleAgentStatus | null;
-  onRunAgente?: () => Promise<void>;
-  agenteRunning?: boolean;
   quickActions?: ModuleQuickAction[];
   logs?: ModuleLogEntry[];
   logsLoading?: boolean;
@@ -104,60 +93,9 @@ function KpiCard({ kpi, loading }: { kpi: ModuleKpi; loading?: boolean }) {
   );
 }
 
-/* ── AgenteCard ───────────────────────────────────────── */
-function AgenteCard({
-  agente, onRun, running,
-}: {
-  agente: ModuleAgentStatus;
-  onRun?: () => void;
-  running?: boolean;
-}) {
-  const res = agente.ultimo_resultado;
-  const resCls = res === "ok" ? "text-emerald-600" : res === "erro" ? "text-red-600" : "text-amber-600";
-  const ResIcon = res === "ok" ? CheckCircle2 : res === "erro" ? XCircle : AlertTriangle;
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-        <Bot className="h-5 w-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{agente.nome}</p>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {agente.ultima_execucao && (
-            <p className="text-xs text-muted-foreground">
-              Última execução: {fmtTs(agente.ultima_execucao)}
-            </p>
-          )}
-          {res && (
-            <span className={cn("flex items-center gap-1 text-xs font-medium", resCls)}>
-              <ResIcon className="h-3 w-3" />
-              {res === "ok" ? "OK" : res === "erro" ? "Erro" : "Aviso"}
-              {agente.total_alertas != null && ` · ${agente.total_alertas} alerta(s)`}
-            </span>
-          )}
-          {!agente.ultima_execucao && (
-            <p className="text-xs text-muted-foreground/50">Nunca executado</p>
-          )}
-        </div>
-      </div>
-      {onRun && (
-        <Button size="sm" variant="outline" onClick={onRun} disabled={running} className="shrink-0 gap-1.5">
-          {running
-            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            : <Play className="h-3.5 w-3.5" />
-          }
-          {running ? "Executando…" : "Executar agora"}
-        </Button>
-      )}
-    </div>
-  );
-}
-
 /* ── Main ─────────────────────────────────────────────── */
 export function ModuleDashboard({
   kpis, kpisLoading,
-  agente, onRunAgente, agenteRunning,
   quickActions,
   logs, logsLoading,
   emptyMessage,
@@ -179,18 +117,8 @@ export function ModuleDashboard({
 
       <div className="grid gap-4 lg:grid-cols-3">
 
-        {/* Coluna principal: Agente + Ações rápidas */}
+        {/* Coluna principal: Ações rápidas */}
         <div className="lg:col-span-2 space-y-4">
-
-          {/* Agente autônomo */}
-          {agente && (
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                Agente Autônomo
-              </h3>
-              <AgenteCard agente={agente} onRun={onRunAgente} running={agenteRunning} />
-            </div>
-          )}
 
           {/* Ações rápidas */}
           {quickActions && quickActions.length > 0 && (

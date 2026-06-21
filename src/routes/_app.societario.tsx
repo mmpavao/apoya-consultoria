@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
-import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { FileText, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/PagePlaceholder";
@@ -36,7 +35,6 @@ const fmtData = (iso?:string|null) => {
 
 function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
-  const agenteAtiv = useAgenteAtividade("societario");
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
   const [filtroTipo,setFiltroTipo] = useState<"todos"|TipoProcesso>("todos");
@@ -85,7 +83,6 @@ function SocietarioPage__Inner() {
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="processos">Pipeline</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
@@ -97,11 +94,6 @@ function SocietarioPage__Inner() {
               { label: "Concluídos",        value: processos.filter(p => p.fase === "concluido").length,                       icon: CheckCircle2,  variant: "success" },
               { label: "Atrasados",         value: processos.filter(p => p.prazo && p.prazo < hoje && p.fase !== "concluido").length, icon: AlertTriangle, variant: "danger" },
             ]}
-            agente={agenteAtiv.status}
-            onRunAgente={agenteAtiv.executar}
-            agenteRunning={agenteAtiv.running}
-            logs={agenteAtiv.logs}
-            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Novo Processo", icon: FileText, onClick: () => setShowNovo(true), variant: "outline" },
             ]}
@@ -230,29 +222,6 @@ function SocietarioPage__Inner() {
         </TabsContent>
 
         {/* Automações Societário */}
-        <TabsContent value="automacoes" className="mt-0">
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Agentes de monitoramento e automação societária.</p>
-            {[
-              { nome: "Monitor JUCISRS", desc: "Verifica status de processos no portal JUCISRS", freq: "Diário", ativa: true },
-              { nome: "Alerta Renovação Licenças", desc: "Lembra vencimento de licenças municipais e alvarás", freq: "Semanal", ativa: true },
-              { nome: "Notificação Conclusão", desc: "Notifica o cliente via WhatsApp ao concluir o processo", freq: "On demand", ativa: true },
-              { nome: "Alerta Processos Parados", desc: "Alerta processos sem movimentação há mais de 15 dias", freq: "Diário", ativa: false },
-            ].map((a, i) => (
-              <div key={i} className="rounded-lg border bg-card p-4 flex items-start gap-4">
-                <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${a.ativa ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{a.nome}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Freq: <strong className="text-foreground">{a.freq}</strong></p>
-                </div>
-                <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${a.ativa ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                  {a.ativa ? "Ativa" : "Inativa"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
 
         {/* Config Societário */}
         <TabsContent value="config" className="mt-0">

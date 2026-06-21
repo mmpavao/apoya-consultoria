@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
-import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { useDepartamentoConfig } from "@/hooks/use-departamento-config";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { KanbanModulo } from "@/components/KanbanModulo";
@@ -532,71 +531,6 @@ function PlanoContasTab() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// TAB — AUTOMAÇÕES CONTÁBEIS
-// ═══════════════════════════════════════════════════════════
-type AutoContabil = { id: string; nome: string; descricao: string; agente: string; frequencia: string; ativa: boolean; ultima_resultado?: "ok"|"erro" };
-
-const AUTOS_CONTABIL: AutoContabil[] = [
-  { id: "1", nome: "Reconciliação Bancária",  descricao: "Concilia extratos bancários com lançamentos automaticamente", agente: "agente-financeiro",  frequencia: "Diário",        ativa: true,  ultima_resultado: "ok" },
-  { id: "2", nome: "Fechamento Mensal",        descricao: "Fecha período e gera balancete ao fim do mês",               agente: "agente-orquestrador", frequencia: "Mensal dia 28", ativa: false },
-  { id: "3", nome: "Alerta Divergências",      descricao: "Notifica quando detecta divergências no período",            agente: "agente-financeiro",  frequencia: "Diário",        ativa: true,  ultima_resultado: "ok" },
-  { id: "4", nome: "Importar NF-e",            descricao: "Importa NF-e recebidas e classifica por CFOP automaticamente", agente: "agente-fiscal",    frequencia: "Semanal",       ativa: false },
-];
-
-function AutomacoesContabil() {
-  const { session } = useAuth();
-  const [autos, setAutos]         = useState<AutoContabil[]>(AUTOS_CONTABIL);
-  const [runningId, setRunningId] = useState<string | null>(null);
-  const toggle = (id: string) => setAutos(a => a.map(x => x.id === id ? { ...x, ativa: !x.ativa } : x));
-
-  async function executar(id: string, agente: string) {
-    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
-    setRunningId(id);
-    toast.loading(`Executando ${agente}…`, { id: "auto-cob" });
-    try {
-      const res = await fetch(`https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/${agente}`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ trigger: "manual" }),
-      });
-      if (res.ok) { toast.success("Agente executado!", { id: "auto-cob" }); setAutos(a => a.map(x => x.id === id ? { ...x, ultima_resultado: "ok" } : x)); }
-      else { const d = await res.json().catch(() => ({})); toast.error((d as any)?.error ?? "Erro", { id: "auto-cob" }); }
-    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "auto-cob" }); }
-    finally { setRunningId(null); }
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Agentes de automação contábil — reconciliação, fechamento e alertas.</p>
-      {autos.map(a => (
-        <div key={a.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
-          <div className={cn("mt-1 h-2.5 w-2.5 rounded-full shrink-0", a.ativa ? "bg-emerald-500" : "bg-muted-foreground/30")} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">{a.nome}</p>
-              {a.ultima_resultado === "ok"  && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-              {a.ultima_resultado === "erro" && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{a.descricao}</p>
-            <div className="flex gap-3 mt-1.5 text-[11px] text-muted-foreground">
-              <span>Agente: <code className="text-foreground">{a.agente}</code></span>
-              <span>Freq: <strong className="text-foreground">{a.frequencia}</strong></span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningId === a.id} onClick={() => executar(a.id, a.agente)}>
-              {runningId === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />} Executar
-            </Button>
-            <button onClick={() => toggle(a.id)} className={cn("p-1 rounded", a.ativa ? "text-emerald-600" : "text-muted-foreground/40")}>
-              {a.ativa ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
 // TAB — CONFIGURAÇÕES CONTÁBEIS
 // ═══════════════════════════════════════════════════════════
 const CONTABIL_PREFS = [
@@ -657,7 +591,6 @@ function ConfigContabil() {
 function ContabilPageInner() {
   const { roles }                   = useAuth();
   const { periodos, loading: pLoad, refresh: refreshPeriodos } = usePeriodosContabeis();
-  const agenteAtiv = useAgenteAtividade("contabil");
   const [tab, setTab] = useState("dashboard");
   const [novoLancNonce, setNovoLancNonce] = useState(0);
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
@@ -674,7 +607,7 @@ function ContabilPageInner() {
           <h1 className="text-2xl font-bold tracking-tight">Contabilidade</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Lançamentos, períodos e fechamento mensal · competência {mesAtual.split("-").reverse().join("/")}</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => { refreshPeriodos(); agenteAtiv.refetch(); }}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+        <Button size="sm" variant="outline" className="gap-1" onClick={() => refreshPeriodos()}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
       </div>
 
 
@@ -686,7 +619,6 @@ function ContabilPageInner() {
           <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
           <TabsTrigger value="plano_contas">Plano de Contas</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="mt-0">
@@ -697,11 +629,6 @@ function ContabilPageInner() {
               { label: "Total de Períodos", value: periodos.length, icon: BookOpen,     variant: "default" },
             ]}
             kpisLoading={pLoad}
-            agente={agenteAtiv.status}
-            onRunAgente={agenteAtiv.executar}
-            agenteRunning={agenteAtiv.running}
-            logs={agenteAtiv.logs}
-            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Novo Lançamento", icon: BookOpen,      onClick: () => { setTab("lancamentos"); setNovoLancNonce(n => n + 1); }, variant: "outline" },
               { label: "Fechar Período",  icon: CheckCircle2,  onClick: () => setTab("periodos"),    variant: "outline" },
@@ -734,7 +661,6 @@ function ContabilPageInner() {
         <TabsContent value="lancamentos"  className="mt-0"><LancamentosTab autoNovo={novoLancNonce} /></TabsContent>
         <TabsContent value="plano_contas" className="mt-0"><PlanoContasTab /></TabsContent>
         <TabsContent value="documentos"   className="mt-0"><ModuleDocumentosTab modulo="contabil" /></TabsContent>
-        <TabsContent value="automacoes"   className="mt-0"><AutomacoesContabil /></TabsContent>
         <TabsContent value="config"       className="mt-0"><ConfigContabil /></TabsContent>
       </Tabs>
     </div>

@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
-import { useAgenteAtividade } from "@/hooks/use-agente-atividade";
 import { useDepartamentoConfig } from "@/hooks/use-departamento-config";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
 import { KanbanModulo } from "@/components/KanbanModulo";
@@ -488,71 +487,6 @@ function EsocialTab() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// TAB — AUTOMAÇÕES DP
-// ═══════════════════════════════════════════════════════════
-type AutoDP = { id: string; nome: string; descricao: string; agente: string; frequencia: string; ativa: boolean; ultima_resultado?: "ok"|"erro" };
-
-const AUTOS_DP: AutoDP[] = [
-  { id: "1", nome: "Monitor eSocial",   descricao: "Verifica eventos vencidos e transmite automaticamente", agente: "agente-rh",    frequencia: "Diário 07:00", ativa: true,  ultima_resultado: "ok" },
-  { id: "2", nome: "Alerta Férias 30d", descricao: "Notifica 30 dias antes do vencimento do período",       agente: "agente-rh",    frequencia: "Semanal",      ativa: true,  ultima_resultado: "ok" },
-  { id: "3", nome: "Fechamento Folha",  descricao: "Consolida e fecha a folha mensal automaticamente",      agente: "agente-rh",    frequencia: "Mensal dia 25",ativa: false },
-  { id: "4", nome: "Alerta Rescisão",   descricao: "Lembra documentos pendentes de rescisão",               agente: "agente-rh",    frequencia: "Diário",       ativa: true,  ultima_resultado: "ok" },
-];
-
-function AutomacoesDP() {
-  const { session } = useAuth();
-  const [autos, setAutos]       = useState<AutoDP[]>(AUTOS_DP);
-  const [runningId, setRunningId] = useState<string | null>(null);
-  const toggle = (id: string) => setAutos(a => a.map(x => x.id === id ? { ...x, ativa: !x.ativa } : x));
-
-  async function executar(id: string, agente: string) {
-    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
-    setRunningId(id);
-    toast.loading(`Executando ${agente}…`, { id: "auto-dp" });
-    try {
-      const res = await fetch(`https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/${agente}`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ trigger: "manual" }),
-      });
-      if (res.ok) { toast.success("Agente executado!", { id: "auto-dp" }); setAutos(a => a.map(x => x.id === id ? { ...x, ultima_resultado: "ok" } : x)); }
-      else { const d = await res.json().catch(() => ({})); toast.error((d as any)?.error ?? "Erro", { id: "auto-dp" }); setAutos(a => a.map(x => x.id === id ? { ...x, ultima_resultado: "erro" } : x)); }
-    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "auto-dp" }); }
-    finally { setRunningId(null); }
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Agentes autônomos para monitoramento e automação do Departamento Pessoal.</p>
-      {autos.map(a => (
-        <div key={a.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
-          <div className={cn("mt-1 h-2.5 w-2.5 rounded-full shrink-0", a.ativa ? "bg-emerald-500" : "bg-muted-foreground/30")} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">{a.nome}</p>
-              {a.ultima_resultado === "ok"  && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-              {a.ultima_resultado === "erro" && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{a.descricao}</p>
-            <div className="flex gap-3 mt-1.5 text-[11px] text-muted-foreground">
-              <span>Agente: <code className="text-foreground">{a.agente}</code></span>
-              <span>Freq: <strong className="text-foreground">{a.frequencia}</strong></span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningId === a.id} onClick={() => executar(a.id, a.agente)}>
-              {runningId === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />} Executar
-            </Button>
-            <button onClick={() => toggle(a.id)} className={cn("p-1 rounded", a.ativa ? "text-emerald-600" : "text-muted-foreground/40")}>
-              {a.ativa ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════
 // TAB — CONFIGURAÇÕES DP
 // ═══════════════════════════════════════════════════════════
 const DP_PREFS = [
@@ -613,7 +547,6 @@ function DpPageInner() {
   const { roles } = useAuth();
   const { funcionarios: todos, loading: funcLoading, refresh: refreshFunc } = useFuncionarios();
   const { ferias } = useFerias();
-  const agenteAtiv = useAgenteAtividade("dp");
   const [tab, setTab] = useState("dashboard");
   const [novaFolhaNonce, setNovaFolhaNonce] = useState(0);
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
@@ -633,7 +566,7 @@ function DpPageInner() {
           <h1 className="text-2xl font-bold tracking-tight">Departamento Pessoal</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Gestão centralizada de funcionários, folha e férias</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => { refreshFunc(); agenteAtiv.refetch(); }}>
+        <Button size="sm" variant="outline" className="gap-1" onClick={() => refreshFunc()}>
           <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </div>
@@ -648,7 +581,6 @@ function DpPageInner() {
           <TabsTrigger value="ferias">Férias</TabsTrigger>
           <TabsTrigger value="esocial">eSocial</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="mt-0">
@@ -660,11 +592,6 @@ function DpPageInner() {
               { label: "eSocial",               value: "—", icon: CheckCircle2, variant: "default" },  // sem integração real (não contar mock)
             ]}
             kpisLoading={funcLoading}
-            agente={agenteAtiv.status}
-            onRunAgente={agenteAtiv.executar}
-            agenteRunning={agenteAtiv.running}
-            logs={agenteAtiv.logs}
-            logsLoading={agenteAtiv.loading}
             quickActions={[
               { label: "Nova Folha", icon: FileText, onClick: () => { setTab("folha"); setNovaFolhaNonce(n => n + 1); }, variant: "outline" },
               { label: "Registrar Férias", icon: Calendar, onClick: () => setTab("ferias"), variant: "outline" },
@@ -699,7 +626,6 @@ function DpPageInner() {
         <TabsContent value="ferias"   className="mt-0"><FeriasTab /></TabsContent>
         <TabsContent value="esocial"  className="mt-0"><EsocialTab /></TabsContent>
         <TabsContent value="documentos" className="mt-0"><ModuleDocumentosTab modulo="dp" /></TabsContent>
-        <TabsContent value="automacoes" className="mt-0"><AutomacoesDP /></TabsContent>
         <TabsContent value="config"   className="mt-0"><ConfigDP /></TabsContent>
       </Tabs>
     </div>
