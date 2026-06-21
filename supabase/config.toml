@@ -1,24 +1,6 @@
 project_id = "ajaqbdsalxfgrwpjbtbn"
 
-# Funções chamadas pelo app — auth via requireUser no corpo (exige JWT de
-# usuário; a anon key NÃO passa). verify_jwt=false p/ o gate do corpo ser a auth.
-[functions.cnpj-enrich]
-verify_jwt = false
-
-[functions.clicksign-envelope]
-verify_jwt = false
-
-[functions.upload-certificate-nfeio]
-verify_jwt = false
-
-# Webhook do Clicksign — público (Clicksign chama), mas FAIL-CLOSED por HMAC.
-[functions.clicksign-webhook]
-verify_jwt = false
-
-# sync-nfse-nfeio — auth via requireUser no corpo (era pública alcançando NFE.io).
-[functions.sync-nfse-nfeio]
-verify_jwt = false
-
-# send-invite — auth própria (Bearer do usuário + checagem de role admin).
+# send-invite — convite interno de usuário (auth própria: Bearer do usuário +
+# checagem de role admin). Única edge function viva (sistema é manual).
 [functions.send-invite]
 verify_jwt = false

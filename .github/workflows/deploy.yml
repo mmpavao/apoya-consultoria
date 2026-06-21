@@ -207,9 +207,7 @@ jobs:
         run: |
           set +e
           fail=0
-          for fn in \
-            nfse-pos-pagamento sync-nfse-nfeio cnpj-enrich clicksign-envelope \
-            clicksign-webhook upload-certificate-nfeio send-invite; do
+          for fn in send-invite; do
             echo "::group::deploy $fn"
             supabase functions deploy "$fn" --project-ref ajaqbdsalxfgrwpjbtbn || { echo "❌ falhou: $fn"; fail=1; }
             echo "::endgroup::"
