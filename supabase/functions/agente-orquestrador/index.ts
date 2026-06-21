@@ -5,6 +5,7 @@
 // não cria tarefa de setor com expert; só consolida + coordena.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth, CORS } from "../_shared/agent.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -87,16 +88,9 @@ Deno.serve(async (req: Request) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) as any;
 
-  // Auth via secret dedicado (fail-open enquanto o secret não estiver setado).
-  if (AGENTS_GATE_SECRET) {
-    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    let ok = !!token && token === AGENTS_GATE_SECRET;
-    // cron (pg_cron) injeta o secret do Vault — valida via RPC SECURITY DEFINER
-    // (env da function e Vault são stores distintos; a RPC compara no banco).
-    if (!ok && token) { try { const { data } = await supabase.rpc("verify_cron_secret", { p_token: token }); ok = data === true; } catch (_) { /* segue p/ JWT */ } }
-    if (!ok && token) { try { const { data } = await supabase.auth.getUser(token); ok = !!data?.user; } catch (_) { /* 401 */ } }
-    if (!ok) return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
-  }
+  // Auth fail-closed — mesmo contrato dos experts (requireAuth em _shared/agent.ts).
+  const denied = await requireAuth(req, supabase, AGENTS_GATE_SECRET);
+  if (denied) return denied;
 
   const inicio = Date.now();
 

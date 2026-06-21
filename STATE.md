@@ -1,56 +1,56 @@
 # STATE — APOYA Gestão
 
-> Snapshot do estado do projeto. Atualizado em **2026-06-20** após auditoria de onboarding.
+> Snapshot do estado do projeto. Atualizado em **2026-06-20** — pronto para deploy produção.
 
 ## Resumo
 
 | Métrica | Valor |
 |---------|-------|
-| **Pronto (estimado)** | ~68% |
+| **Pronto (estimado)** | ~75% |
 | **Build** | ✅ `tsc`, `test`, `build` verdes |
-| **Branch base** | `main` |
-| **Último commit auditado** | `d34cf9c` (eSocial manual real) |
+| **Branch deploy** | `cursor/security-env-onboarding-d50a` → merge `main` → tag `v*.*.*` |
+| **Checklist DevOps** | `docs/DEPLOY_PRODUCAO.md` |
 
 ## O que funciona
 
 - Deploy CI/CD staging-first (Cloudflare Workers + Edge Functions em tag)
-- Módulos principais: Dashboard, Clientes, Fiscal, Financeiro, DP, Contabil, Workflows, CRM, WhatsApp, Societário, Documentos
-- Cálculo de folha/rescisão (`folha-calc`, `rescisao-calc`) com testes
-- eSocial: catálogo fixo + status real em `esocial_evento`
-- Correções recentes de schema: cobranças, conciliação bancária, régua fail-closed
+- Módulos principais operacionais (Clientes, Fiscal, Financeiro, DP, Contabil, Workflows, CRM, WhatsApp)
+- Cálculo folha/rescisão com testes (`folha-calc`, `rescisao-calc`)
+- eSocial real (`esocial_evento`), conciliação bancária (`data_linha`), régua fail-closed
+- Pipeline MCP via `APOYA_SERVICE_TOKEN` (sem segredo hardcoded)
+- Documentos unificados: bucket canônico `documentos-clientes` (cliente ↔ módulos)
+- Webhook Asaas idempotente (re-entrega não re-dispara NFS-e)
+- Agentes fail-closed (`AGENTS_GATE_SECRET` + cron Vault)
 
-## Em progresso / pendente
+## Pendências pós-produção (não bloqueiam deploy)
 
-Ver `BACKLOG.md` para lista completa. Prioridades atuais:
-
-1. ~~Segredo MCP hardcoded~~ → **corrigido** (`APOYA_SERVICE_TOKEN` via `src/lib/worker-env.ts`)
-2. Edge Functions agentes com `verify_jwt=false` — hardening pendente
-3. Automações hardcoded nas UIs de setor — migrar para `automacoes_config` / `agente_logs`
-4. Sincronização documentos cliente ↔ módulos
-5. Dados operacionais reais (0 lançamentos contábeis, 0 funcionários em prod)
-6. ESLint quebrado em `workers/misc/` (Prettier)
-7. Migrations não aplicadas pela CI — risco de drift
-
-## Decisões congeladas
-
-- **Focus NF-e:** zero esforço até liberação do Marcio (`STANDARDS.md`)
-
-## Histórico de auditorias
-
-| Data | Documento |
-|------|-----------|
-| 2026-06-15 | `BACKLOG.md` — endurecimento multi-agente |
-| 2026-06-12 | `docs/PRD.md` v1.0 |
-| 2026-05-22 | `docs/arquitetura/STATUS_FINAL_SPRINT_AUDITORIA.md` |
-
-## Próximos passos (ordem)
-
-1. **Segurança agentes** — JWT ou secret interno nas 7 Edge Functions públicas
-2. **Schema drift** — auditar hooks com `as any` vs colunas reais; testes de regressão nos fluxos de salvar
-3. **UI honesta** — remover mocks de automação; unificar documentos
+- Automações hardcoded nas UIs de setor → migrar para `automacoes_config`
+- Dados operacionais reais (lançamentos, funcionários em prod)
+- ESLint quebrado em `workers/misc/` (Prettier)
+- Focus NF-e congelado (decisão de produto)
+- Cobertura de testes ainda baixa (libs puras)
 
 ## Changelog desta sessão
 
-- Criados: `README.md`, `.env.example`, `STATE.md`
-- Removido segredo hardcoded em `/api/pipeline/*` → `APOYA_SERVICE_TOKEN`
-- Novo utilitário: `src/lib/worker-env.ts` + testes
+### Sessão 1 — Onboarding + segurança MCP
+- `README.md`, `.env.example`, `STATE.md`
+- `src/lib/worker-env.ts` — secrets fail-closed
+- Removido API key hardcoded em `/api/pipeline/*`
+
+### Sessão 2 — Pronto para produção
+- Orquestrador + `requireAuth` fail-closed (cron Vault via RPC)
+- Webhook Asaas idempotente + setup-webhook upsert `integracao_config`
+- Documentos: bucket unificado `documentos-clientes`
+- `docs/DEPLOY_PRODUCAO.md` — checklist completo DevOps
+- CI: `WORKER_BASE_URL` + sync `AGENTS_GATE_SECRET` → Supabase
+
+## Deploy — comando DevOps
+
+```bash
+# 1. Merge PR → main (staging automático)
+# 2. Validar staging
+# 3. Tag produção:
+git tag v1.4.0 && git push origin v1.4.0
+```
+
+Ver `docs/DEPLOY_PRODUCAO.md` para checklist completo.

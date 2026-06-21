@@ -49,7 +49,7 @@ npm run build
 ./deploy.sh
 ```
 
-Detalhes em `DEPLOY.md` e `.github/workflows/deploy.yml`.
+Detalhes em `DEPLOY.md`, `docs/DEPLOY_PRODUCAO.md` (checklist produção) e `.github/workflows/deploy.yml`.
 
 ## Estrutura
 

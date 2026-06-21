@@ -116,15 +116,22 @@ export function json(body: unknown, status = 200): Response {
 
 // Auth dos agentes via SECRET DEDICADO (AGENTS_GATE_SECRET) — verificável de
 // ponta a ponta (diferente da service-role-key, que o runtime divergia).
-// Aceita: (a) token == gateSecret (orquestrador→experts e cron) OU (b) JWT de
-// usuário válido (UI). FAIL-CLOSED: o rollout terminou (secret setado e
-// verificado); sem secret → 401 (config-drift em novo ambiente é bloqueado).
+// Aceita: (a) token == gateSecret (orquestrador→experts e cron manual) OU
+// (b) verify_cron_secret RPC (pg_cron injeta secret do Vault) OU
+// (c) JWT de usuário válido (UI). FAIL-CLOSED: sem secret → 401.
 export async function requireAuth(req: Request, sb: SB, gateSecret?: string | null): Promise<Response | null> {
   if (!gateSecret) return json({ error: "Unauthorized (AGENTS_GATE_SECRET ausente)" }, 401);
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (token && token === gateSecret) return null;        // interno (orquestrador/cron)
-  if (token) {
-    try { const { data, error } = await sb.auth.getUser(token); if (!error && data?.user) return null; } catch (_) { /* 401 */ }
-  }
+  if (!token) return json({ error: "Unauthorized" }, 401);
+  if (token === gateSecret) return null;
+  // Cron diário: pg_cron injeta secret do Vault — valida via RPC SECURITY DEFINER.
+  try {
+    const { data } = await sb.rpc("verify_cron_secret", { p_token: token });
+    if (data === true) return null;
+  } catch (_) { /* segue p/ JWT */ }
+  try {
+    const { data, error } = await sb.auth.getUser(token);
+    if (!error && data?.user) return null;
+  } catch (_) { /* 401 */ }
   return json({ error: "Unauthorized" }, 401);
 }
