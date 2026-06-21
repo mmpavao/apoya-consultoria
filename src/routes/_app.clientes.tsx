@@ -193,7 +193,7 @@ function ClientesPage(){
           {c.whatsapp && (
             <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
               title={`Abrir conversa — ${c.whatsapp}`}
-              onClick={() => navigate({ to: "/whatsapp", search: { tel: c.whatsapp!.replace(/\D/g,""), nome: c.razaoSocial } })}>
+              onClick={() => window.open(`https://wa.me/55${c.whatsapp!.replace(/\D/g,"")}`, "_blank")}>
               <MessageCircle className="h-3.5 w-3.5"/>
             </Button>
           )}

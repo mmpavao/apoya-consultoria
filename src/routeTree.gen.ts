@@ -25,7 +25,6 @@ import { Route as AppCrmRouteImport } from './routes/_app.crm'
 import { Route as AppContabilRouteImport } from './routes/_app.contabil'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
-import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
 import { Route as AppAdministracaoRouteImport } from './routes/_app.administracao'
 import { Route as ApiPipelineIndexRouteImport } from './routes/api/pipeline/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
@@ -119,11 +118,6 @@ const AppClientesRoute = AppClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAutomacoesRoute = AppAutomacoesRouteImport.update({
-  id: '/automacoes',
-  path: '/automacoes',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAdministracaoRoute = AppAdministracaoRouteImport.update({
   id: '/administracao',
   path: '/administracao',
@@ -198,7 +192,6 @@ export interface FileRoutesByFullPath {
   '/login-dev': typeof LoginDevRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/administracao': typeof AppAdministracaoRoute
-  '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/contabil': typeof AppContabilRoute
@@ -228,7 +221,6 @@ export interface FileRoutesByTo {
   '/login-dev': typeof LoginDevRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/administracao': typeof AppAdministracaoRoute
-  '/automacoes': typeof AppAutomacoesRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
   '/contabil': typeof AppContabilRoute
@@ -261,7 +253,6 @@ export interface FileRoutesById {
   '/login-dev': typeof LoginDevRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/_app/administracao': typeof AppAdministracaoRoute
-  '/_app/automacoes': typeof AppAutomacoesRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
   '/_app/contabil': typeof AppContabilRoute
@@ -295,7 +286,6 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/unauthorized'
     | '/administracao'
-    | '/automacoes'
     | '/clientes'
     | '/configuracoes'
     | '/contabil'
@@ -325,7 +315,6 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/unauthorized'
     | '/administracao'
-    | '/automacoes'
     | '/clientes'
     | '/configuracoes'
     | '/contabil'
@@ -357,7 +346,6 @@ export interface FileRouteTypes {
     | '/login-dev'
     | '/unauthorized'
     | '/_app/administracao'
-    | '/_app/automacoes'
     | '/_app/clientes'
     | '/_app/configuracoes'
     | '/_app/contabil'
@@ -513,13 +501,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/automacoes': {
-      id: '/_app/automacoes'
-      path: '/automacoes'
-      fullPath: '/automacoes'
-      preLoaderRoute: typeof AppAutomacoesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/administracao': {
       id: '/_app/administracao'
       path: '/administracao'
@@ -616,7 +597,6 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAdministracaoRoute: typeof AppAdministracaoRoute
-  AppAutomacoesRoute: typeof AppAutomacoesRoute
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
   AppContabilRoute: typeof AppContabilRoute
@@ -637,7 +617,6 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdministracaoRoute: AppAdministracaoRoute,
-  AppAutomacoesRoute: AppAutomacoesRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
   AppContabilRoute: AppContabilRoute,

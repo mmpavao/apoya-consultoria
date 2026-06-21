@@ -327,7 +327,7 @@ function ClienteDetailPage() {
                 </Button>
                 {cliente.whatsapp && (
                   <Button size="sm" variant="outline" className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                    onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}>
+                    onClick={e => { e.stopPropagation(); window.open(`https://wa.me/55${cliente.whatsapp!.replace(/\D/g,"")}`, "_blank"); }}>
                     <MessageSquare className="h-3.5 w-3.5" />WhatsApp
                   </Button>
                 )}
@@ -479,7 +479,7 @@ function ClienteDetailPage() {
                 {cliente.whatsapp ? (
                   <button
                     className="text-sm text-primary hover:underline font-medium"
-                    onClick={e => { e.stopPropagation(); navigate({ to: "/whatsapp", search: { tel: cliente.whatsapp!.replace(/\D/g,""), nome: cliente.razaoSocial } }); }}
+                    onClick={e => { e.stopPropagation(); window.open(`https://wa.me/55${cliente.whatsapp!.replace(/\D/g,"")}`, "_blank"); }}
                   >
                     {cliente.whatsapp}
                   </button>

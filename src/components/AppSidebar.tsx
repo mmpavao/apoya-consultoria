@@ -60,8 +60,6 @@ const NAV: NavItem[] = [
   // ── Ferramentas
   { kind: "group",  label: "FERRAMENTAS" },
   { kind: "link",   to: "/documentos", label: "Documentos",          icon: FolderOpen },
-  { kind: "link",   to: "/whatsapp",   label: "WhatsApp",            icon: MessageSquare,   setor: "whatsapp" },
-  { kind: "link",   to: "/automacoes", label: "Automações",          icon: Bot },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
