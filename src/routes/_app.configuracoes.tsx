@@ -7,7 +7,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { fmtDate } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
-import { useIntegracoes, type IntegracaoTipo } from "@/hooks/use-integracoes";
 import { useUsuarios, type UsuarioRole, ROLE_LABELS } from "@/hooks/use-usuarios";
 import { useEscritorio } from "@/hooks/use-escritorio";
 import { useEffect, useState, useCallback } from "react";
@@ -59,9 +58,6 @@ function ConfiguracoesPage() {
           <TabsTrigger value="usuarios" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <Users className="h-4 w-4" />Usuários
           </TabsTrigger>
-          <TabsTrigger value="integracoes" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <Plug className="h-4 w-4" />Integrações
-          </TabsTrigger>
           <TabsTrigger value="whatsapp" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <MessageSquare className="h-4 w-4" />WhatsApp
           </TabsTrigger>
@@ -87,11 +83,6 @@ function ConfiguracoesPage() {
         {/* ── ABA USUÁRIOS ── */}
         <TabsContent value="usuarios" className="space-y-6">
           <UsuariosSection />
-        </TabsContent>
-
-        {/* ── ABA INTEGRAÇÕES ── */}
-        <TabsContent value="integracoes" className="space-y-6">
-          <IntegracoesSection />
         </TabsContent>
 
         {/* ── ABA WHATSAPP ── */}
@@ -450,57 +441,6 @@ const INTEG_META: Record<string, { icon: string; descricao: string; label: strin
   elevenlabs: { icon: "🎙️", label: "ElevenLabs",descricao: "Síntese de voz para atendimento automatizado" },
 };
 
-function IntegracoesSection() {
-  const { integracoes, loading, toggleAtiva } = useIntegracoes();
-
-  if (loading) return <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto my-4" />;
-
-  return (
-    <div className="space-y-2">
-      {/* WhatsApp inline */}
-      <div className="surface-card p-0 overflow-hidden divide-y divide-border">
-        {integracoes.map(integ => {
-          const meta = INTEG_META[integ.id] ?? { icon: "🔌", label: integ.id, descricao: "" };
-          return (
-            <div key={integ.id} className="flex items-center justify-between px-5 py-4">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{meta.icon}</span>
-                <div>
-                  <p className="text-sm font-medium">{meta.label}</p>
-                  <p className="text-xs text-muted-foreground">{integ.descricao || meta.descricao}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-medium ${integ.ativa ? "text-emerald-600" : "text-muted-foreground"}`}>
-                  {integ.ativa ? "Ativa" : "Inativa"}
-                </span>
-                <Switch
-                  checked={integ.ativa}
-                  onCheckedChange={v => toggleAtiva(integ.id as IntegracaoTipo, v)}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {/* WhatsApp expandido */}
-      <details className="surface-card overflow-hidden">
-        <summary className="flex items-center gap-2 px-5 py-3.5 cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-          <MessageSquare className="h-4 w-4" />
-          Configurar instâncias WhatsApp
-          <ChevronDown className="h-4 w-4 ml-auto" />
-        </summary>
-        <div className="border-t border-border px-4 py-4">
-          <WhatsappInstancesPanel />
-        </div>
-      </details>
-      <p className="text-xs text-muted-foreground/70 flex items-center gap-1.5 pt-1">
-        <KeyRound className="h-3 w-3" />
-        Chaves de API são gerenciadas no servidor e nunca trafegam pelo navegador.
-      </p>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // SEÇÃO: TEMPLATES WHATSAPP

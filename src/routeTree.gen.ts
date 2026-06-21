@@ -16,7 +16,6 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as CheckoutIdRouteImport } from './routes/checkout.$id'
 import { Route as AppWorkflowsRouteImport } from './routes/_app.workflows'
-import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
 import { Route as AppSocietarioRouteImport } from './routes/_app.societario'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
 import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
@@ -29,34 +28,17 @@ import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAutomacoesRouteImport } from './routes/_app.automacoes'
 import { Route as AppAdministracaoRouteImport } from './routes/_app.administracao'
 import { Route as ApiPipelineIndexRouteImport } from './routes/api/pipeline/index'
-import { Route as ApiNfseIndexRouteImport } from './routes/api/nfse/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
-import { Route as ApiWaSendRouteImport } from './routes/api/wa/send'
-import { Route as ApiWaInstancesRouteImport } from './routes/api/wa/instances'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
-import { Route as ApiSerproStatusRouteImport } from './routes/api/serpro/status'
-import { Route as ApiSerproCallRouteImport } from './routes/api/serpro/call'
-import { Route as ApiPluggyConnectTokenRouteImport } from './routes/api/pluggy/connect-token'
 import { Route as ApiPipelineMoverRouteImport } from './routes/api/pipeline/mover'
-import { Route as ApiNfseEmitirCobrancaRouteImport } from './routes/api/nfse/emitir-cobranca'
-import { Route as ApiDasGerarRouteImport } from './routes/api/das/gerar'
-import { Route as ApiCobrancaWebhookRouteImport } from './routes/api/cobranca/webhook'
-import { Route as ApiCobrancaSetupWebhookRouteImport } from './routes/api/cobranca/setup-webhook'
-import { Route as ApiCobrancaReguaRouteImport } from './routes/api/cobranca/regua'
-import { Route as ApiCobrancaEmitirRouteImport } from './routes/api/cobranca/emitir'
 import { Route as ApiCobrancaCriarRouteImport } from './routes/api/cobranca/criar'
 import { Route as ApiCobrancaContratarServicoRouteImport } from './routes/api/cobranca/contratar-servico'
-import { Route as ApiCheckoutIdRouteImport } from './routes/api/checkout/$id'
 import { Route as ApiAdminReguaConfigRouteImport } from './routes/api/admin/regua-config'
 import { Route as ApiAdminBloquearClienteRouteImport } from './routes/api/admin/bloquear-cliente'
-import { Route as AppFiscalSerproRouteImport } from './routes/_app.fiscal.serpro'
-import { Route as AppFiscalNfseRouteImport } from './routes/_app.fiscal.nfse'
 import { Route as AppFiscalDasRouteImport } from './routes/_app.fiscal.das'
 import { Route as AppDpEmpresaIdRouteImport } from './routes/_app.dp_.$empresaId'
 import { Route as AppConfiguracoesServicosRouteImport } from './routes/_app.configuracoes_.servicos'
 import { Route as AppClientesIdRouteImport } from './routes/_app.clientes_.$id'
-import { Route as ApiWebhooksPluggyIndexRouteImport } from './routes/api/webhooks/pluggy/index'
-import { Route as ApiPublicEvolutionWebhookInstanceRouteImport } from './routes/api/public/evolution-webhook.$instance'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -90,11 +72,6 @@ const CheckoutIdRoute = CheckoutIdRouteImport.update({
 const AppWorkflowsRoute = AppWorkflowsRouteImport.update({
   id: '/workflows',
   path: '/workflows',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppWhatsappRoute = AppWhatsappRouteImport.update({
-  id: '/whatsapp',
-  path: '/whatsapp',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSocietarioRoute = AppSocietarioRouteImport.update({
@@ -157,79 +134,19 @@ const ApiPipelineIndexRoute = ApiPipelineIndexRouteImport.update({
   path: '/api/pipeline/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiNfseIndexRoute = ApiNfseIndexRouteImport.update({
-  id: '/api/nfse/',
-  path: '/api/nfse/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
   id: '/fiscal/',
   path: '/fiscal/',
   getParentRoute: () => AppRoute,
-} as any)
-const ApiWaSendRoute = ApiWaSendRouteImport.update({
-  id: '/api/wa/send',
-  path: '/api/wa/send',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWaInstancesRoute = ApiWaInstancesRouteImport.update({
-  id: '/api/wa/instances',
-  path: '/api/wa/instances',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUsuariosConvidarRoute = ApiUsuariosConvidarRouteImport.update({
   id: '/api/usuarios/convidar',
   path: '/api/usuarios/convidar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSerproStatusRoute = ApiSerproStatusRouteImport.update({
-  id: '/api/serpro/status',
-  path: '/api/serpro/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSerproCallRoute = ApiSerproCallRouteImport.update({
-  id: '/api/serpro/call',
-  path: '/api/serpro/call',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPluggyConnectTokenRoute = ApiPluggyConnectTokenRouteImport.update({
-  id: '/api/pluggy/connect-token',
-  path: '/api/pluggy/connect-token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPipelineMoverRoute = ApiPipelineMoverRouteImport.update({
   id: '/api/pipeline/mover',
   path: '/api/pipeline/mover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiNfseEmitirCobrancaRoute = ApiNfseEmitirCobrancaRouteImport.update({
-  id: '/api/nfse/emitir-cobranca',
-  path: '/api/nfse/emitir-cobranca',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDasGerarRoute = ApiDasGerarRouteImport.update({
-  id: '/api/das/gerar',
-  path: '/api/das/gerar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCobrancaWebhookRoute = ApiCobrancaWebhookRouteImport.update({
-  id: '/api/cobranca/webhook',
-  path: '/api/cobranca/webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCobrancaSetupWebhookRoute = ApiCobrancaSetupWebhookRouteImport.update({
-  id: '/api/cobranca/setup-webhook',
-  path: '/api/cobranca/setup-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCobrancaReguaRoute = ApiCobrancaReguaRouteImport.update({
-  id: '/api/cobranca/regua',
-  path: '/api/cobranca/regua',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCobrancaEmitirRoute = ApiCobrancaEmitirRouteImport.update({
-  id: '/api/cobranca/emitir',
-  path: '/api/cobranca/emitir',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCobrancaCriarRoute = ApiCobrancaCriarRouteImport.update({
@@ -243,11 +160,6 @@ const ApiCobrancaContratarServicoRoute =
     path: '/api/cobranca/contratar-servico',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiCheckoutIdRoute = ApiCheckoutIdRouteImport.update({
-  id: '/api/checkout/$id',
-  path: '/api/checkout/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAdminReguaConfigRoute = ApiAdminReguaConfigRouteImport.update({
   id: '/api/admin/regua-config',
   path: '/api/admin/regua-config',
@@ -257,16 +169,6 @@ const ApiAdminBloquearClienteRoute = ApiAdminBloquearClienteRouteImport.update({
   id: '/api/admin/bloquear-cliente',
   path: '/api/admin/bloquear-cliente',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AppFiscalSerproRoute = AppFiscalSerproRouteImport.update({
-  id: '/fiscal/serpro',
-  path: '/fiscal/serpro',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFiscalNfseRoute = AppFiscalNfseRouteImport.update({
-  id: '/fiscal/nfse',
-  path: '/fiscal/nfse',
-  getParentRoute: () => AppRoute,
 } as any)
 const AppFiscalDasRoute = AppFiscalDasRouteImport.update({
   id: '/fiscal/das',
@@ -289,17 +191,6 @@ const AppClientesIdRoute = AppClientesIdRouteImport.update({
   path: '/clientes/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiWebhooksPluggyIndexRoute = ApiWebhooksPluggyIndexRouteImport.update({
-  id: '/api/webhooks/pluggy/',
-  path: '/api/webhooks/pluggy/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicEvolutionWebhookInstanceRoute =
-  ApiPublicEvolutionWebhookInstanceRouteImport.update({
-    id: '/api/public/evolution-webhook/$instance',
-    path: '/api/public/evolution-webhook/$instance',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -317,38 +208,20 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/societario': typeof AppSocietarioRoute
-  '/whatsapp': typeof AppWhatsappRoute
   '/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
   '/clientes/$id': typeof AppClientesIdRoute
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
   '/dp/$empresaId': typeof AppDpEmpresaIdRoute
   '/fiscal/das': typeof AppFiscalDasRoute
-  '/fiscal/nfse': typeof AppFiscalNfseRoute
-  '/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
-  '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
-  '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
-  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
-  '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
-  '/api/das/gerar': typeof ApiDasGerarRoute
-  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
   '/api/pipeline/mover': typeof ApiPipelineMoverRoute
-  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
-  '/api/serpro/call': typeof ApiSerproCallRoute
-  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
-  '/api/wa/instances': typeof ApiWaInstancesRoute
-  '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal/': typeof AppFiscalIndexRoute
-  '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/pipeline/': typeof ApiPipelineIndexRoute
-  '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
-  '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -365,7 +238,6 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AppFinanceiroRoute
   '/obrigacoes': typeof AppObrigacoesRoute
   '/societario': typeof AppSocietarioRoute
-  '/whatsapp': typeof AppWhatsappRoute
   '/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
   '/': typeof AppIndexRoute
@@ -373,31 +245,14 @@ export interface FileRoutesByTo {
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
   '/dp/$empresaId': typeof AppDpEmpresaIdRoute
   '/fiscal/das': typeof AppFiscalDasRoute
-  '/fiscal/nfse': typeof AppFiscalNfseRoute
-  '/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
-  '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
-  '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
-  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
-  '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
-  '/api/das/gerar': typeof ApiDasGerarRoute
-  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
   '/api/pipeline/mover': typeof ApiPipelineMoverRoute
-  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
-  '/api/serpro/call': typeof ApiSerproCallRoute
-  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
-  '/api/wa/instances': typeof ApiWaInstancesRoute
-  '/api/wa/send': typeof ApiWaSendRoute
   '/fiscal': typeof AppFiscalIndexRoute
-  '/api/nfse': typeof ApiNfseIndexRoute
   '/api/pipeline': typeof ApiPipelineIndexRoute
-  '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
-  '/api/webhooks/pluggy': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -416,7 +271,6 @@ export interface FileRoutesById {
   '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/societario': typeof AppSocietarioRoute
-  '/_app/whatsapp': typeof AppWhatsappRoute
   '/_app/workflows': typeof AppWorkflowsRoute
   '/checkout/$id': typeof CheckoutIdRoute
   '/_app/': typeof AppIndexRoute
@@ -424,31 +278,14 @@ export interface FileRoutesById {
   '/_app/configuracoes_/servicos': typeof AppConfiguracoesServicosRoute
   '/_app/dp_/$empresaId': typeof AppDpEmpresaIdRoute
   '/_app/fiscal/das': typeof AppFiscalDasRoute
-  '/_app/fiscal/nfse': typeof AppFiscalNfseRoute
-  '/_app/fiscal/serpro': typeof AppFiscalSerproRoute
   '/api/admin/bloquear-cliente': typeof ApiAdminBloquearClienteRoute
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
-  '/api/checkout/$id': typeof ApiCheckoutIdRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/cobranca/emitir': typeof ApiCobrancaEmitirRoute
-  '/api/cobranca/regua': typeof ApiCobrancaReguaRoute
-  '/api/cobranca/setup-webhook': typeof ApiCobrancaSetupWebhookRoute
-  '/api/cobranca/webhook': typeof ApiCobrancaWebhookRoute
-  '/api/das/gerar': typeof ApiDasGerarRoute
-  '/api/nfse/emitir-cobranca': typeof ApiNfseEmitirCobrancaRoute
   '/api/pipeline/mover': typeof ApiPipelineMoverRoute
-  '/api/pluggy/connect-token': typeof ApiPluggyConnectTokenRoute
-  '/api/serpro/call': typeof ApiSerproCallRoute
-  '/api/serpro/status': typeof ApiSerproStatusRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
-  '/api/wa/instances': typeof ApiWaInstancesRoute
-  '/api/wa/send': typeof ApiWaSendRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
-  '/api/nfse/': typeof ApiNfseIndexRoute
   '/api/pipeline/': typeof ApiPipelineIndexRoute
-  '/api/public/evolution-webhook/$instance': typeof ApiPublicEvolutionWebhookInstanceRoute
-  '/api/webhooks/pluggy/': typeof ApiWebhooksPluggyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -468,38 +305,20 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/obrigacoes'
     | '/societario'
-    | '/whatsapp'
     | '/workflows'
     | '/checkout/$id'
     | '/clientes/$id'
     | '/configuracoes/servicos'
     | '/dp/$empresaId'
     | '/fiscal/das'
-    | '/fiscal/nfse'
-    | '/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
-    | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/cobranca/emitir'
-    | '/api/cobranca/regua'
-    | '/api/cobranca/setup-webhook'
-    | '/api/cobranca/webhook'
-    | '/api/das/gerar'
-    | '/api/nfse/emitir-cobranca'
     | '/api/pipeline/mover'
-    | '/api/pluggy/connect-token'
-    | '/api/serpro/call'
-    | '/api/serpro/status'
     | '/api/usuarios/convidar'
-    | '/api/wa/instances'
-    | '/api/wa/send'
     | '/fiscal/'
-    | '/api/nfse/'
     | '/api/pipeline/'
-    | '/api/public/evolution-webhook/$instance'
-    | '/api/webhooks/pluggy/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -516,7 +335,6 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/obrigacoes'
     | '/societario'
-    | '/whatsapp'
     | '/workflows'
     | '/checkout/$id'
     | '/'
@@ -524,31 +342,14 @@ export interface FileRouteTypes {
     | '/configuracoes/servicos'
     | '/dp/$empresaId'
     | '/fiscal/das'
-    | '/fiscal/nfse'
-    | '/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
-    | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/cobranca/emitir'
-    | '/api/cobranca/regua'
-    | '/api/cobranca/setup-webhook'
-    | '/api/cobranca/webhook'
-    | '/api/das/gerar'
-    | '/api/nfse/emitir-cobranca'
     | '/api/pipeline/mover'
-    | '/api/pluggy/connect-token'
-    | '/api/serpro/call'
-    | '/api/serpro/status'
     | '/api/usuarios/convidar'
-    | '/api/wa/instances'
-    | '/api/wa/send'
     | '/fiscal'
-    | '/api/nfse'
     | '/api/pipeline'
-    | '/api/public/evolution-webhook/$instance'
-    | '/api/webhooks/pluggy'
   id:
     | '__root__'
     | '/_app'
@@ -566,7 +367,6 @@ export interface FileRouteTypes {
     | '/_app/financeiro'
     | '/_app/obrigacoes'
     | '/_app/societario'
-    | '/_app/whatsapp'
     | '/_app/workflows'
     | '/checkout/$id'
     | '/_app/'
@@ -574,31 +374,14 @@ export interface FileRouteTypes {
     | '/_app/configuracoes_/servicos'
     | '/_app/dp_/$empresaId'
     | '/_app/fiscal/das'
-    | '/_app/fiscal/nfse'
-    | '/_app/fiscal/serpro'
     | '/api/admin/bloquear-cliente'
     | '/api/admin/regua-config'
-    | '/api/checkout/$id'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/cobranca/emitir'
-    | '/api/cobranca/regua'
-    | '/api/cobranca/setup-webhook'
-    | '/api/cobranca/webhook'
-    | '/api/das/gerar'
-    | '/api/nfse/emitir-cobranca'
     | '/api/pipeline/mover'
-    | '/api/pluggy/connect-token'
-    | '/api/serpro/call'
-    | '/api/serpro/status'
     | '/api/usuarios/convidar'
-    | '/api/wa/instances'
-    | '/api/wa/send'
     | '/_app/fiscal/'
-    | '/api/nfse/'
     | '/api/pipeline/'
-    | '/api/public/evolution-webhook/$instance'
-    | '/api/webhooks/pluggy/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -609,26 +392,11 @@ export interface RootRouteChildren {
   CheckoutIdRoute: typeof CheckoutIdRoute
   ApiAdminBloquearClienteRoute: typeof ApiAdminBloquearClienteRoute
   ApiAdminReguaConfigRoute: typeof ApiAdminReguaConfigRoute
-  ApiCheckoutIdRoute: typeof ApiCheckoutIdRoute
   ApiCobrancaContratarServicoRoute: typeof ApiCobrancaContratarServicoRoute
   ApiCobrancaCriarRoute: typeof ApiCobrancaCriarRoute
-  ApiCobrancaEmitirRoute: typeof ApiCobrancaEmitirRoute
-  ApiCobrancaReguaRoute: typeof ApiCobrancaReguaRoute
-  ApiCobrancaSetupWebhookRoute: typeof ApiCobrancaSetupWebhookRoute
-  ApiCobrancaWebhookRoute: typeof ApiCobrancaWebhookRoute
-  ApiDasGerarRoute: typeof ApiDasGerarRoute
-  ApiNfseEmitirCobrancaRoute: typeof ApiNfseEmitirCobrancaRoute
   ApiPipelineMoverRoute: typeof ApiPipelineMoverRoute
-  ApiPluggyConnectTokenRoute: typeof ApiPluggyConnectTokenRoute
-  ApiSerproCallRoute: typeof ApiSerproCallRoute
-  ApiSerproStatusRoute: typeof ApiSerproStatusRoute
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
-  ApiWaInstancesRoute: typeof ApiWaInstancesRoute
-  ApiWaSendRoute: typeof ApiWaSendRoute
-  ApiNfseIndexRoute: typeof ApiNfseIndexRoute
   ApiPipelineIndexRoute: typeof ApiPipelineIndexRoute
-  ApiPublicEvolutionWebhookInstanceRoute: typeof ApiPublicEvolutionWebhookInstanceRoute
-  ApiWebhooksPluggyIndexRoute: typeof ApiWebhooksPluggyIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -680,13 +448,6 @@ declare module '@tanstack/react-router' {
       path: '/workflows'
       fullPath: '/workflows'
       preLoaderRoute: typeof AppWorkflowsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/whatsapp': {
-      id: '/_app/whatsapp'
-      path: '/whatsapp'
-      fullPath: '/whatsapp'
-      preLoaderRoute: typeof AppWhatsappRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/societario': {
@@ -773,33 +534,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPipelineIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/nfse/': {
-      id: '/api/nfse/'
-      path: '/api/nfse'
-      fullPath: '/api/nfse/'
-      preLoaderRoute: typeof ApiNfseIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app/fiscal/': {
       id: '/_app/fiscal/'
       path: '/fiscal'
       fullPath: '/fiscal/'
       preLoaderRoute: typeof AppFiscalIndexRouteImport
       parentRoute: typeof AppRoute
-    }
-    '/api/wa/send': {
-      id: '/api/wa/send'
-      path: '/api/wa/send'
-      fullPath: '/api/wa/send'
-      preLoaderRoute: typeof ApiWaSendRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/wa/instances': {
-      id: '/api/wa/instances'
-      path: '/api/wa/instances'
-      fullPath: '/api/wa/instances'
-      preLoaderRoute: typeof ApiWaInstancesRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/usuarios/convidar': {
       id: '/api/usuarios/convidar'
@@ -808,74 +548,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUsuariosConvidarRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/serpro/status': {
-      id: '/api/serpro/status'
-      path: '/api/serpro/status'
-      fullPath: '/api/serpro/status'
-      preLoaderRoute: typeof ApiSerproStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/serpro/call': {
-      id: '/api/serpro/call'
-      path: '/api/serpro/call'
-      fullPath: '/api/serpro/call'
-      preLoaderRoute: typeof ApiSerproCallRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/pluggy/connect-token': {
-      id: '/api/pluggy/connect-token'
-      path: '/api/pluggy/connect-token'
-      fullPath: '/api/pluggy/connect-token'
-      preLoaderRoute: typeof ApiPluggyConnectTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/pipeline/mover': {
       id: '/api/pipeline/mover'
       path: '/api/pipeline/mover'
       fullPath: '/api/pipeline/mover'
       preLoaderRoute: typeof ApiPipelineMoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/nfse/emitir-cobranca': {
-      id: '/api/nfse/emitir-cobranca'
-      path: '/api/nfse/emitir-cobranca'
-      fullPath: '/api/nfse/emitir-cobranca'
-      preLoaderRoute: typeof ApiNfseEmitirCobrancaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/das/gerar': {
-      id: '/api/das/gerar'
-      path: '/api/das/gerar'
-      fullPath: '/api/das/gerar'
-      preLoaderRoute: typeof ApiDasGerarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cobranca/webhook': {
-      id: '/api/cobranca/webhook'
-      path: '/api/cobranca/webhook'
-      fullPath: '/api/cobranca/webhook'
-      preLoaderRoute: typeof ApiCobrancaWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cobranca/setup-webhook': {
-      id: '/api/cobranca/setup-webhook'
-      path: '/api/cobranca/setup-webhook'
-      fullPath: '/api/cobranca/setup-webhook'
-      preLoaderRoute: typeof ApiCobrancaSetupWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cobranca/regua': {
-      id: '/api/cobranca/regua'
-      path: '/api/cobranca/regua'
-      fullPath: '/api/cobranca/regua'
-      preLoaderRoute: typeof ApiCobrancaReguaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/cobranca/emitir': {
-      id: '/api/cobranca/emitir'
-      path: '/api/cobranca/emitir'
-      fullPath: '/api/cobranca/emitir'
-      preLoaderRoute: typeof ApiCobrancaEmitirRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cobranca/criar': {
@@ -892,13 +569,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCobrancaContratarServicoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/checkout/$id': {
-      id: '/api/checkout/$id'
-      path: '/api/checkout/$id'
-      fullPath: '/api/checkout/$id'
-      preLoaderRoute: typeof ApiCheckoutIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/admin/regua-config': {
       id: '/api/admin/regua-config'
       path: '/api/admin/regua-config'
@@ -912,20 +582,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/admin/bloquear-cliente'
       preLoaderRoute: typeof ApiAdminBloquearClienteRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_app/fiscal/serpro': {
-      id: '/_app/fiscal/serpro'
-      path: '/fiscal/serpro'
-      fullPath: '/fiscal/serpro'
-      preLoaderRoute: typeof AppFiscalSerproRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/fiscal/nfse': {
-      id: '/_app/fiscal/nfse'
-      path: '/fiscal/nfse'
-      fullPath: '/fiscal/nfse'
-      preLoaderRoute: typeof AppFiscalNfseRouteImport
-      parentRoute: typeof AppRoute
     }
     '/_app/fiscal/das': {
       id: '/_app/fiscal/das'
@@ -955,20 +611,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/api/webhooks/pluggy/': {
-      id: '/api/webhooks/pluggy/'
-      path: '/api/webhooks/pluggy'
-      fullPath: '/api/webhooks/pluggy/'
-      preLoaderRoute: typeof ApiWebhooksPluggyIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/evolution-webhook/$instance': {
-      id: '/api/public/evolution-webhook/$instance'
-      path: '/api/public/evolution-webhook/$instance'
-      fullPath: '/api/public/evolution-webhook/$instance'
-      preLoaderRoute: typeof ApiPublicEvolutionWebhookInstanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -984,15 +626,12 @@ interface AppRouteChildren {
   AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppObrigacoesRoute: typeof AppObrigacoesRoute
   AppSocietarioRoute: typeof AppSocietarioRoute
-  AppWhatsappRoute: typeof AppWhatsappRoute
   AppWorkflowsRoute: typeof AppWorkflowsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppClientesIdRoute: typeof AppClientesIdRoute
   AppConfiguracoesServicosRoute: typeof AppConfiguracoesServicosRoute
   AppDpEmpresaIdRoute: typeof AppDpEmpresaIdRoute
   AppFiscalDasRoute: typeof AppFiscalDasRoute
-  AppFiscalNfseRoute: typeof AppFiscalNfseRoute
-  AppFiscalSerproRoute: typeof AppFiscalSerproRoute
   AppFiscalIndexRoute: typeof AppFiscalIndexRoute
 }
 
@@ -1008,15 +647,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceiroRoute: AppFinanceiroRoute,
   AppObrigacoesRoute: AppObrigacoesRoute,
   AppSocietarioRoute: AppSocietarioRoute,
-  AppWhatsappRoute: AppWhatsappRoute,
   AppWorkflowsRoute: AppWorkflowsRoute,
   AppIndexRoute: AppIndexRoute,
   AppClientesIdRoute: AppClientesIdRoute,
   AppConfiguracoesServicosRoute: AppConfiguracoesServicosRoute,
   AppDpEmpresaIdRoute: AppDpEmpresaIdRoute,
   AppFiscalDasRoute: AppFiscalDasRoute,
-  AppFiscalNfseRoute: AppFiscalNfseRoute,
-  AppFiscalSerproRoute: AppFiscalSerproRoute,
   AppFiscalIndexRoute: AppFiscalIndexRoute,
 }
 
@@ -1030,27 +666,11 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIdRoute: CheckoutIdRoute,
   ApiAdminBloquearClienteRoute: ApiAdminBloquearClienteRoute,
   ApiAdminReguaConfigRoute: ApiAdminReguaConfigRoute,
-  ApiCheckoutIdRoute: ApiCheckoutIdRoute,
   ApiCobrancaContratarServicoRoute: ApiCobrancaContratarServicoRoute,
   ApiCobrancaCriarRoute: ApiCobrancaCriarRoute,
-  ApiCobrancaEmitirRoute: ApiCobrancaEmitirRoute,
-  ApiCobrancaReguaRoute: ApiCobrancaReguaRoute,
-  ApiCobrancaSetupWebhookRoute: ApiCobrancaSetupWebhookRoute,
-  ApiCobrancaWebhookRoute: ApiCobrancaWebhookRoute,
-  ApiDasGerarRoute: ApiDasGerarRoute,
-  ApiNfseEmitirCobrancaRoute: ApiNfseEmitirCobrancaRoute,
   ApiPipelineMoverRoute: ApiPipelineMoverRoute,
-  ApiPluggyConnectTokenRoute: ApiPluggyConnectTokenRoute,
-  ApiSerproCallRoute: ApiSerproCallRoute,
-  ApiSerproStatusRoute: ApiSerproStatusRoute,
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
-  ApiWaInstancesRoute: ApiWaInstancesRoute,
-  ApiWaSendRoute: ApiWaSendRoute,
-  ApiNfseIndexRoute: ApiNfseIndexRoute,
   ApiPipelineIndexRoute: ApiPipelineIndexRoute,
-  ApiPublicEvolutionWebhookInstanceRoute:
-    ApiPublicEvolutionWebhookInstanceRoute,
-  ApiWebhooksPluggyIndexRoute: ApiWebhooksPluggyIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

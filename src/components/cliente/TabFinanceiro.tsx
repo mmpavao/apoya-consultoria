@@ -13,10 +13,9 @@ import { useState, useMemo, useCallback } from "react";
 import {
   Calendar, CheckCircle2, Clock, CreditCard, DollarSign,
   Hash, Loader2, Search, TrendingUp, User, XCircle, ReceiptText,
-  ArrowDownRight, ArrowUpRight, AlertCircle, Landmark, Wifi, WifiOff,
-  RefreshCw, Link, FileText,
+  ArrowDownRight, ArrowUpRight, AlertCircle,
+  FileText,
 } from "lucide-react";
-import { OpenFinanceDialog } from "@/components/open-finance";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { useCobrancas } from "@/hooks/use-cobrancas";
@@ -29,13 +28,12 @@ import type { Cobranca } from "@/hooks/use-cobrancas";
 // ── helpers ────────────────────────────────────────────────────────────────
 
 // ── sub-tabs ───────────────────────────────────────────────────────────────
-type FinTab = "resumo" | "cobrancas" | "honorarios" | "pagamentos" | "openfinance";
+type FinTab = "resumo" | "cobrancas" | "honorarios" | "pagamentos";
 const FIN_TABS: { id: FinTab; label: string }[] = [
   { id: "resumo",       label: "Resumo"       },
   { id: "cobrancas",    label: "Cobranças"    },
   { id: "honorarios",   label: "Honorários"   },
   { id: "pagamentos",   label: "Pagamentos"   },
-  { id: "openfinance",  label: "Open Finance" },
 ];
 
 // ── pill ───────────────────────────────────────────────────────────────────
@@ -205,189 +203,6 @@ function TabelaCobrancas({ cobrancas, clienteId }: { cobrancas: Cobranca[]; clie
 // ────────────────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ────────────────────────────────────────────────────────────────────────────
-
-// ══════════════════════════════════════════════════════════
-// TabOpenFinance — sub-aba Open Finance
-// ══════════════════════════════════════════════════════════
-interface OFProps { clienteId: string; clienteNome?: string; }
-
-function TabOpenFinance({ clienteId, clienteNome }: OFProps) {
-  const [conexoes, setConexoes] = useState<any[]>([]);
-  const [contas, setContas]     = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [showDialog, setShowDialog] = useState(false);
-
-  async function fetchConexoes() {
-    setLoading(true);
-    try {
-      const { data: conx } = await supabase
-        .from("open_finance_conexoes" as any)
-        .select("*")
-        .eq("empresa_id", clienteId)
-        .order("conectado_em", { ascending: false });
-
-      const { data: cts } = await supabase
-        .from("open_finance_contas" as any)
-        .select("*")
-        .eq("empresa_id", clienteId);
-
-      setConexoes(conx ?? []);
-      setContas(cts ?? []);
-    } catch (e) {
-      console.error("open_finance fetch:", e);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useState(() => { fetchConexoes(); });
-
-  const totalSaldo = contas.reduce((s: number, c: any) => s + (Number(c.saldo) || 0), 0);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16 gap-2">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Carregando conexões bancárias...</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      {/* Header + botão conectar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Landmark className="h-4 w-4 text-blue-600" />
-            Contas bancárias conectadas
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Extratos sincronizados automaticamente via Open Finance regulamentado pelo Banco Central
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchConexoes}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Atualizar"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setShowDialog(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Link className="h-3.5 w-3.5" />
-            Conectar banco
-          </button>
-        </div>
-      </div>
-
-      {/* Saldo consolidado */}
-      {contas.length > 0 && (
-        <div className="surface-card px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Saldo consolidado</p>
-            <p className="text-xl font-bold text-foreground mt-0.5">
-              {totalSaldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[11px] text-muted-foreground">{contas.length} conta{contas.length !== 1 ? "s" : ""} conectada{contas.length !== 1 ? "s" : ""}</p>
-            <p className="text-[11px] text-muted-foreground">{conexoes.length} banco{conexoes.length !== 1 ? "s" : ""} vinculado{conexoes.length !== 1 ? "s" : ""}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Lista de conexões */}
-      {conexoes.length === 0 ? (
-        <div className="border-2 border-dashed border-border rounded-xl p-10 text-center space-y-3">
-          <div className="flex justify-center">
-            <div className="p-3 bg-blue-50 rounded-full">
-              <Landmark className="h-7 w-7 text-blue-400" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">Nenhum banco conectado</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Conecte a conta bancária do cliente para receber extratos automaticamente
-            </p>
-          </div>
-          <button
-            onClick={() => setShowDialog(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Link className="h-4 w-4" />
-            Conectar primeiro banco
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {conexoes.map((cx: any) => {
-            const contasDaCx = contas.filter((c: any) => c.item_id === cx.item_id);
-            return (
-              <div key={cx.id} className="surface-card overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-muted/20">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-md ${cx.status === "ativo" ? "bg-emerald-50" : "bg-red-50"}`}>
-                      {cx.status === "ativo"
-                        ? <Wifi className="h-3.5 w-3.5 text-emerald-600" />
-                        : <WifiOff className="h-3.5 w-3.5 text-red-500" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Banco conectado</p>
-                      <p className="text-[11px] text-muted-foreground font-mono">{cx.item_id?.slice(0,16)}…</p>
-                    </div>
-                  </div>
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                    cx.status === "ativo"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-red-50 text-red-700 border-red-200"
-                  }`}>
-                    {cx.status === "ativo" ? "Ativo" : cx.status === "erro" ? "Erro" : "Expirado"}
-                  </span>
-                </div>
-                {contasDaCx.length > 0 && (
-                  <div className="divide-y divide-border/30">
-                    {contasDaCx.map((ct: any) => (
-                      <div key={ct.account_id} className="flex items-center justify-between px-4 py-2.5">
-                        <div>
-                          <p className="text-sm font-medium">{ct.nome ?? "Conta"}</p>
-                          <p className="text-xs text-muted-foreground">{ct.tipo ?? "—"} · {ct.moeda ?? "BRL"}</p>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {Number(ct.saldo ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {cx.ultimo_erro && (
-                  <div className="px-4 py-2 bg-red-50 border-t border-red-100">
-                    <p className="text-xs text-red-600">⚠️ {cx.ultimo_erro}</p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Dialog Pluggy Connect */}
-      <OpenFinanceDialog
-        open={showDialog}
-        onClose={() => setShowDialog(false)}
-        clienteId={clienteId}
-        clienteNome={clienteNome}
-        onConnected={() => {
-          setShowDialog(false);
-          setTimeout(fetchConexoes, 2000); // aguarda webhook processar
-        }}
-      />
-    </div>
-  );
-}
 
 export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
   const { cobrancas, loading } = useCobrancas();
@@ -589,8 +404,6 @@ export function TabFinanceiro({ cliente }: { cliente: Cliente }) {
       {sub === "cobrancas" && <TabelaCobrancas cobrancas={cobCliente} clienteId={cliente.id} />}
 
       {/* ── OPEN FINANCE ── */}
-      {sub === "openfinance" && <TabOpenFinance clienteId={cliente.id} clienteNome={cliente.razaoSocial} />}
-
       {/* ── HONORÁRIOS ── */}
       {sub === "honorarios" && (
         <div className="max-w-md space-y-4">

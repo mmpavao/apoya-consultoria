@@ -15,9 +15,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useClientes, type Cliente, type Regime, type FormaPagamento } from "@/hooks/use-clientes";
 import { formatCNPJ, isValidCNPJ, onlyDigits } from "@/lib/cnpj";
-import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
-import { useCnpjSerpro } from "@/hooks/use-cnpj-serpro";
-import { useSocios } from "@/hooks/use-socios";
 
 const REGIMES: Regime[] = ["MEI", "Simples", "Lucro Presumido", "Lucro Real", "Doméstica"];
 const FORMAS: FormaPagamento[] = ["PIX", "Boleto", "Débito automático"];
@@ -52,20 +49,11 @@ const SECTIONS: { id: SectionId; label: string; icon: any }[] = [
 
 export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Props) {
   const { clientes, createCliente, updateCliente } = useClientes();
-  const { importarDosCNPJ } = useSocios(null);
-  const [dadosCnpjParaSocios, setDadosCnpjParaSocios] = useState<any>(null);
-  const { buscar: buscarBrasil, loading: loadingBrasil } = useCnpjLookup();
-  const { enriquecer: enriquecerSerpro }                 = useCnpjSerpro();
 
   const [form, setForm]       = useState<Partial<Cliente>>(cliente ?? EMPTY);
   const [saving, setSaving]   = useState(false);
-  const [looking, setLooking] = useState(false);
   const [section, setSection] = useState<SectionId>("identificacao");
   const [sectionErrors, setSectionErrors] = useState<Set<SectionId>>(new Set());
-  const [serproInfo,   setSerproInfo]   = useState<string | null>(null);
-  const [serproAlerts, setSerproAlerts] = useState<string[]>([]);
-  const [aliquotaInfo, setAliquotaInfo]   = useState<string | null>(null);
-  const cnpjRef = useRef<string>("");
 
   // Resetar form quando o dialog abre
   const prevOpen = useRef(false);
@@ -74,11 +62,7 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
     if (open) {
       setForm(cliente ?? EMPTY);
       setSection("identificacao");
-      setSerproInfo(null);
-      setSerproAlerts([]);
-      setDadosCnpjParaSocios(null);
       setSectionErrors(new Set());
-      setAliquotaInfo(null);
     }
   }
 
@@ -86,101 +70,6 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
     setForm(p => ({ ...p, [field]: val }));
   const updateEnd = (field: string, val: string) =>
     setForm(p => ({ ...p, endereco: { ...(p.endereco ?? {}), [field]: val } }));
-
-  // ── Auto-fill ao sair do campo CNPJ ───────────────────────
-  async function handleCnpjBlur() {
-    const digits = onlyDigits(form.cnpj ?? "");
-    if (digits.length !== 14 || digits === cnpjRef.current) return;
-    if (!isValidCNPJ(digits)) { toast.error("CNPJ inválido"); return; }
-    cnpjRef.current = digits;
-
-    // Verificar duplicata
-    const dup = clientes.find(c => onlyDigits(c.cnpj) === digits && c.id !== cliente?.id);
-    if (dup) { toast.error(`CNPJ já cadastrado: ${dup.razaoSocial}`); return; }
-
-    setLooking(true);
-    toast.loading("Buscando dados do CNPJ…", { id: "cnpj-lookup" });
-
-    try {
-      // 1. BrasilAPI — dados cadastrais (rápido, público)
-      const cadastral = await buscarBrasil(digits);
-      if (cadastral) {
-        setForm(prev => ({
-          ...prev,
-          razaoSocial:         cadastral.razaoSocial      ?? prev.razaoSocial,
-          nomeFantasia:        cadastral.nomeFantasia      ?? prev.nomeFantasia,
-          atividadePrincipal:  cadastral.atividadePrincipal ?? prev.atividadePrincipal,
-          email:               cadastral.email             ?? prev.email,
-          telefone:            cadastral.telefone          ?? prev.telefone,
-          // Regime pela BrasilAPI
-          regime: (cadastral.optanteMei       ? "MEI"
-                  : cadastral.optanteSimplesNacional ? "Simples"
-                  : prev.regime) as Regime,
-          endereco: {
-            cep:        cadastral.cep        ?? prev.endereco?.cep        ?? "",
-            logradouro: cadastral.logradouro ?? prev.endereco?.logradouro ?? "",
-            numero:     cadastral.numero     ?? prev.endereco?.numero     ?? "",
-            complemento:cadastral.complemento?? prev.endereco?.complemento?? "",
-            bairro:     cadastral.bairro     ?? prev.endereco?.bairro     ?? "",
-            municipio:  cadastral.municipio  ?? prev.endereco?.municipio  ?? "",
-            uf:         cadastral.uf         ?? prev.endereco?.uf         ?? "",
-          },
-          codigoMunicipioIbge: cadastral.codigoMunicipioIbge ?? prev.codigoMunicipioIbge,
-        }));
-      }
-
-      // Guardar sócios para importação após salvar
-      if (cadastral?.socios && cadastral.socios.length > 0) {
-        setDadosCnpjParaSocios(cadastral);
-      }
-      toast.loading("Consultando SERPRO…", { id: "cnpj-lookup" });
-
-      // 2. SERPRO — regime real + situação fiscal (pode demorar mais)
-      const serpro = await enriquecerSerpro(digits);
-      if (serpro && Object.keys(serpro).length > 0) {
-        setForm(prev => ({
-          ...prev,
-          // Regime SERPRO tem prioridade (é a fonte oficial)
-          regime:            serpro.regime             ?? prev.regime,
-          // Campos fiscais calculados pelo CNAE via EF
-          codigoServicoNfse: serpro.codigoServicoNfse  ?? prev.codigoServicoNfse,
-          aliquotaIss:       serpro.aliquotaIss        ?? prev.aliquotaIss,
-        }));
-
-        // Montar mensagem informativa
-        const infos: string[] = [];
-        const alerts: string[] = [];
-        if (serpro.regime)                infos.push(`Regime: ${serpro.regime}`);
-        if (serpro.dteAtivo !== undefined) infos.push(`DTE: ${serpro.dteAtivo ? "✅ Ativo" : "Não enquadrado"}`);
-        if (serpro.ultimoPgdasPeriodo)    infos.push(`Último PGDAS: ${serpro.ultimoPgdasPeriodo}`);
-        if (serpro.dividaAtivaRfb)        alerts.push("Dívida ativa na Receita Federal");
-        if (serpro.dividaAtivaPgfn)       alerts.push("Dívida ativa na PGFN");
-        if (infos.length > 0)  setSerproInfo(infos.join(" · "));
-        if (alerts.length > 0) setSerproAlerts(alerts);
-        // Info de alíquota vindas do CNAE
-        if (serpro.anexoSimples || serpro.codigoServicoNfse) {
-          const fiscalPartes: string[] = [];
-          if (serpro.anexoSimples)       fiscalPartes.push(`Anexo ${serpro.anexoSimples}`);
-          if (serpro.cnaeDescricao)      fiscalPartes.push(serpro.cnaeDescricao);
-          if (serpro.descricaoServico)   fiscalPartes.push(`Serviço: ${serpro.descricaoServico}`);
-          if (serpro.aliquotaIss !== undefined) fiscalPartes.push(`ISS: ${serpro.aliquotaIss}%`);
-          if (fiscalPartes.length > 0)   setAliquotaInfo(fiscalPartes.join(" · "));
-        }
-      }
-
-      toast.success("Dados preenchidos automaticamente", { id: "cnpj-lookup" });
-    } catch (err: any) {
-      toast.error("Erro ao buscar CNPJ: " + (err?.message ?? "timeout"), { id: "cnpj-lookup" });
-    } finally {
-      setLooking(false);
-    }
-  }
-
-  // ── Lookup manual (botão) ──────────────────────────────────
-  async function handleLookupManual() {
-    cnpjRef.current = ""; // forçar re-fetch
-    await handleCnpjBlur();
-  }
 
   // ── Salvar ────────────────────────────────────────────────
   async function handleSubmit() {
@@ -216,11 +105,6 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
           return;
         }
         toast.success("Cliente cadastrado com sucesso!");
-        // Importar sócios automaticamente se temos dados da Receita
-        if (criado?.id && dadosCnpjParaSocios?.socios?.length) {
-          await importarDosCNPJ(criado.id, dadosCnpjParaSocios.socios);
-          toast.success(`${dadosCnpjParaSocios.socios.length} sócio(s) importados da Receita Federal`);
-        }
       }
       onClose?.(); onOpenChange?.(false);
     } catch (e: any) {
@@ -290,67 +174,13 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
               {/* CNPJ + lookup */}
               <div className="grid gap-1.5">
                 <Label className="text-xs font-medium">CNPJ *</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      value={form.cnpj ?? ""}
-                      onChange={e => update_("cnpj", formatCNPJ(e.target.value))}
-                      onBlur={handleCnpjBlur}
-                      placeholder="00.000.000/0000-00"
-                      maxLength={18}
-                      className="font-mono"
-                    />
-                    {looking && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={e => { e.stopPropagation(); handleLookupManual(); }}
-                    disabled={looking || onlyDigits(form.cnpj ?? "").length !== 14}
-                    className="gap-1.5 shrink-0"
-                  >
-                    <Search className="h-4 w-4" />
-                    {looking ? "Buscando…" : "Buscar"}
-                  </Button>
-                </div>
-
-                {/* Info SERPRO */}
-                {(serproInfo || serproAlerts.length > 0 || (dadosCnpjParaSocios?.socios?.length ?? 0) > 0 || !!aliquotaInfo) && (
-                  <div className="space-y-1.5">
-                    {serproInfo && (
-                      <div className="flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
-                        <span className="text-blue-600 text-xs font-semibold shrink-0">SERPRO</span>
-                        <p className="text-xs text-blue-700">{serproInfo}</p>
-                      </div>
-                    )}
-                    {serproAlerts.map((a, i) => (
-                      <div key={i} className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
-                        <span className="text-rose-500 text-sm shrink-0">⚠️</span>
-                        <p className="text-xs text-rose-700"><span className="font-semibold">Pendência fiscal:</span> {a}</p>
-                      </div>
-                    ))}
-                    {(dadosCnpjParaSocios?.socios?.length ?? 0) > 0 && (
-                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-700">
-                        <span className="font-semibold">👥 {dadosCnpjParaSocios!.socios!.length} sócio(s) encontrado(s):</span>{" "}
-                        {dadosCnpjParaSocios!.socios!.map((s: any) => s.nome).join(" · ")}
-                        <div className="mt-0.5 opacity-70">Serão importados automaticamente ao salvar</div>
-                      </div>
-                    )}
-                    {aliquotaInfo && (
-                      <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                        <span className="text-amber-600 text-sm shrink-0">📊</span>
-                        <div className="text-xs text-amber-700">
-                          <span className="font-semibold">Fiscal preenchido automaticamente</span>
-                          <p className="mt-0.5 opacity-80">{aliquotaInfo}</p>
-                          <p className="mt-0.5 opacity-60">Ver aba Fiscal para revisar código de serviço e alíquota ISS</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <Input
+                  value={form.cnpj ?? ""}
+                  onChange={e => update_("cnpj", formatCNPJ(e.target.value))}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                  className="font-mono"
+                />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">

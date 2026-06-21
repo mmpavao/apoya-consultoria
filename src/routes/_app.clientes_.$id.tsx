@@ -31,8 +31,6 @@ import { useCobrancas } from "@/hooks/use-cobrancas";
 import { useObrigacoes } from "@/hooks/use-obrigacoes";
 import { TabDocumentos } from "@/components/cliente/TabDocumentos";
 import { TabFiscal } from "@/components/cliente/TabFiscal";
-import { EmitirNfseModal } from "@/components/nfse/EmitirNfseModal";
-import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { TabSocios } from "@/components/cliente/TabSocios";
 import { TabCertificados } from "@/components/cliente/TabCertificados";
 import { TabComercial } from "@/components/cliente/TabComercial";
@@ -150,8 +148,6 @@ function ClienteDetailPage() {
   const { obrigacoes } = useObrigacoes();
 
   const [tab, setTab]         = useState<Tab>("geral");
-  const [modalNfse, setModalNfse] = useState(false);
-  const { buscar: buscarCnpjApi, loading: buscandoCnpj } = useCnpjLookup();
 
   const [editMode, setEditMode] = useState(false);
   const [form, setForm]         = useState<Partial<Cliente>>({});
@@ -325,9 +321,6 @@ function ClienteDetailPage() {
               <>
                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:border-destructive" onClick={e => { e.stopPropagation(); handleDelete(); }}>
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />Excluir
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setModalNfse(true)}>
-                  <ReceiptText className="mr-1.5 h-3.5 w-3.5" />Emitir NFS-e
                 </Button>
                 <Button size="sm" onClick={() => { setEditMode(true); setTab("geral"); setTimeout(() => document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); }}>
                   <Edit className="mr-1.5 h-3.5 w-3.5" />Editar
@@ -606,42 +599,6 @@ function ClienteDetailPage() {
                 <Input value={(form as any)[field] ?? ""} onChange={f(field as keyof Cliente)} />
               </div>
             ))}
-            {/* Botão de auto-fill pelo CNPJ */}
-            <div className="sm:col-span-2 flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" className="gap-2" disabled={buscandoCnpj}
-                onClick={async () => {
-                  const cnpj = (form as any).cnpj ?? cliente.cnpj;
-                  if (!cnpj) { toast.error("CNPJ não informado"); return; }
-                  const d = await buscarCnpjApi(cnpj);
-                  if (d) {
-                    setForm((p: any) => ({
-                      ...p,
-                      razaoSocial:        d.razaoSocial       || p.razaoSocial,
-                      nomeFantasia:       d.nomeFantasia       || p.nomeFantasia,
-                      atividadePrincipal: d.atividadePrincipal || p.atividadePrincipal,
-                      email:              d.email              || p.email,
-                      telefone:           d.telefone           || p.telefone,
-                      codigoMunicipioIbge: d.codigoMunicipioIbge || p.codigoMunicipioIbge,
-                      endereco: {
-                        ...p.endereco,
-                        cep:        d.cep        || p.endereco?.cep,
-                        logradouro: d.logradouro || p.endereco?.logradouro,
-                        numero:     d.numero     || p.endereco?.numero,
-                        bairro:     d.bairro     || p.endereco?.bairro,
-                        municipio:  d.municipio  || p.endereco?.municipio,
-                        uf:         d.uf         || p.endereco?.uf,
-                      },
-                    }));
-                    toast.success("Dados preenchidos automaticamente via CNPJ");
-                  }
-                }}
-              >
-                {buscandoCnpj
-                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando…</>
-                  : <><RefreshCw className="h-3.5 w-3.5" /> Auto-fill pelo CNPJ</>}
-              </Button>
-              <span className="text-xs text-muted-foreground">Preenche razão social, endereço e contato automaticamente</span>
-            </div>
 
             <div className="space-y-1.5">
               <Label>Regime</Label>
@@ -773,12 +730,6 @@ function ClienteDetailPage() {
       {tab === "contabil" && <TabContabil clienteId={id} />}
 
     </div>
-
-    <EmitirNfseModal
-      open={modalNfse}
-      onClose={() => setModalNfse(false)}
-      clientePreSelecionado={cliente}
-    />
     </>
   );
 }

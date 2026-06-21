@@ -26,8 +26,6 @@ import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
 import { useAuth } from "@/hooks/use-auth";
 import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
 import { useClientes } from "@/hooks/use-clientes";
-import { useSerpro } from "@/hooks/use-serpro";
-import { SERPRO_TOOLS, SERPRO_CATEGORIES, checkEligibility } from "@/lib/serpro/tools-catalog";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
 import { DasGerarDialog } from "@/components/DasGerarDialog";
@@ -317,242 +315,6 @@ function DasTab() {
     </div>
   );
 }
-
-// ════════════════════════════════════════════════════════════════
-// TAB — NFS-e  (lazy import da rota filha)
-// ════════════════════════════════════════════════════════════════
-function NfseTab() {
-  const NfseContent = lazy(() =>
-    import("@/routes/_app.fiscal.nfse").then(m => ({
-      default: (m as any).NfseContent ?? (() => (
-        <div className="p-8 text-center text-sm text-muted-foreground">Conteúdo NFS-e indisponível.</div>
-      )),
-    }))
-  );
-  return (
-    <Suspense fallback={<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
-      <NfseContent />
-    </Suspense>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-// TAB — SERPRO
-// ════════════════════════════════════════════════════════════════
-type GwStatus = { online: boolean; version?: string; checkedAt: string; latencyMs: number };
-type ResultState = { loading: boolean; text: string | null; pdfB64: string | null; error: string | null; ms: number | null };
-const EMPTY_R: ResultState = { loading: false, text: null, pdfB64: null, error: null, ms: null };
-
-const SERPRO_CAT_TABS = [
-  { id: "all", label: "Todas" }, { id: "mei", label: "MEI" }, { id: "das_mei", label: "DAS MEI" },
-  { id: "pgdas", label: "PGDAS/DAS" }, { id: "declaracoes", label: "Declarações" },
-  { id: "ecac", label: "eCAC" }, { id: "fiscal", label: "Sit. Fiscal" },
-  { id: "parcelamentos", label: "Parcelamentos" }, { id: "pagamentos", label: "PagtoWeb" }, { id: "darf", label: "DARF" },
-];
-
-function dlPdf(b64: string, fn: string) {
-  try {
-    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-    Object.assign(document.createElement("a"), { href: url, download: fn }).click();
-    URL.revokeObjectURL(url);
-  } catch { toast.error("Falha ao gerar PDF"); }
-}
-
-function SRRow({ state, toolName, cnpj }: { state: ResultState; toolName: string; cnpj: string }) {
-  if (state.loading) return <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Consultando…</div>;
-  if (state.error)   return <div className="flex items-start gap-1.5 py-1.5 text-xs text-red-600"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span className="break-words">{state.error}</span></div>;
-  if (!state.text)   return null;
-  return (
-    <div className="mt-2 rounded-md border border-border/60 bg-muted/30 p-3">
-      {state.pdfB64 && <Button size="sm" variant="outline" className="mb-2 h-6 text-[11px] gap-1" onClick={() => dlPdf(state.pdfB64!, `${toolName}-${cnpj}.pdf`)}><Download className="h-3 w-3" /> Baixar PDF</Button>}
-      <pre className="text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap break-all max-h-52">{state.text}</pre>
-      {state.ms != null && <p className="mt-1 text-[10px] text-muted-foreground text-right">{state.ms}ms</p>}
-    </div>
-  );
-}
-
-function SerproTab() {
-  const { session } = useAuth();
-  const token = session?.access_token ?? null;
-  const { clientes } = useClientes();
-  const { call, extractText, extractPdf } = useSerpro();
-  const [gw, setGw]               = useState<GwStatus | null>(null);
-  const [gwLoading, setGwLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState("");
-  const [catTab, setCatTab]       = useState("all");
-  const [searchTool, setSearchTool] = useState("");
-  const [openCats, setOpenCats]   = useState<Record<string, boolean>>({});
-  const [results, setResults]     = useState<Record<string, ResultState>>({});
-
-  async function checkGw() {
-    if (!token) return;
-    setGwLoading(true);
-    const t0 = Date.now();
-    try {
-      const res  = await fetch("/api/serpro/status", { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json().catch(() => ({}));
-      const s    = data?.serpro?.result ?? {};
-      setGw({ online: s.token_ok === true, version: s.version, checkedAt: new Date().toISOString(), latencyMs: Date.now() - t0 });
-    } catch { setGw({ online: false, checkedAt: new Date().toISOString(), latencyMs: 0 }); }
-    finally { setGwLoading(false); }
-  }
-  useEffect(() => { checkGw(); }, [token]);
-
-  const cliente   = useMemo(() => clientes.find(c => c.id === selectedId) ?? null, [clientes, selectedId]);
-  const regimeKey = useMemo(() => {
-    const r = (cliente?.regime ?? "").toUpperCase();
-    if (r === "SIMPLES NACIONAL" || r === "SIMPLES") return "SIMPLES";
-    if (r === "LUCRO PRESUMIDO") return "LUCRO_PRESUMIDO";
-    if (r === "LUCRO REAL") return "LUCRO_REAL";
-    return r;
-  }, [cliente]);
-  const cnpj = useMemo(() => (cliente?.cnpj ?? "").replace(/\D/g, ""), [cliente]);
-
-  const kpiElig = useMemo(() => {
-    const disp = SERPRO_TOOLS.filter(t =>
-      cliente ? checkEligibility(t.name, { regime: regimeKey, tem_certificado: (cliente as any).tem_certificado, tem_procuracao: (cliente as any).tem_procuracao }).eligible : false
-    ).length;
-    return { total: SERPRO_TOOLS.length, disp, bloq: SERPRO_TOOLS.length - disp };
-  }, [cliente, regimeKey]);
-
-  const filteredTools = useMemo(() => {
-    const q = searchTool.trim().toLowerCase();
-    return SERPRO_TOOLS.filter(t => {
-      if (catTab !== "all" && t.category !== catTab) return false;
-      if (q && !t.name.includes(q) && !t.description.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [catTab, searchTool]);
-
-  const grouped = useMemo(() =>
-    filteredTools.reduce<Record<string, typeof SERPRO_TOOLS>>((acc, t) => { acc[t.category] = [...(acc[t.category] ?? []), t]; return acc; }, {})
-  , [filteredTools]);
-
-  async function runTool(tool: typeof SERPRO_TOOLS[0]) {
-    if (!cnpj && tool.params.includes("cnpj")) { toast.error("Selecione um cliente com CNPJ"); return; }
-    const params: Record<string, string> = {};
-    if (tool.params.includes("cnpj")) params.cnpj = cnpj;
-    if (tool.params.includes("cpf") && (cliente as any)?.cpf) params.cpf = ((cliente as any).cpf as string).replace(/\D/g, "");
-    if (tool.params.includes("ano")) params.ano = String(new Date().getFullYear());
-    if (tool.params.includes("periodo")) { const d = new Date(); d.setMonth(d.getMonth() - 1); params.periodo = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`; }
-    setResults(p => ({ ...p, [tool.name]: { ...EMPTY_R, loading: true } }));
-    const res    = await call(tool.name, params, selectedId || undefined);
-    const text   = extractText(res);
-    const pdfB64 = extractPdf(res);
-    setResults(p => ({ ...p, [tool.name]: { loading: false, text: res.ok ? text : null, pdfB64: pdfB64 ?? null, error: res.ok ? null : (res.error ?? "Erro"), ms: res.duracao_ms ?? null } }));
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Gateway */}
-      <div className="rounded-lg border bg-card p-4 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          {gw?.online ? <Wifi className="h-5 w-5 text-emerald-500" /> : <WifiOff className="h-5 w-5 text-red-400" />}
-          <div><p className="text-sm font-semibold">Gateway SERPRO</p><p className="text-xs text-muted-foreground">mcp.zapro.tech</p></div>
-        </div>
-        {gw && <>
-          <span className={cn("text-sm font-medium", gw.online ? "text-emerald-600" : "text-red-500")}>{gw.online ? "Autenticado" : "Offline"}</span>
-          {gw.latencyMs > 0 && <span className="text-xs text-muted-foreground">{gw.latencyMs}ms</span>}
-          {gw.version && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">v{gw.version}</span>}
-        </>}
-        <Button size="sm" variant="outline" className="ml-auto h-7 gap-1 text-xs" onClick={checkGw} disabled={gwLoading}>
-          {gwLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Verificar
-        </Button>
-      </div>
-
-      {/* Cliente */}
-      <div className="rounded-lg border bg-card p-4 space-y-3">
-        <p className="text-sm font-semibold">Cliente para consulta</p>
-        <Select value={selectedId} onValueChange={setSelectedId}>
-          <SelectTrigger className="h-9 w-full max-w-sm"><SelectValue placeholder="Selecionar cliente…" /></SelectTrigger>
-          <SelectContent>
-            {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.razaoSocial ?? c.nomeFantasia} — {c.regime ?? "—"}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {cliente && (
-          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span>CNPJ: <strong className="text-foreground font-mono">{cliente.cnpj}</strong></span>
-            <span>Regime: <strong className="text-foreground">{cliente.regime}</strong></span>
-            <span className="text-emerald-600">{kpiElig.disp} tools disponíveis</span>
-            <span>{kpiElig.bloq} bloqueadas por regime/cert</span>
-          </div>
-        )}
-      </div>
-
-      {/* Filtros */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1">
-          {SERPRO_CAT_TABS.map(tab => (
-            <button key={tab.id} onClick={() => setCatTab(tab.id)}
-              className={cn("px-3 py-1 text-xs rounded-full border transition-colors",
-                catTab === tab.id ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground/40"
-              )}>{tab.label}</button>
-          ))}
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input placeholder="Buscar tool…" className="pl-9 h-9" value={searchTool} onChange={e => setSearchTool(e.target.value)} />
-        </div>
-      </div>
-
-      {/* Tools */}
-      <div className="space-y-2">
-        {Object.entries(grouped).map(([cat, tools]) => {
-          const isOpen = openCats[cat] ?? catTab !== "all";
-          return (
-            <div key={cat} className="rounded-lg border bg-card overflow-hidden">
-              <button className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
-                onClick={() => setOpenCats(p => ({ ...p, [cat]: !isOpen }))}>
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold">{SERPRO_CATEGORIES[cat] ?? cat}</span>
-                  <span className="text-xs text-muted-foreground">({tools.length})</span>
-                </div>
-                {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-              </button>
-              {isOpen && (
-                <div className="divide-y divide-border/40 border-t border-border/40">
-                  {tools.map(tool => {
-                    const elig  = cliente ? checkEligibility(tool.name, { regime: regimeKey, tem_certificado: (cliente as any).tem_certificado, tem_procuracao: (cliente as any).tem_procuracao }) : { eligible: false, reason: "Selecione um cliente" } as any;
-                    const state = results[tool.name] ?? EMPTY_R;
-                    return (
-                      <div key={tool.name} className="px-4 py-3 hover:bg-muted/20 transition-colors">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium">{tool.description}</p>
-                              {tool.returnsPdf && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">PDF</span>}
-                              {tool.isHeavy   && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">Pesada</span>}
-                            </div>
-                            <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{tool.name}</p>
-                            {!elig.eligible && <p className="text-xs text-amber-600 mt-1 flex items-start gap-1"><AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />{(elig as any).reason}</p>}
-                          </div>
-                          <Button size="sm" variant={elig.eligible ? "default" : "outline"} disabled={!elig.eligible || state.loading} className="shrink-0 h-7 text-xs gap-1" onClick={() => runTool(tool)}>
-                            {state.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : state.text ? <RefreshCw className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                            {state.text ? "Atualizar" : "Executar"}
-                          </Button>
-                        </div>
-                        <SRRow state={state} toolName={tool.name} cnpj={cnpj} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {Object.keys(grouped).length === 0 && (
-          <div className="rounded-lg border bg-card p-8 flex flex-col items-center gap-3 text-center text-muted-foreground">
-            <Search className="h-8 w-8 opacity-30" />
-            <p className="text-sm">Nenhuma tool encontrada{searchTool ? ` para "${searchTool}"` : ""}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ════════════════════════════════════════════════════════════════
 // TAB — DOCUMENTOS FISCAIS
 // ════════════════════════════════════════════════════════════════
@@ -705,82 +467,6 @@ function DocumentosTab() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════
-// TAB — AUTOMAÇÕES
-// ════════════════════════════════════════════════════════════════
-type AutoFiscal = { id: string; nome: string; descricao: string; agente: string; frequencia: string; ultima_execucao?: string; ativa: boolean; ultima_resultado?: "ok"|"erro"|"aviso" };
-
-const AUTOMACOES_FIXAS: AutoFiscal[] = [
-  { id: "1", nome: "Monitoramento Fiscal Diário",  descricao: "Verifica obrigações vencidas, a vencer e certificados",         agente: "agente-fiscal",       frequencia: "Diário 08:00", ativa: true,  ultima_resultado: "ok" },
-  { id: "2", nome: "Geração DAS Automática",        descricao: "Gera guias DAS/DASMEI para todos os clientes Simples/MEI",     agente: "agente-fiscal",       frequencia: "Mensal dia 1", ativa: false },
-  { id: "3", nome: "Envio DAS por WhatsApp",        descricao: "Envia guias DAS geradas aos clientes via WhatsApp",            agente: "agente-fiscal",       frequencia: "Mensal dia 2", ativa: false },
-  { id: "4", nome: "Alerta Certificados 30d",       descricao: "Notifica sobre certificados digitais com vencimento em 30 dias", agente: "agente-fiscal",      frequencia: "Semanal",      ativa: true,  ultima_resultado: "ok" },
-  { id: "5", nome: "Orquestrador Central",          descricao: "Executa todos os agentes em paralelo e consolida alertas",     agente: "agente-orquestrador", frequencia: "Diário 08:00", ativa: true,  ultima_resultado: "ok" },
-];
-
-function AutomacoesTab() {
-  const [automacoes, setAutomacoes] = useState<AutoFiscal[]>(AUTOMACOES_FIXAS);
-  const [runningId, setRunningId]   = useState<string | null>(null);
-  const { session } = useAuth();
-  const toggle = (id: string) => setAutomacoes(a => a.map(x => x.id === id ? { ...x, ativa: !x.ativa } : x));
-
-  async function executarAgora(id: string, agente: string) {
-    if (!session?.access_token) { toast.error("Sessão expirada"); return; }
-    setRunningId(id);
-    toast.loading(`Executando ${agente}…`, { id: "auto-run" });
-    try {
-      const res = await fetch(`https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/${agente}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ trigger: "manual" }),
-      });
-      if (res.ok) {
-        toast.success("Agente executado!", { id: "auto-run" });
-        setAutomacoes(a => a.map(x => x.id === id ? { ...x, ultima_execucao: new Date().toISOString(), ultima_resultado: "ok" } : x));
-      } else {
-        const d = await res.json().catch(() => ({}));
-        toast.error((d as any)?.error ?? "Erro na execução", { id: "auto-run" });
-        setAutomacoes(a => a.map(x => x.id === id ? { ...x, ultima_resultado: "erro" } : x));
-      }
-    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "auto-run" }); }
-    finally { setRunningId(null); }
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Agentes autônomos que monitoram e executam tarefas fiscais automaticamente.</p>
-      {automacoes.map(auto => (
-        <div key={auto.id} className="rounded-lg border bg-card p-4 flex items-start gap-4">
-          <div className={cn("mt-1 h-2.5 w-2.5 rounded-full shrink-0", auto.ativa ? "bg-emerald-500" : "bg-muted-foreground/30")} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-medium">{auto.nome}</p>
-              {auto.ultima_resultado === "ok"    && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-              {auto.ultima_resultado === "erro"   && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-              {auto.ultima_resultado === "aviso"  && <AlertTriangle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{auto.descricao}</p>
-            <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-muted-foreground">
-              <span>Agente: <code className="text-foreground">{auto.agente}</code></span>
-              <span>Frequência: <strong className="text-foreground">{auto.frequencia}</strong></span>
-              {auto.ultima_execucao && <span>Última: {new Date(auto.ultima_execucao).toLocaleString("pt-BR")}</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={runningId === auto.id} onClick={() => executarAgora(auto.id, auto.agente)}>
-              {runningId === auto.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-              Executar
-            </Button>
-            <button onClick={() => toggle(auto.id)} className={cn("p-1 rounded transition-colors", auto.ativa ? "text-emerald-600" : "text-muted-foreground/40")}>
-              {auto.ativa ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -1029,10 +715,7 @@ function FiscalModuloInner() {
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="das">DAS</TabsTrigger>
-          <TabsTrigger value="nfse">NFS-e</TabsTrigger>
-          <TabsTrigger value="serpro">SERPRO</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="automacoes">Automações</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
 
@@ -1067,21 +750,8 @@ function FiscalModuloInner() {
         <TabsContent value="das" className="mt-0">
           <DasTab />
         </TabsContent>
-        <TabsContent value="nfse" className="mt-0">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4 flex items-center gap-2 text-sm text-amber-700">
-            <ShieldAlert className="h-4 w-4 shrink-0" />
-            Emissão temporariamente suspensa — pendência junto à prefeitura de Caçapava. Apenas consulta disponível.
-          </div>
-          <NfseTab />
-        </TabsContent>
-        <TabsContent value="serpro" className="mt-0">
-          <SerproTab />
-        </TabsContent>
         <TabsContent value="documentos" className="mt-0">
           <DocumentosTab />
-        </TabsContent>
-        <TabsContent value="automacoes" className="mt-0">
-          <AutomacoesTab />
         </TabsContent>
         <TabsContent value="config" className="mt-0">
           <ConfiguracoesTab />
