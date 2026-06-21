@@ -340,81 +340,37 @@ export function useContratosCliente(clienteId: string) {
   }, [fetch]);
 
   // ── Clicksign: Enviar para assinatura ────────────────────
-  const enviarParaAssinatura = useCallback(async (contratoId: string) => {
+  // Assinatura MANUAL (sem Clicksign): o operador atualiza o status do contrato.
+  // A assinatura em si é feita fora do sistema (e-mail/papel/portal próprio).
+  async function setStatusManual(contratoId: string, status: string, msg: string) {
     setActionLoading(contratoId);
     try {
-      const res = await globalThis.fetch(`${SUPABASE_EF_URL}/clicksign-envelope`, {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${await efToken()}`,
-        },
-        body: JSON.stringify({ contrato_id: contratoId }),
-      });
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Erro no envio");
-      toast.success("Contrato enviado para assinatura!");
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await (supabase as any).from("contrato_cliente")
+        .update({ status }).eq("id", contratoId);
+      if (error) throw error;
+      toast.success(msg);
       await fetch();
-      return result as { envelope_id: string; sign_url: string; message: string };
     } catch (err) {
-      console.error("[useContratosCliente/enviarParaAssinatura] Error:", err);
-      toast.error(`Erro ao enviar: ${err}`);
+      toast.error(`Erro: ${err instanceof Error ? err.message : err}`);
       throw err;
     } finally {
       setActionLoading(null);
     }
-  }, [fetch]);
+  }
 
-  // ── Clicksign: Reenviar notificação ──────────────────────
+  const enviarParaAssinatura = useCallback(
+    (contratoId: string) => setStatusManual(contratoId, "aguardando_assinatura", "Contrato marcado como enviado para assinatura"),
+    [fetch]
+  );
   const reenviarNotificacao = useCallback(async (contratoId: string) => {
-    setActionLoading(contratoId + "_resend");
-    try {
-      const res = await globalThis.fetch(`${SUPABASE_EF_URL}/clicksign-envelope`, {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${await efToken()}`,
-        },
-        body: JSON.stringify({ contrato_id: contratoId, action: "resend" }),
-      });
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Erro ao reenviar");
-      toast.success("Notificação reenviada!");
-      return result;
-    } catch (err) {
-      console.error("[useContratosCliente/reenviarNotificacao] Error:", err);
-      toast.error(`Erro ao reenviar: ${err}`);
-      throw err;
-    } finally {
-      setActionLoading(null);
-    }
+    toast.info("Reenvie a cobrança de assinatura ao cliente pelo seu canal (e-mail/WhatsApp).");
+    void contratoId;
   }, []);
-
-  // ── Clicksign: Cancelar envelope ─────────────────────────
-  const cancelarEnvelope = useCallback(async (contratoId: string) => {
-    setActionLoading(contratoId + "_cancel");
-    try {
-      const res = await globalThis.fetch(`${SUPABASE_EF_URL}/clicksign-envelope`, {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${await efToken()}`,
-        },
-        body: JSON.stringify({ contrato_id: contratoId, action: "cancel" }),
-      });
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || "Erro ao cancelar");
-      toast.success("Envelope cancelado no Clicksign");
-      await fetch();
-      return result;
-    } catch (err) {
-      console.error("[useContratosCliente/cancelarEnvelope] Error:", err);
-      toast.error(`Erro ao cancelar: ${err}`);
-      throw err;
-    } finally {
-      setActionLoading(null);
-    }
-  }, [fetch]);
+  const cancelarEnvelope = useCallback(
+    (contratoId: string) => setStatusManual(contratoId, "cancelado", "Contrato cancelado"),
+    [fetch]
+  );
 
   return {
     contratos, loading, actionLoading, refetch: fetch,

@@ -26,10 +26,8 @@ import { Route as AppContabilRouteImport } from './routes/_app.contabil'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppAdministracaoRouteImport } from './routes/_app.administracao'
-import { Route as ApiPipelineIndexRouteImport } from './routes/api/pipeline/index'
 import { Route as AppFiscalIndexRouteImport } from './routes/_app.fiscal.index'
 import { Route as ApiUsuariosConvidarRouteImport } from './routes/api/usuarios/convidar'
-import { Route as ApiPipelineMoverRouteImport } from './routes/api/pipeline/mover'
 import { Route as ApiCobrancaCriarRouteImport } from './routes/api/cobranca/criar'
 import { Route as ApiCobrancaContratarServicoRouteImport } from './routes/api/cobranca/contratar-servico'
 import { Route as ApiAdminReguaConfigRouteImport } from './routes/api/admin/regua-config'
@@ -123,11 +121,6 @@ const AppAdministracaoRoute = AppAdministracaoRouteImport.update({
   path: '/administracao',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiPipelineIndexRoute = ApiPipelineIndexRouteImport.update({
-  id: '/api/pipeline/',
-  path: '/api/pipeline/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
   id: '/fiscal/',
   path: '/fiscal/',
@@ -136,11 +129,6 @@ const AppFiscalIndexRoute = AppFiscalIndexRouteImport.update({
 const ApiUsuariosConvidarRoute = ApiUsuariosConvidarRouteImport.update({
   id: '/api/usuarios/convidar',
   path: '/api/usuarios/convidar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPipelineMoverRoute = ApiPipelineMoverRouteImport.update({
-  id: '/api/pipeline/mover',
-  path: '/api/pipeline/mover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCobrancaCriarRoute = ApiCobrancaCriarRouteImport.update({
@@ -211,10 +199,8 @@ export interface FileRoutesByFullPath {
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/fiscal/': typeof AppFiscalIndexRoute
-  '/api/pipeline/': typeof ApiPipelineIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -241,10 +227,8 @@ export interface FileRoutesByTo {
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/fiscal': typeof AppFiscalIndexRoute
-  '/api/pipeline': typeof ApiPipelineIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -273,10 +257,8 @@ export interface FileRoutesById {
   '/api/admin/regua-config': typeof ApiAdminReguaConfigRoute
   '/api/cobranca/contratar-servico': typeof ApiCobrancaContratarServicoRoute
   '/api/cobranca/criar': typeof ApiCobrancaCriarRoute
-  '/api/pipeline/mover': typeof ApiPipelineMoverRoute
   '/api/usuarios/convidar': typeof ApiUsuariosConvidarRoute
   '/_app/fiscal/': typeof AppFiscalIndexRoute
-  '/api/pipeline/': typeof ApiPipelineIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -305,10 +287,8 @@ export interface FileRouteTypes {
     | '/api/admin/regua-config'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/pipeline/mover'
     | '/api/usuarios/convidar'
     | '/fiscal/'
-    | '/api/pipeline/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -335,10 +315,8 @@ export interface FileRouteTypes {
     | '/api/admin/regua-config'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/pipeline/mover'
     | '/api/usuarios/convidar'
     | '/fiscal'
-    | '/api/pipeline'
   id:
     | '__root__'
     | '/_app'
@@ -366,10 +344,8 @@ export interface FileRouteTypes {
     | '/api/admin/regua-config'
     | '/api/cobranca/contratar-servico'
     | '/api/cobranca/criar'
-    | '/api/pipeline/mover'
     | '/api/usuarios/convidar'
     | '/_app/fiscal/'
-    | '/api/pipeline/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -382,9 +358,7 @@ export interface RootRouteChildren {
   ApiAdminReguaConfigRoute: typeof ApiAdminReguaConfigRoute
   ApiCobrancaContratarServicoRoute: typeof ApiCobrancaContratarServicoRoute
   ApiCobrancaCriarRoute: typeof ApiCobrancaCriarRoute
-  ApiPipelineMoverRoute: typeof ApiPipelineMoverRoute
   ApiUsuariosConvidarRoute: typeof ApiUsuariosConvidarRoute
-  ApiPipelineIndexRoute: typeof ApiPipelineIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -508,13 +482,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdministracaoRouteImport
       parentRoute: typeof AppRoute
     }
-    '/api/pipeline/': {
-      id: '/api/pipeline/'
-      path: '/api/pipeline'
-      fullPath: '/api/pipeline/'
-      preLoaderRoute: typeof ApiPipelineIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app/fiscal/': {
       id: '/_app/fiscal/'
       path: '/fiscal'
@@ -527,13 +494,6 @@ declare module '@tanstack/react-router' {
       path: '/api/usuarios/convidar'
       fullPath: '/api/usuarios/convidar'
       preLoaderRoute: typeof ApiUsuariosConvidarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/pipeline/mover': {
-      id: '/api/pipeline/mover'
-      path: '/api/pipeline/mover'
-      fullPath: '/api/pipeline/mover'
-      preLoaderRoute: typeof ApiPipelineMoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cobranca/criar': {
@@ -647,9 +607,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminReguaConfigRoute: ApiAdminReguaConfigRoute,
   ApiCobrancaContratarServicoRoute: ApiCobrancaContratarServicoRoute,
   ApiCobrancaCriarRoute: ApiCobrancaCriarRoute,
-  ApiPipelineMoverRoute: ApiPipelineMoverRoute,
   ApiUsuariosConvidarRoute: ApiUsuariosConvidarRoute,
-  ApiPipelineIndexRoute: ApiPipelineIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
