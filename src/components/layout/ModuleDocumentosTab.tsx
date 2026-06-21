@@ -3,7 +3,8 @@
  *
  * Componente reutilizável de Documentos para todos os módulos.
  * Usa as tabelas documento_pasta + documento_arquivo com filtro por modulo.
- * Upload para Supabase Storage bucket "documentos".
+ * Upload para Supabase Storage bucket canônico "documentos-clientes"
+ * (mesmo bucket do TabDocumentos do cliente — evita silo entre telas).
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,7 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+const CLIENTE_BUCKET = "documentos-clientes";
 const CORES_PASTA = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ef4444","#8b5cf6","#ec4899","#14b8a6"];
 
 /* ── Componente principal ─────────────────────────────── */
@@ -164,14 +166,14 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
 
     try {
       for (const file of Array.from(files)) {
-        const path = `${modulo}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        const path = `${clienteSel}/${modulo}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
         const { error: upErr } = await (supabase as any).storage
-          .from("documentos")
+          .from(CLIENTE_BUCKET)
           .upload(path, file, { upsert: false });
         if (upErr) throw upErr;
 
         const { data: urlData } = (supabase as any).storage
-          .from("documentos")
+          .from(CLIENTE_BUCKET)
           .getPublicUrl(path);
 
         await (supabase as any).from("documento_arquivo").insert({
@@ -180,7 +182,7 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
           tamanho_bytes: file.size,
           storage_path: path,
           storage_url: urlData?.publicUrl ?? null,
-          bucket: "documentos",
+          bucket: CLIENTE_BUCKET,
           pasta_id: pastaSel,
           cliente_id: clienteSel,
           modulo,
@@ -228,7 +230,7 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
   async function excluirArquivo(arq: Arquivo) {
     if (!confirm(`Excluir "${arq.nome}"?`)) return;
     try {
-      await (supabase as any).storage.from((arq as any).bucket ?? "documentos").remove([arq.storage_path]);
+      await (supabase as any).storage.from((arq as any).bucket ?? CLIENTE_BUCKET).remove([arq.storage_path]);
       await (supabase as any).from("documento_arquivo").delete().eq("id", arq.id);
       setArquivos(prev => prev.filter(a => a.id !== arq.id));
       toast.success("Arquivo excluído");
@@ -239,7 +241,7 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
 
   /* ── Abrir/baixar (signed URL do bucket da linha — robusto p/ bucket privado) ── */
   async function abrirArquivo(arq: Arquivo, download = false) {
-    const bucket = (arq as any).bucket ?? "documentos";
+    const bucket = (arq as any).bucket ?? CLIENTE_BUCKET;
     const { data, error } = await (supabase as any).storage
       .from(bucket)
       .createSignedUrl(arq.storage_path, 3600, download ? { download: arq.nome } : undefined);

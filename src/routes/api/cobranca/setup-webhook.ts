@@ -37,7 +37,10 @@ export const Route = createFileRoute("/api/cobranca/setup-webhook")({
           ? "https://sandbox.asaas.com/api/v3"
           : "https://api.asaas.com/v3";
 
-        const webhookUrl   = "https://apoya-gestao.talkzzbot.workers.dev/api/cobranca/webhook";
+        const webhookBase = process.env.WORKER_BASE_URL
+          ?? (globalThis as any).__env__?.WORKER_BASE_URL
+          ?? "https://apoyaproject.zapro.tech";
+        const webhookUrl   = `${webhookBase.replace(/\/$/, "")}/api/cobranca/webhook`;
         const webhookToken = crypto.randomUUID().replace(/-/g, "");
 
         const headers = {
@@ -93,18 +96,28 @@ export const Route = createFileRoute("/api/cobranca/setup-webhook")({
           return json({ error: "Asaas recusou", detail: result.errors }, 400);
         }
 
-        // Persistir dados na config do banco
+        // Persistir dados na config do banco (upsert — antes só update quebrava se a linha não existia)
         const db = supabaseAdmin as any;
-        await db.from("integracao_config").update({
-          config: {
-            sandbox:         isSandbox,
-            base_url:        baseUrl,
-            webhook_id:      result.id ?? existing?.id,
-            webhook_token:   webhookToken,
-            webhook_url:     webhookUrl,
-            configurado_em:  new Date().toISOString(),
-          },
-        }).eq("tipo", "asaas");
+        const configPayload = {
+          sandbox:         isSandbox,
+          base_url:        baseUrl,
+          webhook_id:      result.id ?? existing?.id,
+          webhook_token:   webhookToken,
+          webhook_url:     webhookUrl,
+          configurado_em:  new Date().toISOString(),
+        };
+        const { data: cfgRow } = await db.from("integracao_config")
+          .select("id").eq("tipo", "asaas").maybeSingle();
+        if (cfgRow) {
+          await db.from("integracao_config").update({ config: configPayload, ativa: true })
+            .eq("tipo", "asaas");
+        } else {
+          await db.from("integracao_config").insert({
+            tipo: "asaas",
+            ativa: true,
+            config: configPayload,
+          });
+        }
 
         return json({
           ok:          true,

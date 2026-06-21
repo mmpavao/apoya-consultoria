@@ -162,6 +162,12 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
           // ── PAGAMENTO CONFIRMADO ──────────────────────────────────────────
           case "PAYMENT_RECEIVED":
           case "PAYMENT_CONFIRMED": {
+            // Idempotência: re-entrega Asaas não re-dispara NFS-e nem re-notifica
+            if (cob.status === "paga") {
+              console.log(`[webhook] ↩ idempotente — cobrança ${cob.id} já paga (nfse=${cob.nfse_status ?? "?"})`);
+              break;
+            }
+
             const valor    = Number(payment.value ?? cob.valor);
             const valorBRL = valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
             const nome     = (cli?.razao_social ?? "Cliente").split(" ")[0];
@@ -211,14 +217,18 @@ export const Route = createFileRoute("/api/cobranca/webhook")({
                 .maybeSingle();
 
               const emissaoNf = contratoAtivo?.emissao_nf ?? "automatica";
-              if (emissaoNf !== "manual") {
+              if (emissaoNf !== "manual" && cob.nfse_status !== "emitida") {
                 dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+              } else if (cob.nfse_status === "emitida") {
+                console.log(`[webhook] NFS-e já emitida para ${cob.id} — skip dispatch`);
               } else {
                 console.log(`[webhook] 📋 NFS-e manual para ${cob.id} — aguarda ação do escritório`);
               }
             } catch {
               // fallback: emitir automaticamente se não conseguir buscar contrato
-              dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+              if (cob.nfse_status !== "emitida") {
+                dispararNfse(cob.id, cob.cliente_id).catch(() => {});
+              }
             }
 
             console.log(`[webhook] ✅ PAGO — ${cob.id} — ${valorBRL} — ${cli?.razao_social}`);
