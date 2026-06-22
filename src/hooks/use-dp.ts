@@ -204,9 +204,10 @@ export function useCreateFolha() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const db = supabase as any;
       // Busca os ativos e CALCULA a folha (antes a folha nascia zerada)
-      const { data: funcs } = await db.from("funcionarios")
+      const { data: funcs, error: funcErr } = await db.from("funcionarios")
         .select("id, salario_base, dependentes")
         .eq("empresa_id", empresaId).eq("status", "ativo");
+      if (funcErr) throw funcErr;
       const ativos = (funcs ?? []) as { id: string; salario_base: number; dependentes?: number | null }[];
       const totais = calcFolhaTotais(ativos);
       const { data: folha, error } = await db.from("folha_mensal").insert({

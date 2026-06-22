@@ -71,13 +71,13 @@ function ProntidaoMini({ c }: { c: Cliente }) {
 }
 
 
-function Initials({nome, regime}:{nome:string; regime:Regime}){
+function Initials({nome, regime}:{nome:string; regime?:Regime}){
   const init=nome.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
   const cfg={MEI:"bg-violet-100 text-violet-700", Simples:"bg-blue-100 text-blue-700",
     "Lucro Presumido":"bg-cyan-100 text-cyan-700","Lucro Real":"bg-indigo-100 text-indigo-700",
     "Doméstica":"bg-emerald-100 text-emerald-700"};
   return (
-    <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${cfg[regime]??cfg.Simples}`}>
+    <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${regime ? (cfg[regime] ?? "bg-slate-100 text-slate-600") : "bg-slate-100 text-slate-600"}`}>
       {init}
     </span>
   );
@@ -128,7 +128,7 @@ function ClientesPage(){
       key:"cliente", header:"Cliente",
       cell: c=>(
         <div className="flex items-center gap-2.5" style={{overflow:"visible",whiteSpace:"normal"}}>
-          <Initials nome={c.razaoSocial} regime={c.regime ?? "Simples"}/>
+          <Initials nome={c.razaoSocial} regime={c.regime}/>
           <div>
             <span className="font-medium text-foreground leading-tight">
               {c.razaoSocial}
@@ -147,7 +147,7 @@ function ClientesPage(){
       key:"regime", header:"Regime",
       headerClassName:"hidden sm:table-cell", className:"hidden sm:table-cell",
       cell: c=>(
-        <InlineBadge color={R_C[c.regime ?? "Simples"] ?? "gray"} dot>
+        <InlineBadge color={c.regime ? (R_C[c.regime] ?? "gray") : "gray"} dot>
           {c.regime ? (REGIME_LABEL[c.regime] ?? c.regime) : "—"}
           {c.regimeHibrido && <span className="ml-1 opacity-60">·H</span>}
         </InlineBadge>

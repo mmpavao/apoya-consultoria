@@ -220,7 +220,12 @@ function LancamentosTab({ autoNovo = 0 }: { autoNovo?: number }) {
     { key: "debito", header: "Conta Débito", headerClassName: "hidden md:table-cell font-mono", className: "hidden md:table-cell text-xs font-mono", cell: l => l.conta_debito },
     { key: "credito", header: "Conta Crédito", headerClassName: "hidden md:table-cell font-mono", className: "hidden md:table-cell text-xs font-mono", cell: l => l.conta_credito },
     { key: "valor", header: "Valor", headerClassName: "text-right", className: "text-right tabular-nums font-semibold", cell: l => fmtBRL(l.valor) },
-    { key: "tipo", header: "Tipo", cell: l => <InlineBadge color={l.tipo === "debito" ? "red" : "green"} dot>{l.tipo}</InlineBadge> },
+    { key: "tipo", header: "Tipo", cell: l => {
+      const isDebito = l.tipo === "debito";
+      const isCredito = l.tipo === "credito";
+      const color = isDebito ? "red" : isCredito ? "green" : "gray";
+      return <InlineBadge color={color} dot>{l.tipo}</InlineBadge>;
+    } },
     { key: "acoes", header: "", className: "text-right whitespace-nowrap", cell: l => (
       <div className="flex items-center justify-end gap-1">
         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Editar" onClick={() => abrirEdicao(l)}>
