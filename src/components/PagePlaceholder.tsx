@@ -2,42 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
-
-/* ────────────────────────────────────────────────────────
-   PageTabs — sub-navegação padrão (ex.: Fiscal: DAS / NFS-e / SERPRO)
-   ──────────────────────────────────────────────────────── */
-export function PageTabs({
-  items,
-}: {
-  items: Array<{ to: string; label: string; icon?: LucideIcon }>;
-}) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  return (
-    <div className="surface-card flex flex-wrap items-center gap-1 p-1.5">
-      {items.map((it) => {
-        const Icon = it.icon;
-        const active = pathname === it.to || pathname.startsWith(it.to + "/");
-        return (
-          <Link
-            key={it.to}
-            to={it.to}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all",
-              active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            {Icon && <Icon className="h-4 w-4" />}
-            {it.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
 
 /* ────────────────────────────────────────────────────────
    PageHeader — cabeçalho único de toda página
@@ -186,69 +151,6 @@ export function Pagination({
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────
-   PlaceholderBlock (mantém compat com rotas em construção)
-   ──────────────────────────────────────────────────────── */
-export function PlaceholderBlock({
-  icon: Icon,
-  title,
-  description,
-  module,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  module: string;
-}) {
-  return (
-    <div className="surface-card border-dashed p-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-        <Icon className="h-7 w-7" />
-      </div>
-      <h2 className="mt-5 text-lg font-semibold">{title}</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{description}</p>
-      <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-        {module}
-      </div>
-    </div>
-  );
-}
-
-/** Tabs sem router — para uso com estado local */
-export function TabsSimple({
-  tabs,
-  activeTab,
-  onTabChange,
-}: {
-  tabs: Array<{ id: string; label: string; icon?: LucideIcon }>;
-  activeTab: string;
-  onTabChange: (id: string) => void;
-}) {
-  return (
-    <div className="flex border-b border-border">
-      {tabs.map(t => {
-        const Icon = t.icon;
-        return (
-          <button
-            key={t.id}
-            onClick={() => onTabChange(t.id)}
-            className={cn(
-              "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
-              activeTab === t.id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {Icon && <Icon className="w-3.5 h-3.5" />}
-            {t.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

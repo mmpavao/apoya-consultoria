@@ -22,8 +22,6 @@ import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef, type Bad
 import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { CobrancaFormDialog } from "@/components/CobrancaFormDialog";
 import { PagamentoDialog } from "@/components/PagamentoDialog";
-// import { financeiroStore, type Cobranca, type CobrancaStatus, type ReguaStage } from "@/lib/financeiro-store";
-
 export const Route = createFileRoute("/_app/financeiro")({
   component: FinanceiroPage,
   head: () => ({ meta: [{ title: "Financeiro · APOYA Gestão" }] }),
