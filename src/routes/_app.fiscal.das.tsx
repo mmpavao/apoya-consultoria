@@ -34,7 +34,7 @@ function DasPage() {
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth() + 1);
-  const { guias: items, loading: dasLoading, refresh } = useDas();
+  const { guias: items, loading: dasLoading, error: dasError, refresh } = useDas();
   const { clientes } = useClientes();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
@@ -218,12 +218,20 @@ function DasPage() {
         }
       />
 
+      {dasError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar guias DAS: {dasError}.
+          <button type="button" onClick={() => refresh()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
+
       <KpiGrid cols={5}>
-        <KpiCard icon={FileText}      tone="neutral" label="Total"    value={kpi.total} />
-        <KpiCard icon={Loader2}       tone="info"    label="Pendente" value={kpi.pendente} />
-        <KpiCard icon={CheckCircle2}  tone="warning" label="Geradas"  value={kpi.gerada} />
-        <KpiCard icon={Wallet}        tone="success" label="Pagas"    value={kpi.paga} />
-        <KpiCard icon={AlertTriangle} tone="neutral" label="Total R$" value={fmtBRL(kpi.valor)} />
+        <KpiCard icon={FileText}      tone="neutral" label="Total"    value={dasError ? "—" : dasLoading ? "…" : kpi.total} />
+        <KpiCard icon={Loader2}       tone="info"    label="Pendente" value={dasError ? "—" : dasLoading ? "…" : kpi.pendente} />
+        <KpiCard icon={CheckCircle2}  tone="warning" label="Geradas"  value={dasError ? "—" : dasLoading ? "…" : kpi.gerada} />
+        <KpiCard icon={Wallet}        tone="success" label="Pagas"    value={dasError ? "—" : dasLoading ? "…" : kpi.paga} />
+        <KpiCard icon={AlertTriangle} tone="neutral" label="Total R$" value={dasError ? "—" : fmtBRL(kpi.valor)} />
       </KpiGrid>
 
 
