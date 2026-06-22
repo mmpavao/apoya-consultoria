@@ -149,7 +149,7 @@ function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: bool
         {[
           { label: "Regime",      value: cliente.regime ? (REGIME_LABEL[cliente.regime] ?? cliente.regime) : "—" },
           { label: "CNPJ",        value: cliente.cnpj || "—" },
-          { label: "Venc. DAS",   value: "Todo dia 20" },
+          { label: "Venc. DAS",   value: (isMEI || isSimples) ? "Dia 20 (mês seguinte)" : "—" },
           { label: "Obrigações",  value: obgAtrasada > 0 ? `${obgAtrasada} atrasada${obgAtrasada>1?"s":""}` : obgPendente > 0 ? `${obgPendente} pendente${obgPendente>1?"s":""}` : "Em dia" },
         ].map(k => (
           <div key={k.label} className="surface-card px-4 py-3">

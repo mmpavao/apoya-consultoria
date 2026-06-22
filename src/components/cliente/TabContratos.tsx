@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { Cliente } from "@/hooks/use-clientes";
 import { useEscritorio } from "@/hooks/use-escritorio";
 import { substituirPlaceholders } from "@/lib/contrato-placeholders";
+import { sanitizeContratoHtml } from "@/lib/sanitize-html";
 import { toast } from "sonner";
 import {
   FileText, Plus, Send, RefreshCw, XCircle, Download,
@@ -268,7 +269,7 @@ function ContratoRow({
               </p>
               <div
                 className="prose prose-sm max-h-48 overflow-y-auto rounded-lg border border-border/60 bg-background p-3 text-xs"
-                dangerouslySetInnerHTML={{ __html: contrato.corpo_html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeContratoHtml(contrato.corpo_html) }}
               />
             </div>
           )}
