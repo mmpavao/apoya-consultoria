@@ -1,16 +1,16 @@
 # STATE — APOYA Gestão
 
-> Atualizado: **2026-06-22** · Pivô **100% manual** (decisão Marcio) · **v3.43.0** em prod
+> Atualizado: **2026-06-22** · Pivô **100% manual** (decisão Marcio) · **v3.44.0** em prod
 
 ## Status do repositório
 
 | Item | Estado |
 |------|--------|
 | Branch ativa | `main` |
-| PRs abertas | **0** (PR #3 legado — branch removida; fechar manualmente no GitHub se ainda aparecer) |
-| Versão prod | **v3.43.0** |
+| PRs abertas | **1** (PR #3 legado SERPRO — fechar manualmente no GitHub) |
+| Versão prod | **v3.44.0** |
 | Modo | 100% manual — CRUD Supabase |
-| Próximo foco | Bugs fluxo manual (ver `BACKLOG.md` Temas 1, 3, 7) |
+| Próximo foco | Backlog Tema 1 (schema/colunas) — ver `BACKLOG.md` |
 
 ## Decisão vigente
 
@@ -23,6 +23,7 @@ TanStack Start (React 19) → Cloudflare Worker `apoya-gestao` + Supabase `ajaqb
 ## O que foi removido (não recriar)
 
 - Agentes (`agente-*`), cron, MCP, `/api/pipeline/*`
+- UI/código de agentes IA (cadastro, Ana/Sofia/Hugo nos workflows) — v3.44.0
 - SERPRO, NFS-e/Focus, Asaas, Pluggy, WhatsApp/Evolution, Clicksign-send
 - Rotas: `/whatsapp`, `/automacoes`, `/fiscal/nfse`, `/fiscal/serpro`
 - Edge functions: só **`send-invite`** permanece
@@ -38,6 +39,7 @@ TanStack Start (React 19) → Cloudflare Worker `apoya-gestao` + Supabase `ajaqb
 | Contábil | Lançamentos, plano, conciliação |
 | Kanban | `update tarefas.etapa_pipeline` direto no Supabase |
 | Documentos | Bucket `documentos-clientes` |
+| Workflows | Responsáveis = usuários reais do banco |
 
 ## Regras de deploy
 
@@ -48,7 +50,7 @@ npx tsc --noEmit && npm test && npm run build
 
 - Migrations: agente ARQUITETO (Base44), **não** CI
 - Edge functions: só em tag prod + `deno check`
-- Versão atual: **v3.43.0** (prod — cleanup pós-pivô manual)
+- Versão atual: **v3.44.0** (prod)
 
 ## Gates locais
 
@@ -56,7 +58,6 @@ npx tsc --noEmit && npm test && npm run build
 
 ## Changelog recente
 
+- **v3.44.0**: remoção resíduos agentes IA na UI; backlog P1 manual (contábil, erros UI, config honesta, folha DP)
+- v3.43.0: cleanup pós-pivô — DAS/fiscal 100% manual; dead code whatsapp/evolution
 - Pivô L1–L3: remoção agentes + integrações
-- Cleanup: dashboard sem chamadas a edge functions removidas; docs alinhados
-- Cleanup L4: DAS/fiscal 100% manual (sem SERPRO/WA API); dead code whatsapp/evolution removido
-- v3.44: fixes backlog manual (contábil, erros UI, config honesta, folha DP)
