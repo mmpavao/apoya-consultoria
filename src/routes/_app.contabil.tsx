@@ -571,9 +571,9 @@ function ConfigContabil() {
       </div>
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <h3 className="text-sm font-semibold">Integração Bancária</h3>
-        <p className="text-xs text-muted-foreground">Conecte o extrato bancário para reconciliação automática.</p>
+        <p className="text-xs text-muted-foreground">Modo manual — importe extrato CSV na aba Conciliação (sem Open Finance ativo).</p>
         <div className="grid gap-2 md:grid-cols-3">
-          {[{ label: "Status", val: "Não configurado" }, { label: "Banco", val: "—" }, { label: "Última sync", val: "—" }].map(item => (
+          {[{ label: "Status", val: "Manual" }, { label: "Banco", val: "—" }, { label: "Última sync", val: "—" }].map(item => (
             <div key={item.label} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
               <span className="text-xs text-muted-foreground">{item.label}</span>
               <span className="text-sm font-medium">{item.val}</span>

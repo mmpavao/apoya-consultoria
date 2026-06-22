@@ -253,7 +253,7 @@ export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: 
       {sub === "apuracao" && (
         <ApuracaoMensalCard
           clienteId={cliente.id}
-          regime={cliente.regime ?? "simples_nacional"}
+          regime={cliente.regime ?? "Simples"}
         />
       )}
     </div>

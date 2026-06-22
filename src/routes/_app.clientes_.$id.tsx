@@ -205,6 +205,17 @@ function ClienteDetailPage() {
     </div>
   );
 
+  if (clienteError) return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+      <AlertTriangle className="h-10 w-10 text-red-400" />
+      <p className="text-muted-foreground">Erro ao carregar cliente: {clienteError}</p>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => refetchCliente()}>Tentar de novo</Button>
+        <Link to="/clientes"><Button variant="outline" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Button></Link>
+      </div>
+    </div>
+  );
+
   if (!cliente) return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
       <AlertTriangle className="h-10 w-10 text-muted-foreground/40" />

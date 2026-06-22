@@ -140,7 +140,7 @@ export function CobrancaFormDialog({ open, onClose, onCreated, cobranca }: Props
         return;
       }
 
-      toast.success("Cobrança criada! Use 'Emitir' para enviar ao Asaas.");
+      toast.success("Cobrança registrada no sistema (modo manual — sem emissão automática no gateway).");
       window.dispatchEvent(new Event("apoya:cobrancas:changed"));
       onCreated?.();
       onClose();
