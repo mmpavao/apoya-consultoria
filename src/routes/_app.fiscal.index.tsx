@@ -431,15 +431,28 @@ function DashboardTab() {
   const { kpis, loading: kpiLoading, refetch } = useFiscalKpis();
   const [obrigacoes, setObrigacoes] = useState<any[]>([]);
   const [loadingOb, setLoadingOb]   = useState(true);
+  const [obError, setObError]       = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase
-      .from("obrigacoes")
-      .select("id,tipo,cliente_nome,vencimento,status")
-      .order("vencimento", { ascending: true })
-      .limit(8)
-      .then(({ data }) => { setObrigacoes(data ?? []); setLoadingOb(false); });
+  const loadObrigacoes = useCallback(async () => {
+    setLoadingOb(true);
+    setObError(null);
+    try {
+      const { data, error } = await supabase
+        .from("obrigacoes")
+        .select("id,tipo,cliente_nome,vencimento,status")
+        .order("vencimento", { ascending: true })
+        .limit(8);
+      if (error) throw error;
+      setObrigacoes(data ?? []);
+    } catch (e: any) {
+      setObError(e?.message ?? "Erro ao carregar obrigações");
+      setObrigacoes([]);
+    } finally {
+      setLoadingOb(false);
+    }
   }, []);
+
+  useEffect(() => { loadObrigacoes(); }, [loadObrigacoes]);
 
   const hoje = new Date().toISOString().split("T")[0];
   const vencidas   = obrigacoes.filter(o => o.vencimento < hoje && !["concluida","cancelada"].includes(o.status));
@@ -468,13 +481,19 @@ function DashboardTab() {
             <h3 className="text-sm font-semibold">Obrigações próximas</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Ordenadas por vencimento · operação manual</p>
           </div>
-          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={refetch} disabled={kpiLoading}>
-            <RefreshCw className={cn("h-3 w-3", kpiLoading && "animate-spin")} />
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => { refetch(); loadObrigacoes(); }} disabled={kpiLoading || loadingOb}>
+            <RefreshCw className={cn("h-3 w-3", (kpiLoading || loadingOb) && "animate-spin")} />
           </Button>
         </div>
+        {obError && (
+          <div className="mx-5 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            {obError}
+          </div>
+        )}
         {loadingOb ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-        ) : obrigacoes.length === 0 ? (
+        ) : obError ? null : obrigacoes.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <CheckCircle2 className="h-8 w-8 text-emerald-400" />
             <p className="text-sm">Nenhuma obrigação pendente</p>

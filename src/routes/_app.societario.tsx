@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SectorGuard } from "@/components/SectorGuard";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, LayoutGrid, List, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleDashboard } from "@/components/layout/ModuleDashboard";
 import { ModuleDocumentosTab } from "@/components/layout/ModuleDocumentosTab";
+import { useDepartamentoConfig } from "@/hooks/use-departamento-config";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FileText, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/PagePlaceholder";
 import {
@@ -32,6 +35,51 @@ const fmtData = (iso?:string|null) => {
   const [y,m,d] = iso.split("T")[0].split("-");
   return `${d}/${m}/${y}`;
 };
+
+const SOC_PREFS = [
+  { key: "notif_abertura",   label: "Lembrete ao concluir abertura (manual)",     def: true },
+  { key: "alerta_parado",    label: "Alertar processos parados há +15 dias",      def: true },
+  { key: "aprovacao_envio",  label: "Aprovação antes de registrar envio",         def: false },
+  { key: "checklist_auto",   label: "Gerar checklist sugerido por tipo",          def: true },
+  { key: "notif_prazo_7d",   label: "Lembrete de prazo 7 dias antes",             def: true },
+];
+
+function ConfigSocietario() {
+  const { config, loading, saving, save } = useDepartamentoConfig("societario");
+  const [vals, setVals] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setVals(Object.fromEntries(SOC_PREFS.map(p => [p.key, (config[p.key] as boolean) ?? p.def])));
+  }, [config]);
+  const toggle = (key: string) => setVals(v => ({ ...v, [key]: !v[key] }));
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Preferências Societárias</h3>
+          <Button size="sm" className="h-8 text-xs gap-1" disabled={saving || loading} onClick={() => save(vals)}>
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Salvar
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Toggles persistidos no Supabase — sem integração com JUCISRS/e-CAC nesta versão.</p>
+        <div className="grid gap-2 md:grid-cols-2">
+          {SOC_PREFS.map(p => (
+            <div key={p.key} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => toggle(p.key)}>
+              <span className="text-sm">{p.label}</span>
+              <div className={cn("h-5 w-9 rounded-full transition-colors relative", vals[p.key] ? "bg-emerald-500" : "bg-muted-foreground/30")}>
+                <div className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform", vals[p.key] ? "translate-x-4" : "translate-x-0.5")} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold">Portais externos</h3>
+        <p className="text-xs text-muted-foreground">Acesso manual — JUCISRS, REDESIM, e-CAC e prefeitura são operados fora do sistema.</p>
+      </div>
+    </div>
+  );
+}
 
 function SocietarioPage__Inner() {
   const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
@@ -225,46 +273,7 @@ function SocietarioPage__Inner() {
 
         {/* Config Societário */}
         <TabsContent value="config" className="mt-0">
-          <div className="space-y-4">
-            <div className="rounded-lg border bg-card p-5 space-y-3">
-              <h3 className="text-sm font-semibold">Preferências Societárias</h3>
-              <div className="grid gap-2 md:grid-cols-2">
-                {[
-                  { label: "Notificar abertura concluída via WhatsApp", ativo: true },
-                  { label: "Alertar processos parados há +15 dias",      ativo: true },
-                  { label: "Aprovação obrigatória antes de enviar",       ativo: false },
-                  { label: "Gerar checklist automático por tipo",         ativo: true },
-                  { label: "Notificar prazo 7 dias antes",               ativo: true },
-                  { label: "Integração JUCISRS automática",              ativo: false },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/30 cursor-pointer">
-                    <span className="text-sm">{item.label}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.ativo ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                      {item.ativo ? "Ativo" : "Inativo"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-lg border bg-card p-5 space-y-3">
-              <h3 className="text-sm font-semibold">Portais Integrados</h3>
-              <div className="grid gap-2 md:grid-cols-2">
-                {[
-                  { portal: "JUCISRS", status: "Configurado", ok: true },
-                  { portal: "REDESIM", status: "Não configurado", ok: false },
-                  { portal: "e-CAC", status: "Via SERPRO", ok: true },
-                  { portal: "Prefeitura", status: "Manual", ok: false },
-                ].map(item => (
-                  <div key={item.portal} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                    <span className="text-sm font-medium">{item.portal}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${item.ok ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                      {item.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <ConfigSocietario />
         </TabsContent>
       </Tabs>
 

@@ -17,7 +17,7 @@ export interface Cliente {
   razaoSocial: string;
   nomeFantasia?: string;
   cnpj: string;
-  regime: Regime;
+  regime?: Regime;
   regimeHibrido?: boolean;
   tier?: TierServico;
   status: Status;
@@ -56,7 +56,9 @@ function fromDb(row: Record<string, unknown>): Cliente {
     razaoSocial:       row.razao_social as string,
     nomeFantasia:      row.nome_fantasia as string | undefined,
     cnpj:              row.cnpj as string,
-    regime:            ((row.regime as string) ?? "Simples").replace("Simples Nacional", "Simples") as Regime,
+    regime:            row.regime
+      ? (String(row.regime).replace("Simples Nacional", "Simples") as Regime)
+      : undefined,
     regimeHibrido:     row.regime_hibrido as boolean,
     tier:              row.tier as TierServico | undefined,
     status:            row.status as Status,

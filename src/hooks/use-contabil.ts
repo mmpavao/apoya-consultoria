@@ -64,10 +64,9 @@ export function useLancamentos(empresaId: string, mesReferencia: string) {
       if (error) throw error;
       const list = data ?? [];
       setLancamentos(list);
-      setTotais({
-        totalDebito:  list.filter((l: Lancamento) => l.tipo === "debito").reduce((s: number, l: Lancamento) => s + Number(l.valor), 0),
-        totalCredito: list.filter((l: Lancamento) => l.tipo === "credito").reduce((s: number, l: Lancamento) => s + Number(l.valor), 0),
-      });
+      // Partida dobrada: cada lançamento equilibra débito = crédito = valor
+      const total = list.reduce((s: number, l: Lancamento) => s + Number(l.valor), 0);
+      setTotais({ totalDebito: total, totalCredito: total });
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar lançamentos"); }
     finally { setLoading(false); }
   }, [empresaId, mesReferencia]);

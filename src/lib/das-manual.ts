@@ -15,7 +15,7 @@ export async function criarGuiasDoMes(
   guiasExistentes: { clienteId: string; competencia: string }[],
 ): Promise<{ criadas: number; error?: string }> {
   const elegiveis = clientes.filter(
-    c => ["MEI", "Simples"].includes(c.regime) && c.status === "ativo",
+    c => c.regime && ["MEI", "Simples"].includes(c.regime) && c.status === "ativo",
   );
   const existentes = new Set(
     guiasExistentes
@@ -30,7 +30,7 @@ export async function criarGuiasDoMes(
     cliente_id:   c.id,
     cliente_nome: c.razaoSocial,
     cnpj:         c.cnpj ?? "",
-    regime:       c.regime,
+    regime:       c.regime ?? "—",
     tipo:         c.regime === "MEI" ? "DASMEI" : "DAS",
     competencia,
     vencimento:   venc,

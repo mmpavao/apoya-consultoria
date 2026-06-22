@@ -78,10 +78,10 @@ function FinanceiroPage__Inner(){
   const [salvandoRegua, setSalvandoRegua] = useState(false);
   const { config: depConfig, saving: savingCfg, save: saveDepConfig } = useDepartamentoConfig("financeiro");
   const [configsFin, setConfigsFin] = useState([
-    { key: "nfse_auto",    label: "Emitir NFS-e após pagamento",     enabled: false },
-    { key: "bloquear",     label: "Bloquear cliente inadimplente",   enabled: true  },
-    { key: "juros_auto",   label: "Juros automático após vencimento", enabled: false },
-    { key: "notif_wpp",    label: "Notificar via WhatsApp",           enabled: true  },
+    { key: "nfse_auto",    label: "Registrar NFS-e após pagamento (manual)",     enabled: false },
+    { key: "bloquear",     label: "Bloquear cliente inadimplente",             enabled: true  },
+    { key: "juros_auto",   label: "Calcular juros/multa manualmente",          enabled: false },
+    { key: "notif_wpp",    label: "Lembrete via wa.me (link manual)",          enabled: true  },
   ]);
   // hidrata os toggles com o que está salvo no banco
   useEffect(() => {
@@ -479,8 +479,8 @@ function FinanceiroPage__Inner(){
           <div className="rounded-lg border bg-muted/30 p-4">
             <p className="text-xs font-semibold mb-2 uppercase tracking-wide text-muted-foreground">Régua de Cobrança</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Lembrete, contatos de cobrança, negativação e suspensão automáticos por atraso.
-              Os prazos (dias) e mensagens são configuráveis e usados pela execução automática.
+              Prazos e mensagens da régua de cobrança (configuração persistida).
+              A execução é manual — operador acompanha vencimentos e contata clientes.
             </p>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setShowReguaModal(true)}>
               <Settings2 className="h-3.5 w-3.5"/> Configurar Régua

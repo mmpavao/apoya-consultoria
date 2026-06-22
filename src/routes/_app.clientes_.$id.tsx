@@ -276,7 +276,7 @@ function ClienteDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Identidade */}
           <div className="flex items-start gap-4">
-            <Avatar nome={cliente.razaoSocial} regime={cliente.regime} />
+            <Avatar nome={cliente.razaoSocial} regime={cliente.regime ?? "Simples"} />
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-foreground leading-tight">{cliente.razaoSocial}</h1>
               {cliente.nomeFantasia && (
@@ -288,8 +288,8 @@ function ClienteDetailPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
                   {st.label}
                 </span>
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${REGIME_CFG[cliente.regime] ?? "bg-slate-50 text-slate-600 border-slate-200"}`}>
-                  {REGIME_LABEL[cliente.regime]}
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${cliente.regime ? (REGIME_CFG[cliente.regime] ?? "bg-slate-50 text-slate-600 border-slate-200") : "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                  {cliente.regime ? REGIME_LABEL[cliente.regime] : "Regime não informado"}
                 </span>
                 {cliente.regimeHibrido && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
@@ -452,7 +452,7 @@ function ClienteDetailPage() {
 
           {/* Regime e características */}
           <SectionCard title="Regime Tributário" icon={ShieldCheck}>
-            <InfoRow icon={ShieldCheck}  label="Regime"               value={REGIME_LABEL[cliente.regime]} />
+            <InfoRow icon={ShieldCheck}  label="Regime"               value={cliente.regime ? REGIME_LABEL[cliente.regime] : "—"} />
             <InfoRow icon={Zap}          label="Regime Híbrido"       value={cliente.regimeHibrido ? "Sim" : undefined} />
             <InfoRow icon={ReceiptText}  label="Cód. Serviço NFS-e"   value={cliente.codigoServicoNfse} />
             <InfoRow icon={Users}        label="Tem Empregados (eSocial)" value={cliente.temEmpregados ? "Sim" : "Não"} />

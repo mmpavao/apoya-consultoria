@@ -12,8 +12,9 @@ function fromDb(row: Record<string, unknown>): Cliente {
     razaoSocial:         row.razao_social as string,
     nomeFantasia:        row.nome_fantasia as string | undefined,
     cnpj:                row.cnpj as string,
-    regime:              ((row.regime as string) ?? "Simples")
-                           .replace("Simples Nacional", "Simples") as any,
+    regime:              row.regime
+      ? (String(row.regime).replace("Simples Nacional", "Simples") as any)
+      : undefined,
     regimeHibrido:       Boolean(row.regime_hibrido),
     tier:                row.tier as any,
     status:              (row.status as any) ?? "ativo",
