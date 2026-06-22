@@ -6,11 +6,14 @@ import { useState, useEffect } from "react";
 import { fmtBRL } from "@/lib/format";
 import {
   Calculator, CheckCircle2, Circle, ChevronDown, ChevronUp,
-  Loader2, AlertTriangle, FileText, Send, Lock
+  Loader2, FileText, Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface ApuracaoMensal {
   id: string;
@@ -63,19 +66,33 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
   const mes = mesReferencia ?? getMesAnterior();
   const [apuracao, setApuracao] = useState<ApuracaoMensal | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [saving, setSaving]     = useState(false);
+  const [dasOpen, setDasOpen]   = useState(false);
+  const [dasValor, setDasValor] = useState("");
+  const [dasVenc, setDasVenc]   = useState(() => {
+    const d = new Date();
+    d.setDate(20);
+    return d.toISOString().split("T")[0];
+  });
 
   async function carregar() {
     setLoading(true);
+    setLoadError(null);
     try {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("apuracoes_mensais")
         .select("*")
         .eq("empresa_id", clienteId)
         .eq("mes_referencia", mes)
         .maybeSingle();
+      if (error) throw error;
       setApuracao(data);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar apuração";
+      setLoadError(msg);
+      setApuracao(null);
     } finally {
       setLoading(false);
     }
@@ -140,6 +157,57 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
     carregar();
   }
 
+  const regimeNorm = regime.replace("Simples Nacional", "Simples");
+  const podeRegistrarDas = ["MEI", "Simples"].includes(regimeNorm);
+
+  async function registrarDas() {
+    if (!apuracao) return;
+    const valor = parseFloat(dasValor.replace(",", "."));
+    if (!dasVenc || Number.isNaN(valor) || valor <= 0) {
+      toast.error("Informe valor e vencimento válidos");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: cli, error: cliErr } = await supabase
+        .from("clientes")
+        .select("razao_social, cnpj, regime")
+        .eq("id", clienteId)
+        .single();
+      if (cliErr || !cli) throw new Error("Cliente não encontrado");
+
+      const tipo = cli.regime === "MEI" ? "DASMEI" : "DAS";
+      const { error: guiaErr } = await supabase.from("das_guias").insert({
+        cliente_id: clienteId,
+        cliente_nome: cli.razao_social,
+        cnpj: cli.cnpj ?? "",
+        regime: cli.regime ?? regimeNorm,
+        tipo,
+        competencia: mes,
+        vencimento: dasVenc,
+        valor,
+        status: "pendente",
+      });
+      if (guiaErr) throw guiaErr;
+
+      const { error: apErr } = await (supabase as any)
+        .from("apuracoes_mensais")
+        .update({ das_valor: valor, das_vencimento: dasVenc })
+        .eq("id", apuracao.id);
+      if (apErr) throw apErr;
+
+      toast.success("Guia DAS registrada");
+      window.dispatchEvent(new Event("apoya:das:changed"));
+      setDasOpen(false);
+      setDasValor("");
+      carregar();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao registrar DAS");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const [mesLabel, ano] = (() => {
     const [y, m] = mes.split("-");
     const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -189,7 +257,14 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
             </div>
           )}
 
-          {!loading && !apuracao && (
+          {loadError && !loading && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2 mt-3">
+              Erro ao carregar: {loadError}
+              <button type="button" onClick={carregar} className="ml-auto underline font-medium">Tentar de novo</button>
+            </div>
+          )}
+
+          {!loading && !loadError && !apuracao && (
             <div className="flex flex-col items-center py-6 gap-3">
               <p className="text-sm text-muted-foreground">Apuração não iniciada para esta competência</p>
               <Button
@@ -291,7 +366,19 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
 
               {/* Ações */}
               {apuracao.status !== "fechado" && (
-                <div className="flex gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {podeRegistrarDas && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-8"
+                      onClick={e => { e.stopPropagation(); setDasOpen(true); }}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Registrar DAS
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="sm"
@@ -308,6 +395,30 @@ export function ApuracaoMensalCard({ clienteId, regime, mesReferencia }: Props) 
           )}
         </div>
       )}
+
+      <Dialog open={dasOpen} onOpenChange={setDasOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Registrar guia DAS — {mesLabel}/{ano}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label>Valor (R$)</Label>
+              <Input value={dasValor} onChange={e => setDasValor(e.target.value)} placeholder="0,00" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Vencimento</Label>
+              <Input type="date" value={dasVenc} onChange={e => setDasVenc(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDasOpen(false)}>Cancelar</Button>
+            <Button onClick={registrarDas} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar guia"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

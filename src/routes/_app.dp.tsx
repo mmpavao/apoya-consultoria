@@ -567,6 +567,20 @@ function DpPageInner() {
   const demitidos   = todos.filter(f => f.status === "demitido" && f.data_demissao?.startsWith(mesAtual)).length;
   const feriasVenc  = ferias.filter(f => f.status === "pendente" && f.periodo_aquisitivo_fim <= em30).length;
 
+  const [esocialPendentes, setEsocialPendentes] = useState<number | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { count, error } = await (supabase as any)
+        .from("esocial_evento")
+        .select("*", { count: "exact", head: true })
+        .eq("competencia", mesAtual)
+        .eq("status", "pendente");
+      setEsocialPendentes(error ? null : (count ?? 0));
+    })();
+  }, [mesAtual, funcLoading]);
+
+  const esocialKpi = esocialPendentes === null ? "—" : esocialPendentes;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -597,7 +611,7 @@ function DpPageInner() {
               { label: "Funcionários Ativos",   value: ativos,      icon: Users,         variant: "default" },
               { label: "Férias Vencendo (30d)", value: feriasVenc,  icon: Calendar,      variant: feriasVenc > 0 ? "warning" : "default" },
               { label: "Rescisões do Mês",      value: demitidos,   icon: FileText,      variant: demitidos > 0 ? "danger" : "default" },
-              { label: "eSocial",               value: "—", icon: CheckCircle2, variant: "default" },  // sem integração real (não contar mock)
+              { label: "eSocial pendentes", value: esocialKpi, icon: CheckCircle2, variant: (typeof esocialKpi === "number" && esocialKpi > 0) ? "warning" as const : "default" },
             ]}
             kpisLoading={funcLoading}
             quickActions={[

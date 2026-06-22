@@ -38,7 +38,7 @@ function ObrigacoesPage(){
   const now = new Date();
   const [ano, setAno]           = useState(now.getFullYear());
   const [mes, setMes]           = useState(now.getMonth()+1);
-  const { obrigacoes: items, loading: obgLoading, refetch: refresh, updateStatus } = useObrigacoes();
+  const { obrigacoes: items, loading: obgLoading, error: obError, refetch: refresh, updateStatus } = useObrigacoes();
   const [query, setQuery]       = useState("");
   const [status, setStatus]     = useState<"todos"|ObrigacaoStatus>("todos");
   const [dialogOb, setDialogOb] = useState(false);
@@ -201,12 +201,20 @@ function ObrigacoesPage(){
         }
       />
 
+      {obError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar obrigações: {obError}. Os totais podem estar incorretos.
+          <button type="button" onClick={() => refresh()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
+
       <KpiGrid cols={5}>
-        <KpiCard icon={Calendar}      tone="neutral" label="Total"        value={kpi.total} />
-        <KpiCard icon={Clock}         tone="info"    label="Pendente"     value={kpi.pendente} />
-        <KpiCard icon={AlertTriangle} tone="danger"  label="Atrasadas"    value={kpi.atrasada} />
-        <KpiCard icon={TrendingUp}    tone="warning" label="Em andamento" value={kpi.andamento} />
-        <KpiCard icon={CheckCircle2}  tone="success" label="Concluídas"   value={kpi.concluida} />
+        <KpiCard icon={Calendar}      tone="neutral" label="Total"        value={obgLoading ? "…" : kpi.total} />
+        <KpiCard icon={Clock}         tone="info"    label="Pendente"     value={obgLoading ? "…" : kpi.pendente} />
+        <KpiCard icon={AlertTriangle} tone="danger"  label="Atrasadas"    value={obgLoading ? "…" : kpi.atrasada} />
+        <KpiCard icon={TrendingUp}    tone="warning" label="Em andamento" value={obgLoading ? "…" : kpi.andamento} />
+        <KpiCard icon={CheckCircle2}  tone="success" label="Concluídas"   value={obgLoading ? "…" : kpi.concluida} />
       </KpiGrid>
 
       {/* Barra ações em lote */}

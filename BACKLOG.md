@@ -60,10 +60,12 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - [P3] use-societario.ts:112 — erro vira "Sem processos".
 
 ## TEMA 7 — Botões/abas mortas (viola STANDARDS #5)
-- [P1] _app.societario.tsx:87 — TabsTrigger "Documentos" SEM TabsContent → aba vazia (e `ModuleDocumentosTab` importado e não usado).
-- [P1] _app.configuracoes.tsx:756-804 — aba "Sistema" tem trigger mas o TabsContent está FORA do `<Tabs>` → aba não mostra nada.
-- [P1] _app.contabil.tsx:584 / _app.dp.tsx:593 — botão "Atualizar" do header sem onClick.
-- [P2] motor/ApuracaoMensalCard.tsx:303 — "Gerar DAS" só dá toast "em implementação".
+> **Corrigido v3.44.0** (Societário Documentos, Config Sistema, Atualizar contábil/DP) + **v3.48.0** (ApuracaoMensalCard Registrar DAS, copy honesta gateway/bancário/fiscal).
+
+- ~~[P1] _app.societario.tsx — TabsTrigger Documentos sem TabsContent~~ — corrigido v3.44.
+- ~~[P1] _app.configuracoes.tsx — aba Sistema fora do Tabs~~ — corrigido v3.44.
+- ~~[P1] _app.contabil.tsx / _app.dp.tsx — botão Atualizar sem onClick~~ — corrigido v3.44.
+- ~~[P2] motor/ApuracaoMensalCard.tsx — "Gerar DAS" inexistente~~ — botão "Registrar DAS" + dialog v3.48.
 
 ## TEMA 8 — Documentos cliente ↔ módulos não sincronizam
 > **Corrigido v3.47.0:** `ModuleDocumentosTab` usa o mesmo contrato do cliente (`cliente_id`, bucket `documentos-clientes`, path `{cliente}/{pastaId}/…`). Prop `modulo` é só contexto de UI.
@@ -113,6 +115,14 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - Tema 8: `ModuleDocumentosTab` lê/grava por `cliente_id` (sem silo por `modulo`)
 - Tema 8: upload com path `{cliente}/{pastaId}/…` alinhado ao `use-documentos-cliente`
 
+## Corrigido em v3.48.0 (PR — Tema 7 restante + Tema 6)
+
+- Tema 7: `ApuracaoMensalCard` — "Registrar DAS" (guia + apuração) + erro explícito no load
+- Tema 6: `_app.obrigacoes` — banner de erro + KPIs com loading
+- Tema 6: `_app.clientes_.$id` — distingue erro de fetch vs cliente inexistente
+- Tema 2: copy honesta — cobrança sem gateway fantasma, integração bancária manual, notificações fiscal informacional
+- Tema 2: KPI eSocial DP calculado de `esocial_evento` (pendentes do mês)
+
 ## Tema 1 — pendente (schema/migrations, não só código)
 
 - [P0] `cobrancas.created_by` — coluna não existe (insert já corrigido em `api/cobranca/criar`)
@@ -128,7 +138,7 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 1. **Tema 1** (schema-mismatch) — destrava salvar/conciliar/cobrar. Maior valor, risco controlado.
 2. ~~**Tema 4** (segurança)~~ — concluído v3.46.0.
 3. ~~**Tema 8** (docs cliente ↔ módulos)~~ — concluído v3.47.0.
-4. **Tema 7** (abas/botões mortos) — rápido, visível.
-5. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI.
+4. ~~**Tema 7** (abas/botões mortos)~~ — concluído v3.44 + v3.48.
+5. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI (parcialmente feito).
 6. **Tema 3** (cálculo de folha/rescisão) — feature grande, precisa spec do Marcio.
 7. **Tema 9** (contratos, tipos, duplicação) — conforme prioridade.

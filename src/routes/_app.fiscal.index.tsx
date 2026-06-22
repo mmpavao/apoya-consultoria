@@ -560,7 +560,7 @@ function ConfiguracoesTab() {
         </div>
       </div>
       <div className="rounded-lg border bg-card p-5 space-y-3">
-        <div><h3 className="text-sm font-semibold">Notificações</h3><p className="text-xs text-muted-foreground mt-0.5">Como o sistema sinaliza pendências fiscais</p></div>
+        <div><h3 className="text-sm font-semibold">Notificações</h3><p className="text-xs text-muted-foreground mt-0.5">Informacional — o que o modo manual oferece hoje</p></div>
         <div className="space-y-2">
           {[
             { label: "Alertas críticos no Dashboard", ativo: true },
