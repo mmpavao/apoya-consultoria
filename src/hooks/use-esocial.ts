@@ -19,10 +19,12 @@ export interface EsocialRegistro {
 export function useEsocial(empresaId?: string, competencia?: string) {
   const [registros, setRegistros] = useState<Record<string, EsocialRegistro>>({});
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     if (!empresaId || !competencia) { setRegistros({}); return; }
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from("esocial_evento")
@@ -31,7 +33,11 @@ export function useEsocial(empresaId?: string, competencia?: string) {
       const map: Record<string, EsocialRegistro> = {};
       (data ?? []).forEach((r: EsocialRegistro & { codigo: string }) => { map[r.codigo] = r; });
       setRegistros(map);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar eSocial"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar eSocial";
+      setError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [empresaId, competencia]);
 
@@ -53,5 +59,5 @@ export function useEsocial(empresaId?: string, competencia?: string) {
     return true;
   }, [empresaId, competencia, fetch]);
 
-  return { registros, loading, marcar, refresh: fetch };
+  return { registros, loading, error, marcar, refresh: fetch };
 }

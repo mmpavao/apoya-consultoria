@@ -149,10 +149,12 @@ export async function consultaCNPJ(cnpj: string): Promise<DadosCNPJ | null> {
 export function useSocios(clienteId: string | null) {
   const [socios, setSocios] = useState<Socio[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!clienteId) return;
     setLoading(true);
+    setError(null);
     try {
       const { data, error } = await (supabase as any)
         .from("cliente_socio")
@@ -164,6 +166,8 @@ export function useSocios(clienteId: string | null) {
       if (error) throw error;
       setSocios((data ?? []).map(fromDb));
     } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar sócios";
+      setError(msg);
       console.error("useSocios load:", e);
     } finally {
       setLoading(false);
@@ -264,5 +268,5 @@ export function useSocios(clienteId: string | null) {
     }
   }, [load]);
 
-  return { socios, loading, load, upsert, remove, importarDosCNPJ };
+  return { socios, loading, error, load, upsert, remove, importarDosCNPJ };
 }

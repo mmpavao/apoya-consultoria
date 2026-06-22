@@ -81,7 +81,7 @@ function DasTab() {
   const now = new Date();
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth() + 1);
-  const { guias: items, loading: dasLoading, refresh } = useDas();
+  const { guias: items, loading: dasLoading, error: dasError, refresh } = useDas();
   const { clientes } = useClientes();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
@@ -223,12 +223,19 @@ function DasTab() {
           )}
         </div>
       </div>
+      {dasError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar guias DAS: {dasError}.
+          <button type="button" onClick={() => refresh()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <FKpiCard icon={FileText}      label="Total"    value={kpi.total}          loading={dasLoading} />
-        <FKpiCard icon={Clock}         label="Pendente" value={kpi.pendente}       loading={dasLoading} variant={kpi.pendente > 0 ? "warning" : "default"} />
-        <FKpiCard icon={CheckCircle2}  label="Geradas"  value={kpi.gerada}         loading={dasLoading} variant={kpi.gerada > 0 ? "info" : "default"} />
-        <FKpiCard icon={Wallet}        label="Pagas"    value={kpi.paga}           loading={dasLoading} />
-        <FKpiCard icon={AlertTriangle} label="Total R$" value={fmtBRL(kpi.valor)}  loading={dasLoading} />
+        <FKpiCard icon={FileText}      label="Total"    value={dasError ? "—" : kpi.total}          loading={dasLoading} />
+        <FKpiCard icon={Clock}         label="Pendente" value={dasError ? "—" : kpi.pendente}       loading={dasLoading} variant={kpi.pendente > 0 ? "warning" : "default"} />
+        <FKpiCard icon={CheckCircle2}  label="Geradas"  value={dasError ? "—" : kpi.gerada}         loading={dasLoading} variant={kpi.gerada > 0 ? "info" : "default"} />
+        <FKpiCard icon={Wallet}        label="Pagas"    value={dasError ? "—" : kpi.paga}           loading={dasLoading} />
+        <FKpiCard icon={AlertTriangle} label="Total R$" value={dasError ? "—" : fmtBRL(kpi.valor)}  loading={dasLoading} />
       </div>
       <DataTable
         rows={pageRows} cols={cols} getKey={g => g.id}

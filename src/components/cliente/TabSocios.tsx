@@ -3,7 +3,7 @@
  * Exibe % participação, qualificação, dados pessoais e permite editar/adicionar sócios.
  */
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Users, Loader2, UserCheck, UserX, Building, User } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Loader2, UserCheck, UserX, Building, User, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +42,7 @@ const EMPTY_SOCIO = {
 interface Props { clienteId: string; }
 
 export function TabSocios({ clienteId }: Props) {
-  const { socios, loading, load, upsert, remove } = useSocios(clienteId);
+  const { socios, loading, error, load, upsert, remove } = useSocios(clienteId);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Partial<Socio> | null>(null);
   const [form, setForm]           = useState(EMPTY_SOCIO);
@@ -116,8 +116,17 @@ export function TabSocios({ clienteId }: Props) {
         </div>
       )}
 
+      {/* Erro */}
+      {!loading && error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar sócios: {error}.
+          <button type="button" onClick={() => load()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
+
       {/* Vazio */}
-      {!loading && socios.length === 0 && (
+      {!loading && !error && socios.length === 0 && (
         <div className="surface-card p-8 text-center rounded-xl border border-dashed">
           <Users className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
           <p className="text-muted-foreground">Nenhum sócio cadastrado</p>

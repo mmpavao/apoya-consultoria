@@ -415,7 +415,7 @@ function EsocialTab() {
   const [empresaId, setEmpresaId]   = useState("");
   const [competencia, setCompetencia] = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`);
   const [filtro, setFiltro] = useState<"todos"|"pendente"|"transmitido"|"erro">("todos");
-  const { registros, loading, marcar } = useEsocial(empresaId, competencia);
+  const { registros, loading, error: esocialError, marcar } = useEsocial(empresaId, competencia);
 
   const eventos = empresaId
     ? ESOCIAL_CATALOGO.map(c => {
@@ -449,11 +449,18 @@ function EsocialTab() {
         {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
+      {empresaId && esocialError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar eventos eSocial: {esocialError}. Os totais podem estar incorretos.
+        </div>
+      )}
+
       {empresaId && (
       <div className="grid grid-cols-3 gap-3">
-        <DKpiCard icon={CheckCircle2}  label="Transmitidos" value={transmitidos} variant="default" />
-        <DKpiCard icon={Clock}         label="Pendentes"    value={pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
-        <DKpiCard icon={AlertTriangle} label="Com erro"     value={erros}        variant={erros > 0 ? "danger" : "default"} />
+        <DKpiCard icon={CheckCircle2}  label="Transmitidos" value={esocialError ? "—" : transmitidos} variant="default" />
+        <DKpiCard icon={Clock}         label="Pendentes"    value={esocialError ? "—" : pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
+        <DKpiCard icon={AlertTriangle} label="Com erro"     value={esocialError ? "—" : erros}        variant={erros > 0 ? "danger" : "default"} />
       </div>
       )}
 
@@ -566,7 +573,7 @@ function ConfigDP() {
 // ═══════════════════════════════════════════════════════════
 function DpPageInner() {
   const { roles } = useAuth();
-  const { funcionarios: todos, loading: funcLoading, refresh: refreshFunc } = useFuncionarios();
+  const { funcionarios: todos, loading: funcLoading, error: funcError, refresh: refreshFunc } = useFuncionarios();
   const { ferias } = useFerias();
   const [tab, setTab] = useState("dashboard");
   const [novaFolhaNonce, setNovaFolhaNonce] = useState(0);
@@ -619,11 +626,18 @@ function DpPageInner() {
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="mt-0">
+          {funcError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Erro ao carregar funcionários: {funcError}.
+              <button type="button" onClick={() => refreshFunc()} className="ml-auto underline font-medium">Tentar de novo</button>
+            </div>
+          )}
           <ModuleDashboard
             kpis={[
-              { label: "Funcionários Ativos",   value: ativos,      icon: Users,         variant: "default" },
+              { label: "Funcionários Ativos",   value: funcError ? "—" : ativos,      icon: Users,         variant: "default" },
               { label: "Férias Vencendo (30d)", value: feriasVenc,  icon: Calendar,      variant: feriasVenc > 0 ? "warning" : "default" },
-              { label: "Rescisões do Mês",      value: demitidos,   icon: FileText,      variant: demitidos > 0 ? "danger" : "default" },
+              { label: "Rescisões do Mês",      value: funcError ? "—" : demitidos,   icon: FileText,      variant: demitidos > 0 ? "danger" : "default" },
               { label: "eSocial pendentes", value: esocialKpi, icon: CheckCircle2, variant: (typeof esocialKpi === "number" && esocialKpi > 0) ? "warning" as const : "default" },
             ]}
             kpisLoading={funcLoading}

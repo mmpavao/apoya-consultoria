@@ -65,9 +65,11 @@ export interface Rescisao {
 export function useFuncionarios(empresaId?: string) {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (supabase as any).from("funcionarios").select("*").order("nome");
@@ -83,12 +85,14 @@ export function useFuncionarios(empresaId?: string) {
       }));
       setFuncionarios(enriched);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao carregar funcionários");
+      const msg = e instanceof Error ? e.message : "Erro ao carregar funcionários";
+      setError(msg);
+      toast.error(msg);
     } finally { setLoading(false); }
   }, [empresaId]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  return { funcionarios, loading, refresh: fetch };
+  return { funcionarios, loading, error, refresh: fetch };
 }
 
 export function useFuncionarioById(id: string) {
