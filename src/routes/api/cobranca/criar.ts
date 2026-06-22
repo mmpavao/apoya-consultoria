@@ -3,41 +3,18 @@
  * Cria uma cobrança no banco de dados (sem emitir no Asaas ainda).
  *
  * REGRA: cliente DEVE ter contrato ativo (contrato_cliente.status=ativo).
- *
- * Body:
- *   cliente_id    : uuid
- *   valor         : number
- *   competencia   : "YYYY-MM"
- *   vencimento    : "YYYY-MM-DD"
- *   descricao?    : string
- *   forma?        : "PIX" | "BOLETO" | "UNDEFINED"
- *   recorrente?   : boolean
+ * Auth: staff financeiro (admin, contador, supervisor).
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-async function getUserFromReq(req: Request) {
-  const auth  = req.headers.get("Authorization") ?? "";
-  const token = auth.replace("Bearer ", "").trim();
-  if (!token) return null;
-  const { data, error } = await (supabaseAdmin as any).auth.getUser(token);
-  if (error || !data.user) return null;
-  return data.user;
-}
+import { jsonResponse, requireFinanceStaff } from "@/lib/api-auth";
 
 export const Route = createFileRoute("/api/cobranca/criar")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
-        const user = await getUserFromReq(request);
-        if (!user) return json({ error: "Unauthorized" }, 401);
+        const auth = await requireFinanceStaff(request);
+        if (auth instanceof Response) return auth;
 
         let body: {
           cliente_id: string;
@@ -49,14 +26,13 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           recorrente?: boolean;
         };
         try { body = await request.json(); }
-        catch { return json({ error: "Body inválido" }, 400); }
+        catch { return jsonResponse({ error: "Body inválido" }, 400); }
 
         const { cliente_id, valor, descricao, forma = "UNDEFINED", recorrente = false } = body;
-        if (!cliente_id || !valor) return json({ error: "cliente_id e valor são obrigatórios" }, 400);
+        if (!cliente_id || !valor) return jsonResponse({ error: "cliente_id e valor são obrigatórios" }, 400);
 
         const db = supabaseAdmin as any;
 
-        // ── REGRA: verificar contrato ativo ─────────────────────────────
         const { data: contrato } = await db
           .from("contrato_cliente")
           .select("id,status")
@@ -66,30 +42,27 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           .maybeSingle();
 
         if (!contrato) {
-          return json({
+          return jsonResponse({
             error: "Cliente não possui contrato ativo. Assine o contrato de prestação de serviços antes de gerar cobranças.",
             code: "SEM_CONTRATO",
           }, 409);
         }
 
-        // ── Buscar dados do cliente ─────────────────────────────────────
         const { data: cliente, error: cErr } = await db
           .from("clientes")
           .select("id,razao_social,cnpj,dia_vencimento,regime")
           .eq("id", cliente_id)
           .single();
 
-        if (cErr || !cliente) return json({ error: "Cliente não encontrado" }, 404);
+        if (cErr || !cliente) return jsonResponse({ error: "Cliente não encontrado" }, 404);
 
         const now  = new Date();
         const comp = body.competencia ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-        // Calcular vencimento
         const [ano, mes] = comp.split("-").map(Number);
         const diaVenc    = cliente.dia_vencimento ?? 10;
         const vencimento = body.vencimento ?? new Date(ano, mes - 1, diaVenc).toISOString().split("T")[0];
 
-        // ── Verificar duplicidade ───────────────────────────────────────
         const { data: existente } = await db
           .from("cobrancas")
           .select("id,status")
@@ -99,7 +72,7 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           .maybeSingle();
 
         if (existente) {
-          return json({ error: `Cobrança já existe para ${comp}`, cobranca_id: existente.id, status: existente.status }, 409);
+          return jsonResponse({ error: `Cobrança já existe para ${comp}`, cobranca_id: existente.id, status: existente.status }, 409);
         }
 
         const desc = descricao ?? `Mensalidade APOYA — ${comp}`;
@@ -119,9 +92,9 @@ export const Route = createFileRoute("/api/cobranca/criar")({
           recorrente,
         }).select().single();
 
-        if (iErr) return json({ error: iErr.message }, 500);
+        if (iErr) return jsonResponse({ error: iErr.message }, 500);
 
-        return json({ ok: true, cobranca: nova });
+        return jsonResponse({ ok: true, cobranca: nova });
       },
     },
   },
