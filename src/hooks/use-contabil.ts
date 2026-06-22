@@ -47,11 +47,13 @@ export interface TotaisLancamentos {
 export function useLancamentos(empresaId: string, mesReferencia: string) {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totais, setTotais] = useState<TotaisLancamentos>({ totalDebito: 0, totalCredito: 0 });
 
   const fetch = useCallback(async () => {
     if (!empresaId || !mesReferencia) return;
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
@@ -67,12 +69,16 @@ export function useLancamentos(empresaId: string, mesReferencia: string) {
       // Partida dobrada: cada lançamento equilibra débito = crédito = valor
       const total = list.reduce((s: number, l: Lancamento) => s + Number(l.valor), 0);
       setTotais({ totalDebito: total, totalCredito: total });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar lançamentos"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar lançamentos";
+      setError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [empresaId, mesReferencia]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  return { lancamentos, loading, totais, refresh: fetch };
+  return { lancamentos, loading, error, totais, refresh: fetch };
 }
 
 export interface NovoLancamentoInput {
@@ -162,10 +168,12 @@ export function useDeletarLancamento() {
 export function usePlanoContas(empresaId: string) {
   const [contas, setContas] = useState<PlanoContas[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!empresaId) return;
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
@@ -177,16 +185,26 @@ export function usePlanoContas(empresaId: string) {
         .order("codigo");
       if (error) throw error;
       setContas(data ?? []);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar plano de contas"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar plano de contas";
+      setError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [empresaId]);
 
   useEffect(() => { refetch(); }, [refetch]);
 
-  return { contas, loading, refetch };
+  return { contas, loading, error, refetch };
 }
 
-export interface PlanoContaInput { codigo: string; nome: string; tipo: string; nivel?: number; }
+export interface PlanoContaInput { codigo: string; nome: string; tipo: string; nivel?: number; natureza?: string; }
+
+/** Deriva natureza contábil pelo grupo do código (1/5 devedora; demais credora). */
+export function naturezaFromCodigo(codigo: string): string {
+  const g = codigo.trim().charAt(0);
+  return g === "1" || g === "5" ? "devedora" : "credora";
+}
 
 export function useSalvarPlanoConta() {
   const [loading, setLoading] = useState(false);
@@ -199,7 +217,9 @@ export function useSalvarPlanoConta() {
         codigo:     input.codigo,
         descricao:  input.nome,
         tipo:       input.tipo,
+        natureza:   input.natureza ?? naturezaFromCodigo(input.codigo),
         nivel:      input.nivel ?? input.codigo.split(".").length,
+        aceita_lancamento: input.tipo === "analitica",
         ativo:      true,
       };
       const q = id
@@ -239,9 +259,11 @@ export function useDeletarPlanoConta() {
 export function usePeriodosContabeis(empresaId?: string) {
   const [periodos, setPeriodos] = useState<PeriodoContabil[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       // aliases: colunas reais são mes_referencia e created_at; UI usa competencia/aberto_em
@@ -252,12 +274,16 @@ export function usePeriodosContabeis(empresaId?: string) {
       const { data, error } = await q;
       if (error) throw error;
       setPeriodos(data ?? []);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar períodos"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar períodos";
+      setError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [empresaId]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  return { periodos, loading, refresh: fetch };
+  return { periodos, loading, error, refresh: fetch };
 }
 
 export function useAbrirPeriodo() {
@@ -301,10 +327,12 @@ export function useFecharPeriodo() {
 export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
   const [extratos, setExtratos] = useState<ExtratoBancario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     if (!empresaId || !mesReferencia) return;
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
@@ -315,7 +343,11 @@ export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
         .order("data_linha");   // coluna real (era data_movimento, inexistente)
       if (error) throw error;
       setExtratos(data ?? []);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro ao carregar extratos"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar extratos";
+      setError(msg);
+      toast.error(msg);
+    }
     finally { setLoading(false); }
   }, [empresaId, mesReferencia]);
 
@@ -325,5 +357,5 @@ export function useExtratosBancarios(empresaId: string, mesReferencia: string) {
   const conciliados = extratos.filter(e => !!e.conciliado_em).length;
   const pendentes   = extratos.filter(e => !e.conciliado_em).length;
 
-  return { extratos, loading, conciliados, pendentes, refresh: fetch };
+  return { extratos, loading, error, conciliados, pendentes, refresh: fetch };
 }

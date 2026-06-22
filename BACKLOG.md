@@ -76,14 +76,30 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 
 ---
 
-## Corrigido em v3.44 (branch cursor/backlog-fixes-d50a)
+## Corrigido em v3.44.0 (PR #6 + #7)
 
 - Tema 1: totais contábeis (partida dobrada) — `use-contabil.ts`
+- Tema 1: extrato_bancario (`data_linha`, `historico_banco`, `conciliado_em`)
+- Tema 1: NovoLancDialog usa `useCriarLancamento` (NOT NULL + `created_by`)
+- Tema 1: financeiro régua → `regua_cobranca_config` (não `pipeline_config`)
+- Tema 1: fiscal obrigações sem `valor_estimado`; plano_contas alias `descricao`
+- Tema 1: documento_pasta exige cliente selecionado
 - Tema 2/6: painéis fake eSocial (DP) e Societário → manual/persistido
 - Tema 6: erros silenciosos dashboard (DAS, calendário fiscal, obrigações fiscal)
-- Tema 7: Folha DP → link para editor de linhas em `/dp/$empresaId`
+- Tema 7: Folha DP → link para editor de linhas; Societário Documentos; Config Sistema
+- Agentes IA: UI/código removidos (Configurações, Workflows, convites)
 - Regime: não fabricar "Simples" quando ausente no banco
-- Financeiro: copy alinhada ao modo manual (régua, toggles)
+
+## Corrigido em v3.45.0 (branch cursor/backlog-tema1-cleanup-d50a)
+
+- Tema 1: `plano_contas` insert inclui `natureza` (NOT NULL) + `aceita_lancamento`
+- Tema 6: hooks contábeis expõem `error` (não só toast + lista vazia)
+
+## Tema 1 — pendente (schema/migrations, não só código)
+
+- [P0] `cobrancas.created_by` — coluna não existe (insert já corrigido em `api/cobranca/criar`)
+- [P0] `cobrancas.observacoes` — coluna não existe (PagamentoDialog já corrigido)
+- [P1] `_app.contabil.tsx` — `PLANO_PADRAO` hardcoded como fallback quando empresa sem plano custom (honesto, read-only)
 
 ## Contagem (sem falsos positivos)
 - **P0: ~13** (Temas 1, 2, 3) — bugs que quebram salvar/telas ou expõem mock como real.
