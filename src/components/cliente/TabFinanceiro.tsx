@@ -71,47 +71,9 @@ function FinCard({ title, icon: Icon, children }: { title: string; icon: any; ch
   );
 }
 
-// ── emissão manual de NFS-e ──────────────────────────────────────────────
-// Chama a rota interna do Worker /api/nfse/emitir-cobranca
-async function emitirNFManual(cobrancaId: string, _clienteId: string): Promise<{ ok: boolean; erro?: string }> {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token ?? "";
-    const r = await fetch("/api/nfse/emitir-cobranca", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify({ cobranca_id: cobrancaId }),
-    });
-    if (!r.ok) {
-      let msg = `HTTP ${r.status}`;
-      try { const e = await r.json(); msg = e.error ?? msg; } catch {}
-      return { ok: false, erro: msg };
-    }
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, erro: e?.message ?? "Erro de rede" };
-  }
-}
-
-// ── tabela de cobranças reutilizável ───────────────────────────────────────
+// ── status NFS-e (registro manual na tabela nfse_emitida) ─────────────────
 function TabelaCobrancas({ cobrancas, clienteId }: { cobrancas: Cobranca[]; clienteId?: string }) {
   const [query, setQuery] = useState("");
-  const [emitindo, setEmitindo] = useState<string | null>(null);
-
-  const handleEmitirNF = async (cob: Cobranca) => {
-    if (!clienteId) return;
-    setEmitindo(cob.id);
-    const { ok, erro } = await emitirNFManual(cob.id, clienteId);
-    setEmitindo(null);
-    if (ok) {
-      toast.success("NFS-e emitida com sucesso! PDF enviado por e-mail e WhatsApp.");
-    } else {
-      toast.error(`Erro ao emitir NFS-e: ${erro ?? "verifique os dados fiscais"}`);
-    }
-  };
 
   const STATUS_COR: Record<string, "green"|"red"|"amber"|"gray"> = {
     paga:"green", vencida:"red", pendente:"amber", cancelada:"gray"
@@ -164,25 +126,16 @@ function TabelaCobrancas({ cobrancas, clienteId }: { cobrancas: Cobranca[]; clie
                   <td>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <Pill cor={STATUS_COR[c.status] ?? "gray"}>{STATUS_LBL[c.status] ?? c.status}</Pill>
-                      {c.status === "paga" && !c.nfseStatus && clienteId && (
-                        <button onClick={() => handleEmitirNF(c)} disabled={emitindo === c.id}
-                          title="Emitir NFS-e" className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">
-                          {emitindo === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ReceiptText className="h-3 w-3" />}
-                          {emitindo === c.id ? "…" : "Emitir NF"}
-                        </button>
-                      )}
                       {c.nfseStatus === "emitida" && (
                         <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-700">
                           <FileText className="h-3 w-3" /> NF ✓
                         </span>
                       )}
-                      {c.nfseStatus === "erro" && clienteId && (
-                        <button onClick={() => handleEmitirNF(c)} disabled={emitindo === c.id}
-                          title={c.nfseErro ?? "Erro — clique para tentar novamente"}
-                          className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50">
-                          <ReceiptText className="h-3 w-3" />
-                          NF Erro ↺
-                        </button>
+                      {c.nfseStatus === "erro" && (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700"
+                          title={c.nfseErro ?? "Erro no registro manual"}>
+                          <ReceiptText className="h-3 w-3" /> NF Erro
+                        </span>
                       )}
                     </div>
                   </td>

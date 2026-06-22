@@ -1,17 +1,17 @@
 /**
  * Módulo Fiscal — /_app/fiscal/
- * Tabs: Pipeline (default) | DAS | NFS-e | SERPRO | Documentos | Automações | Configurações
+ * Tabs: Dashboard | Pipeline | DAS | Documentos | Configurações
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { fmtBRL, fmtDate } from "@/lib/format";
 import { SectorGuard } from "@/components/SectorGuard";
-import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  Activity, AlertCircle, AlertTriangle, Calendar,
-  CheckCircle2, ChevronDown, ChevronRight, Clock, Download,
+  AlertCircle, AlertTriangle, Calendar,
+  CheckCircle2, Check, Clock, Download,
   FileText, FolderOpen, Loader2, Plus, Receipt,
-  RefreshCw, Search, Send, ShieldAlert,
-  ToggleLeft, ToggleRight, Upload, Wallet, Wifi, WifiOff, Zap, Eye,
+  RefreshCw, Search, ShieldAlert,
+  Upload, Wallet, Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,9 +23,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { KanbanModulo } from "@/components/KanbanModulo";
 import { useFiscalKpis } from "@/hooks/use-fiscal-kpis";
-import { useAuth } from "@/hooks/use-auth";
 import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
 import { useClientes } from "@/hooks/use-clientes";
+import { criarGuiasDoMes, marcarDasLoteComoGeradas } from "@/lib/das-manual";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
 import { Pagination } from "@/components/PagePlaceholder";
 import { DasGerarDialog } from "@/components/DasGerarDialog";
@@ -82,6 +82,7 @@ function DasTab() {
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth() + 1);
   const { guias: items, loading: dasLoading, refresh } = useDas();
+  const { clientes } = useClientes();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
   const [dialogDas, setDialogDas] = useState(false);
@@ -96,17 +97,19 @@ function DasTab() {
     window.addEventListener("apoya:das:changed", fn);
     window.addEventListener("apoya:clientes:changed", fn);
     return () => { window.removeEventListener("apoya:das:changed", fn); window.removeEventListener("apoya:clientes:changed", fn); };
-  }, [comp]);
+  }, [comp, refresh]);
   useEffect(() => setSel(new Set()), [comp]);
+
+  const doMes = useMemo(() => items.filter(g => g.competencia === comp), [items, comp]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items
+    return doMes
       .filter(g => q ? `${g.clienteNome} ${g.cnpj}`.toLowerCase().includes(q) : true)
       .filter(g => regime === "todos" || g.regime === regime)
       .filter(g => status === "todos" || g.status === status)
       .sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
-  }, [items, query, regime, status]);
+  }, [doMes, query, regime, status]);
 
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
@@ -115,87 +118,41 @@ function DasTab() {
   const pageRows   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const kpi = useMemo(() => ({
-    total:    items.length,
-    pendente: items.filter(g => g.status === "pendente").length,
-    gerada:   items.filter(g => g.status === "gerada").length,
-    paga:     items.filter(g => g.status === "paga").length,
-    valor:    items.reduce((s, g) => s + g.valor, 0),
-  }), [items]);
+    total:    doMes.length,
+    pendente: doMes.filter(g => g.status === "pendente").length,
+    gerada:   doMes.filter(g => g.status === "gerada").length,
+    paga:     doMes.filter(g => g.status === "paga").length,
+    valor:    doMes.reduce((s, g) => s + g.valor, 0),
+  }), [doMes]);
 
   const toggleAll = () => setSel(sel.size === filtered.length ? new Set() : new Set(filtered.map(g => g.id)));
   const toggleOne = (id: string) => { const s = new Set(sel); s.has(id) ? s.delete(id) : s.add(id); setSel(s); };
 
-  async function gerarLote() {
-    const ids = filtered.filter(g => sel.has(g.id) && (g.status === "pendente" || g.status === "erro")).map(g => g.clienteId);
-    if (!ids.length) { toast.error("Selecione ao menos 1 DAS pendente"); return; }
+  async function marcarLoteGeradas() {
+    const ids = filtered
+      .filter(g => sel.has(g.id) && (g.status === "pendente" || g.status === "erro"))
+      .map(g => g.id);
+    if (!ids.length) { toast.error("Selecione guias pendentes ou com erro"); return; }
     setBusy(true);
-    toast.loading(`Gerando ${ids.length} DAS…`, { id: "das-lote" });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", { id: "das-lote" }); return; }
-      let ok = 0, err = 0;
-      for (const clienteId of ids) {
-        const res = await fetch("/api/das/gerar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ mode: "individual", cliente_id: clienteId, competencia: comp }),
-        });
-        const d = await res.json() as any;
-        if (d.ok && d.geradas > 0) ok++; else err++;
-      }
+      const n = await marcarDasLoteComoGeradas(ids);
       await refresh();
-      if (err === 0) toast.success(`${ok} DAS gerada(s)`, { id: "das-lote" });
-      else toast.warning(`${ok} gerada(s) · ${err} com erro`, { id: "das-lote" });
+      toast.success(`${n} guia(s) marcada(s) como gerada`);
       setSel(new Set());
-    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-lote" }); }
+    } catch (e: any) { toast.error("Erro: " + e?.message); }
     finally { setBusy(false); }
   }
 
-  async function gerarTodosDoMes() {
+  async function inicializarMes() {
     setBusy(true);
-    toast.loading("Criando guias para todos os clientes elegíveis…", { id: "das-init" });
+    toast.loading("Criando guias para clientes elegíveis…", { id: "das-init" });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", { id: "das-init" }); return; }
-      const res = await fetch("/api/das/gerar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: "lote", competencia: comp }),
-      });
-      const d = await res.json() as any;
-      if (d.ok) { toast.success(`${d.geradas ?? 0} guia(s) criada(s) para ${comp}`, { id: "das-init" }); await refresh(); }
-      else toast.error(d.error ?? "Erro ao gerar", { id: "das-init" });
+      const { criadas, error } = await criarGuiasDoMes(comp, clientes, items);
+      await refresh();
+      if (error) toast.error(error, { id: "das-init" });
+      else if (criadas === 0) toast.info("Todas as guias deste mês já existem", { id: "das-init" });
+      else toast.success(`${criadas} guia(s) criada(s) para ${comp}`, { id: "das-init" });
     } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-init" }); }
-    finally { setBusy(false); }
-  }
-
-  async function enviarWhats() {
-    const elig = filtered.filter(g => sel.has(g.id) && g.status === "gerada");
-    if (!elig.length) { toast.error("Selecione DAS já geradas"); return; }
-    setBusy(true);
-    toast.loading(`Enviando ${elig.length} DAS via WhatsApp…`, { id: "das-wpp" });
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", { id: "das-wpp" }); return; }
-      let enviadas = 0, erros = 0;
-      for (const g of elig) {
-        const nome = g.clienteNome.split(" ")[0];
-        const cf   = g.competencia.split("-").reverse().join("/");
-        const msg  = `Olá ${nome}! DAS competência ${cf}. Valor: ${fmtBRL(g.valor)}. Venc: ${fmtDate(g.vencimento)}` +
-          (g.codigoBarras ? ` | Cód: ${g.codigoBarras}` : "") + (g.pdfUrl ? ` | PDF: ${g.pdfUrl}` : "");
-        const r = await fetch("/api/wa/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: g.clienteId }),
-        });
-        const dd = await r.json().catch(() => ({})) as any;
-        if (dd.ok) enviadas++; else erros++;
-      }
-      await refresh();
-      if (erros === 0) toast.success(`${enviadas} DAS enviado(s)!`, { id: "das-wpp" });
-      else toast.warning(`${enviadas} enviado(s) · ${erros} com erro`, { id: "das-wpp" });
-      setSel(new Set());
-    } catch (e: any) { toast.error("Erro: " + e?.message, { id: "das-wpp" }); }
     finally { setBusy(false); }
   }
 
@@ -232,7 +189,6 @@ function DasTab() {
       cell: g => (
         <div>
           <InlineBadge color={DAS_COLOR[g.status]} dot>{DAS_LABEL[g.status]}</InlineBadge>
-          {g.enviadoWaEm && <div className="text-[10px] text-emerald-600">✓ WhatsApp</div>}
         </div>
       ),
     },
@@ -253,21 +209,18 @@ function DasTab() {
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setDialogDas(true)} disabled={busy} className="h-8 text-xs gap-1">
-            <Plus className="h-3 w-3" /> DAS manual
+            <Plus className="h-3 w-3" /> Nova guia
           </Button>
-          <Button size="sm" variant="outline" onClick={gerarTodosDoMes} disabled={busy} className="h-8 text-xs gap-1">
-            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Receipt className="h-3 w-3" />}
-            Gerar DAS do Mês
+          <Button size="sm" variant="outline" onClick={inicializarMes} disabled={busy} className="h-8 text-xs gap-1">
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Inicializar mês
           </Button>
-          {sel.size > 0 && <>
-            <Button size="sm" onClick={gerarLote} disabled={busy} className="h-8 text-xs gap-1">
-              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-              Gerar {sel.size}
+          {sel.size > 0 && (
+            <Button size="sm" onClick={marcarLoteGeradas} disabled={busy} className="h-8 text-xs gap-1">
+              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              Marcar geradas ({sel.size})
             </Button>
-            <Button size="sm" variant="outline" onClick={enviarWhats} disabled={busy} className="h-8 text-xs gap-1">
-              <Send className="h-3 w-3" /> WhatsApp
-            </Button>
-          </>}
+          )}
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -308,7 +261,7 @@ function DasTab() {
         }
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size} />
+        <TableFooter total={doMes.length} filtered={filtered.length} selected={sel.size} />
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />
       </div>
       <DasGerarDialog open={dialogDas} onClose={() => setDialogDas(false)} onCreated={() => { setDialogDas(false); refresh(); }} />
@@ -477,44 +430,21 @@ function DocumentosTab() {
 function DashboardTab() {
   const { kpis, loading: kpiLoading, refetch } = useFiscalKpis();
   const [obrigacoes, setObrigacoes] = useState<any[]>([]);
-  const [agenteLog, setAgenteLog]   = useState<any[]>([]);
   const [loadingOb, setLoadingOb]   = useState(true);
-  const [loadingLog, setLoadingLog] = useState(true);
 
   useEffect(() => {
-    // Carregar obrigações recentes
     supabase
       .from("obrigacoes")
-      .select("id,tipo,cliente_nome,vencimento,status")  // sem valor_estimado (coluna não existe → quebrava a query)
+      .select("id,tipo,cliente_nome,vencimento,status")
       .order("vencimento", { ascending: true })
       .limit(8)
       .then(({ data }) => { setObrigacoes(data ?? []); setLoadingOb(false); });
-
-    // Carregar logs dos agentes via API server-side (a RLS bloqueia leitura
-    // direta de agente_logs pelo usuário).
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch("/api/agentes/atividade?setor=fiscal", {
-          headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-        });
-        const data = await res.json().catch(() => ({}));
-        setAgenteLog((data?.logs ?? []).map((l: any) => ({
-          id: l.id, acao: l.label, agente: "Agente Fiscal",
-          resultado: l.status === "ok" ? "ok" : l.status === "erro" ? "erro" : "aviso",
-          erro_mensagem: "", executado_em: l.ts,
-        })));
-      } catch { /* mantém vazio */ }
-      finally { setLoadingLog(false); }
-    })();
   }, []);
 
   const hoje = new Date().toISOString().split("T")[0];
   const vencidas   = obrigacoes.filter(o => o.vencimento < hoje && !["concluida","cancelada"].includes(o.status));
   const aVencer    = obrigacoes.filter(o => o.vencimento >= hoje && !["concluida","cancelada"].includes(o.status));
   const concluidas = obrigacoes.filter(o => o.status === "concluida");
-
-  const fmtTs   = (ts: string) => ts ? new Date(ts).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
   const statusColor: Record<string, string> = {
     pendente:     "text-blue-600 bg-blue-50 border-blue-200",
@@ -525,7 +455,6 @@ function DashboardTab() {
 
   return (
     <div className="space-y-6">
-      {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <FKpiCard label="Obrigações Vencidas" value={kpis?.obrigacoes_vencidas ?? 0}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpiLoading} />
         <FKpiCard label="A vencer (7 dias)"   value={kpis?.obrigacoes_a_vencer_7d ?? 0} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpiLoading} />
@@ -533,91 +462,49 @@ function DashboardTab() {
         <FKpiCard label="Certificados < 30d"   value={kpis?.certificados_expirando ?? 0}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpiLoading} />
       </div>
 
-      {/* Duas colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Coluna 1 — Obrigações próximas */}
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b">
-            <div>
-              <h3 className="text-sm font-semibold">Obrigações próximas</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Ordenadas por vencimento</p>
-            </div>
-            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={refetch} disabled={kpiLoading}>
-              <RefreshCw className={cn("h-3 w-3", kpiLoading && "animate-spin")} />
-            </Button>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div>
+            <h3 className="text-sm font-semibold">Obrigações próximas</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Ordenadas por vencimento · operação manual</p>
           </div>
-          {loadingOb ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : obrigacoes.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-              <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-              <p className="text-sm">Nenhuma obrigação pendente</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {obrigacoes.slice(0, 7).map(ob => {
-                const atrasado = ob.vencimento < hoje && !["concluida","cancelada"].includes(ob.status);
-                return (
-                  <div key={ob.id} className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors">
-                    <div className={cn("shrink-0 h-2 w-2 rounded-full", atrasado ? "bg-red-500" : ob.status === "concluida" ? "bg-emerald-500" : "bg-blue-500")} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{ob.tipo}</p>
-                      <p className="text-xs text-muted-foreground truncate">{ob.cliente_nome ?? "—"}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={cn("text-xs font-semibold tabular-nums", atrasado ? "text-red-600" : "text-foreground")}>
-                        {fmtDate(ob.vencimento)}
-                      </p>
-                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", statusColor[ob.status] ?? "text-muted-foreground bg-muted border-border")}>
-                        {ob.status?.replace("_", " ")}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={refetch} disabled={kpiLoading}>
+            <RefreshCw className={cn("h-3 w-3", kpiLoading && "animate-spin")} />
+          </Button>
         </div>
-
-        {/* Coluna 2 — Atividade dos Agentes */}
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b">
-            <h3 className="text-sm font-semibold">Atividade dos Agentes</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Últimas execuções automáticas</p>
+        {loadingOb ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : obrigacoes.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+            <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+            <p className="text-sm">Nenhuma obrigação pendente</p>
           </div>
-          {loadingLog ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : agenteLog.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-              <Activity className="h-8 w-8 opacity-30" />
-              <p className="text-sm">Nenhuma execução registrada</p>
-              <p className="text-xs opacity-60">Execute um agente na aba Automações</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {agenteLog.map(log => (
-                <div key={log.id} className="px-5 py-3 flex items-start gap-3 hover:bg-muted/20 transition-colors">
-                  <div className={cn("mt-0.5 shrink-0 h-2 w-2 rounded-full", log.resultado === "ok" ? "bg-emerald-500" : log.resultado === "erro" ? "bg-red-500" : "bg-yellow-500")} />
+        ) : (
+          <div className="divide-y divide-border/40">
+            {obrigacoes.slice(0, 7).map(ob => {
+              const atrasado = ob.vencimento < hoje && !["concluida","cancelada"].includes(ob.status);
+              return (
+                <div key={ob.id} className="px-5 py-3 flex items-center gap-3 hover:bg-muted/20 transition-colors">
+                  <div className={cn("shrink-0 h-2 w-2 rounded-full", atrasado ? "bg-red-500" : ob.status === "concluida" ? "bg-emerald-500" : "bg-blue-500")} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium truncate">{log.acao?.replace(/_/g, " ")}</p>
-                      <span className="text-[10px] font-mono text-muted-foreground">{log.agente}</span>
-                    </div>
-                    {log.erro_mensagem && <p className="text-xs text-red-500 truncate mt-0.5">{log.erro_mensagem}</p>}
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{fmtTs(log.executado_em)}</p>
+                    <p className="text-sm font-medium truncate">{ob.tipo}</p>
+                    <p className="text-xs text-muted-foreground truncate">{ob.cliente_nome ?? "—"}</p>
                   </div>
-                  <span className={cn("shrink-0 text-[10px] px-1.5 py-0.5 rounded border font-semibold", log.resultado === "ok" ? "text-emerald-600 bg-emerald-50 border-emerald-200" : log.resultado === "erro" ? "text-red-600 bg-red-50 border-red-200" : "text-yellow-600 bg-yellow-50 border-yellow-200")}>
-                    {log.resultado ?? "—"}
-                  </span>
+                  <div className="text-right shrink-0">
+                    <p className={cn("text-xs font-semibold tabular-nums", atrasado ? "text-red-600" : "text-foreground")}>
+                      {fmtDate(ob.vencimento)}
+                    </p>
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", statusColor[ob.status] ?? "text-muted-foreground bg-muted border-border")}>
+                      {ob.status?.replace("_", " ")}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Resumo de status */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border bg-card p-4 text-center">
           <p className="text-3xl font-bold text-red-600 tabular-nums">{vencidas.length}</p>
@@ -641,46 +528,25 @@ function DashboardTab() {
 // TAB — CONFIGURAÇÕES
 // ════════════════════════════════════════════════════════════════
 function ConfiguracoesTab() {
-  const { session } = useAuth();
-  const [gwStatus, setGwStatus] = useState<"idle"|"checking"|"ok"|"erro">("idle");
-  const [gwMsg, setGwMsg]       = useState("");
-
-  async function testarGateway() {
-    if (!session?.access_token) return;
-    setGwStatus("checking");
-    try {
-      const res  = await fetch("/api/serpro/status", { headers: { Authorization: `Bearer ${session.access_token}` } });
-      const data = await res.json().catch(() => ({}));
-      const ok   = data?.serpro?.result?.token_ok === true;
-      setGwStatus(ok ? "ok" : "erro");
-      setGwMsg(ok ? `v${data?.serpro?.result?.version ?? "—"} · ${data?.serpro?.result?.contratante ?? "—"}` : "Gateway offline ou token inválido");
-    } catch (e: any) { setGwStatus("erro"); setGwMsg(e.message); }
-  }
-
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-5 space-y-4">
-        <div><h3 className="text-sm font-semibold">Gateway SERPRO</h3><p className="text-xs text-muted-foreground mt-0.5">Conexão com mcp.zapro.tech para consultas na Receita Federal</p></div>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 text-xs font-mono text-muted-foreground">mcp.zapro.tech — Bearer $SERPRO_TOKEN</div>
-          <Button size="sm" variant="outline" className="h-8 text-xs gap-1 shrink-0" onClick={testarGateway} disabled={gwStatus === "checking"}>
-            {gwStatus === "checking" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />} Testar
-          </Button>
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Modo de operação</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Fiscal 100% manual — sem integrações automáticas</p>
         </div>
-        {gwStatus === "ok"   && <div className="flex items-center gap-1.5 text-xs text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Conectado · {gwMsg}</div>}
-        {gwStatus === "erro" && <div className="flex items-center gap-1.5 text-xs text-red-600"><AlertCircle className="h-3.5 w-3.5" /> {gwMsg}</div>}
+        <div className="flex items-center gap-2 text-xs">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+          <span className="text-muted-foreground">DAS, obrigações e documentos são registrados diretamente no Supabase pela equipe.</span>
+        </div>
       </div>
       <div className="rounded-lg border bg-card p-5 space-y-3">
-        <div><h3 className="text-sm font-semibold">Focus NF-e</h3><p className="text-xs text-muted-foreground mt-0.5">API de emissão e consulta de NFS-e</p></div>
-        <div className="flex items-center gap-2 text-xs"><AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" /><span className="text-amber-700">Emissão suspensa — pendência junto à prefeitura de Caçapava.</span></div>
-      </div>
-      <div className="rounded-lg border bg-card p-5 space-y-3">
-        <div><h3 className="text-sm font-semibold">Notificações</h3><p className="text-xs text-muted-foreground mt-0.5">Como o sistema notifica sobre pendências fiscais</p></div>
+        <div><h3 className="text-sm font-semibold">Notificações</h3><p className="text-xs text-muted-foreground mt-0.5">Como o sistema sinaliza pendências fiscais</p></div>
         <div className="space-y-2">
           {[
             { label: "Alertas críticos no Dashboard", ativo: true },
-            { label: "Notificações por WhatsApp (em breve)", ativo: false },
-            { label: "E-mail diário de pendências (em breve)", ativo: false },
+            { label: "WhatsApp via link wa.me (por cliente)", ativo: true },
+            { label: "E-mail automático de pendências", ativo: false },
           ].map(item => (
             <div key={item.label} className="flex items-center gap-3 text-sm">
               <div className={cn("h-2 w-2 rounded-full", item.ativo ? "bg-emerald-500" : "bg-muted-foreground/30")} />
@@ -698,15 +564,12 @@ function ConfiguracoesTab() {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 function FiscalModuloInner() {
-  const { roles } = useAuth();
-  const podeAprovar = roles.includes("admin") || roles.includes("contador");
-
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Fiscal</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Gestão tributária · DAS · NFS-e · SERPRO · Pipeline de obrigações</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Gestão tributária manual · DAS · Obrigações · Pipeline</p>
         </div>
       </div>
 

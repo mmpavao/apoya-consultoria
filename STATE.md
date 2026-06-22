@@ -48,3 +48,4 @@ npx tsc --noEmit && npm test && npm run build
 
 - Pivô L1–L3: remoção agentes + integrações
 - Cleanup: dashboard sem chamadas a edge functions removidas; docs alinhados
+- Cleanup L4: DAS/fiscal 100% manual (sem SERPRO/WA API); dead code whatsapp/evolution removido

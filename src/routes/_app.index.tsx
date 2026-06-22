@@ -233,8 +233,8 @@ function Dashboard() {
         />
         <MiniLink
           to="/financeiro"
-          label="NFS-e emitidas no mês"
-          value={String(kpis.nfseEmitidaMes)}
+          label="Honorários recebidos"
+          value={kpis.honorariosMes > 0 ? fmtBRL(kpis.honorariosMes) : "—"}
           sub={kpis.honorariosAtraso > 0 ? `${fmtBRL(kpis.honorariosAtraso)} de cobranças vencidas` : "Cobranças em dia"}
           icon={DollarSign}
         />
