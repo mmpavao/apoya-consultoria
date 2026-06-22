@@ -69,7 +69,7 @@ export function CobrancaFormDialog({ open, onClose, onCreated, cobranca }: Props
         .from("contrato_cliente")
         .select("id")
         .eq("cliente_id", form.clienteId)
-        .eq("status", "ativo")
+        .in("status", ["assinado", "ativo"])
         .limit(1)
         .maybeSingle();
       setSemContrato(!data);

@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/cobranca/contratar-servico")({
           .from("contrato_cliente")
           .select("id,status,titulo")
           .eq("cliente_id", cliente_id)
-          .eq("status", "ativo")
+          .in("status", ["assinado", "ativo"])
           .limit(1)
           .maybeSingle();
 

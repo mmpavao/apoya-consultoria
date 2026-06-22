@@ -180,6 +180,8 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
       if (certMeta.validoAte) {
         const dtAlerta = new Date(certMeta.validoAte);
         dtAlerta.setDate(dtAlerta.getDate() - 60);
+        // competencia e responsavel são NOT NULL em obrigacoes.
+        const { data: { user } } = await supabase.auth.getUser();
         await (supabase as any).from("obrigacoes").upsert({
           cliente_id:   clienteId,
           codigo:       `CERT-VENC-${clienteId.slice(0, 8)}`,
@@ -187,8 +189,10 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
           descricao:    `Certificado A1 vence em ${new Date(certMeta.validoAte).toLocaleDateString("pt-BR")}. Iniciar processo de renovação com a AC.`,
           tipo:         "certificado",
           regime:       "todos",
+          competencia:  dtAlerta.toISOString().slice(0, 7),
           vencimento:   dtAlerta.toISOString().split("T")[0],
           status:       "pendente",
+          responsavel:  user?.email ?? "Escritório",
           cliente_nome: razaoSocial ?? "",
         }, { onConflict: "codigo" });
       }
