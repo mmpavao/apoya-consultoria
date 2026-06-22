@@ -8,7 +8,7 @@ O sistema tinha integrações e agentes meio-construídos e com bug. Decisão: z
 ## 2. O que é o APOYA
 - Software de contabilidade (escritório, ~8 clientes). Setores: Clientes, Fiscal, Contábil, DP, Financeiro, Societário + Documentos/Kanban/Tarefas.
 - Stack: TanStack Start (React 19) em Cloudflare Workers (worker apoya-gestao) + Supabase (Postgres + RLS + Auth + Storage + Edge Functions/Deno), projeto ajaqbdsalxfgrwpjbtbn.
-- Repo: github.com/mmpavao/apoya-consultoria. Régua de versão: v3.42.x.
+- Repo: github.com/mmpavao/apoya-consultoria. Régua de versão: **v3.43.x** (prod atual: v3.43.0).
 
 ## 3. O que foi REMOVIDO no pivô (NÃO recriar)
 - Agentes: 8 edge functions agente-* + cron diário + RPC verify_cron_secret + secret no Vault + abas "Automações" + card "Agente Autônomo" do ModuleDashboard + hook use-agente-atividade + rota /api/agentes/atividade. Deletados do repo E do Supabase.

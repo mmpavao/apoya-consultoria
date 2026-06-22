@@ -31,8 +31,8 @@ Integrações (Asaas, Evolution, etc.) **não são necessárias** no pivô manua
 ```bash
 git push origin main          # → apoya-gestao-staging
 # validar staging
-git tag v3.37.0
-git push origin v3.37.0       # → apoya-gestao + send-invite
+git tag v3.44.0
+git push origin v3.44.0       # → apoya-gestao + send-invite
 gh run watch
 ```
 
@@ -51,5 +51,5 @@ Aplicadas **out-of-band** pelo agente ARQUITETO (Base44). CI não aplica migrati
 
 ```bash
 npx wrangler rollback --name apoya-gestao
-git revert <commit> && git tag v3.37.1 && git push origin v3.37.1
+git revert <commit> && git tag v3.44.1 && git push origin v3.44.1
 ```

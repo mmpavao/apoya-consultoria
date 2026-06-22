@@ -1,8 +1,10 @@
 # APOYA Gestão — Backlog de Endurecimento (auditoria multi-agente 15/06/2026)
 
+> **Status pós-pivô (v3.43.0):** muitos itens abaixo referem integrações/agentes **removidos** (SERPRO, Asaas, WhatsApp, MCP, cron, webhooks). Trate como histórico. Itens ainda relevantes para o modo manual: **Tema 1** (schema/colunas), **Tema 3** (cálculo folha/rescisão), **Tema 7** (UI morta), partes de **Tema 2/6** (mock/erro silencioso). Ver `AGENTS.md` e `STATE.md`.
+
 Auditoria de 7 domínios contra `STANDARDS.md`. Achados com arquivo:linha e severidade.
 Falsos positivos da auditoria (gerados quando o working tree foi temporariamente
-corrompido por um agente) foram REMOVIDOS: rotas `api/wa/send`/`instances` existem.
+corrompido por um agente) foram REMOVIDOS. Rotas `api/wa/send`/`instances` **não existem mais** (pivô manual).
 
 Ordem de ataque na Phase 2 = por TEMA (raiz comum), começando pelos que gravam/leem
 errado no banco (saves que falham calado), depois fachadas, segurança e o resto.

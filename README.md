@@ -45,7 +45,7 @@ Ver `STANDARDS.md` para Definition of Done.
 3. Tag `v3.x.y` → produção
 
 ```bash
-git tag v3.37.0 && git push origin v3.37.0
+git tag v3.44.0 && git push origin v3.44.0
 ```
 
 Detalhes: `docs/DEPLOY_PRODUCAO.md`

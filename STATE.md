@@ -1,6 +1,16 @@
 # STATE — APOYA Gestão
 
-> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio)
+> Atualizado: **2026-06-22** · Pivô **100% manual** (decisão Marcio) · **v3.43.0** em prod
+
+## Status do repositório
+
+| Item | Estado |
+|------|--------|
+| Branch ativa | `main` |
+| PRs abertas | **0** (PR #3 legado — branch removida; fechar manualmente no GitHub se ainda aparecer) |
+| Versão prod | **v3.43.0** |
+| Modo | 100% manual — CRUD Supabase |
+| Próximo foco | Bugs fluxo manual (ver `BACKLOG.md` Temas 1, 3, 7) |
 
 ## Decisão vigente
 
