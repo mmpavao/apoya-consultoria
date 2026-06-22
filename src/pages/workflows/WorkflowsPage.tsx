@@ -9,10 +9,12 @@ import { Input }    from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useTarefas, Tarefa, TarefaStatus, TarefaTipo, TarefaPrioridade, SlaStatus } from "@/hooks/use-tarefas";
+import { useResponsaveis } from "@/hooks/use-responsaveis";
 import {
   BadgeStatus, BadgePrioridade, BadgeSLA, BadgeTipo, AvatarResponsavel,
-  TIPO_LABEL, PRIORIDADE_LABEL, STATUS_LABEL, TODOS_RESPONSAVEIS,
+  TIPO_LABEL, PRIORIDADE_LABEL, STATUS_LABEL,
   PRIORIDADE_EMOJI, TIPO_DOT, STATUS_CSS, formatData, formatDataCurta, formatDataRelativa,
+  responsavelInitials,
 } from "./tarefa-utils";
 import { TarefaModal }  from "./TarefaModal";
 import { NovaTarefaForm } from "./NovaTarefaForm";
@@ -41,6 +43,7 @@ export default function WorkflowsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const { tarefas, loading, refetch, atualizarTarefa } = useTarefas();
+  const { responsaveis } = useResponsaveis();
 
   const filtered = useMemo(() => tarefas.filter(t => {
     if (fResp   && t.responsavel !== fResp)   return false;
@@ -139,7 +142,7 @@ export default function WorkflowsPage() {
             {[
               {
                 placeholder: "Responsável", val: fResp, fn: setFResp,
-                opts: TODOS_RESPONSAVEIS.map(r => ({ v: r.nome, l: `${r.tipo === "agente" ? "🤖" : "👤"} ${r.nome}` })),
+                opts: responsaveis.map(r => ({ v: r.nome, l: r.nome })),
               },
               {
                 placeholder: "Tipo", val: fTipo, fn: setFTipo,
@@ -301,8 +304,8 @@ function KanbanCard({ tarefa: t, onSelect, onDragStart, onDragEnd }: {
       {/* Footer */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
         <div className="flex items-center gap-1">
-          <div className="w-5 h-5 rounded-full bg-violet-100 text-violet-700 text-[9px] font-bold flex items-center justify-center">
-            {t.responsavel_tipo === "agente" ? "AI" : t.responsavel.split(" ").map(w => w[0]).slice(0,2).join("")}
+          <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold flex items-center justify-center">
+            {responsavelInitials(t.responsavel)}
           </div>
           <span className="text-[10px] text-muted-foreground">{t.responsavel.split(" ")[0]}</span>
         </div>
@@ -355,8 +358,8 @@ function ListaView({ tarefas, onSelect }: { tarefas: Tarefa[]; onSelect: (t: Tar
                 <td><BadgePrioridade prioridade={t.prioridade} /></td>
                 <td>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                      {t.responsavel_tipo === "agente" ? "AI" : t.responsavel.split(" ").map(w=>w[0]).slice(0,2).join("")}
+                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {responsavelInitials(t.responsavel)}
                     </span>
                     <span className="text-xs text-muted-foreground">{t.responsavel}</span>
                   </span>
@@ -417,7 +420,7 @@ function TimelineView({ tarefas, onSelect }: { tarefas: Tarefa[]; onSelect: (t: 
                   <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                     <span>📅 {formatData(t.data_prazo)}</span>
                     <span>•</span>
-                    <span>{t.responsavel_tipo === "agente" ? "🤖" : "👤"} {t.responsavel}</span>
+                    <span>{t.responsavel}</span>
                   </div>
                 </div>
               </div>
@@ -462,11 +465,15 @@ function DashboardView({ tarefas, onSelect }: { tarefas: Tarefa[]; onSelect: (t:
   })).filter(x => x.count > 0).sort((a,b) => b.count - a.count);
 
   // Por responsável
-  const byResp = TODOS_RESPONSAVEIS.map(r => ({
-    nome: r.nome, tipo: r.tipo,
-    count: tarefas.filter(t => t.responsavel === r.nome).length,
-    atrasadas: tarefas.filter(t => t.responsavel === r.nome && (t.sla_status === "atrasada" || t.sla_status === "expirada")).length,
-  })).filter(r => r.count > 0).sort((a,b) => b.count - a.count);
+  const byResp = Object.values(
+    tarefas.reduce((acc, t) => {
+      const cur = acc[t.responsavel] ?? { nome: t.responsavel, count: 0, atrasadas: 0 };
+      cur.count += 1;
+      if (t.sla_status === "atrasada" || t.sla_status === "expirada") cur.atrasadas += 1;
+      acc[t.responsavel] = cur;
+      return acc;
+    }, {} as Record<string, { nome: string; count: number; atrasadas: number }>),
+  ).sort((a, b) => b.count - a.count);
 
   // Urgentes
   const urgentes = tarefas
@@ -526,8 +533,8 @@ function DashboardView({ tarefas, onSelect }: { tarefas: Tarefa[]; onSelect: (t:
           <div className="space-y-3">
             {byResp.slice(0, 6).map(r => (
               <div key={r.nome} className="flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${r.tipo === "agente" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}`}>
-                  {r.tipo === "agente" ? "AI" : r.nome.split(" ").map(w => w[0]).slice(0,2).join("")}
+                <div className="w-7 h-7 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 bg-blue-100 text-blue-700">
+                  {responsavelInitials(r.nome)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground truncate">{r.nome}</p>

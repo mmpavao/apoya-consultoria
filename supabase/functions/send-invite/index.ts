@@ -11,13 +11,12 @@ const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL      = Deno.env.get("APP_URL") ?? "https://apoyaproject.zapro.tech";
 const SMTP_FROM    = Deno.env.get("SMTP_FROM") ?? "nao-responder@apoya.com.br";
 
-const VALID_ROLES = ["admin","contador","assistente","agente","supervisor"];
+const VALID_ROLES = ["admin","contador","assistente","supervisor"];
 
 const ROLE_LABELS: Record<string, string> = {
   admin:      "Administrador",
   contador:   "Contador",
   assistente: "Assistente",
-  agente:     "Agente",
   supervisor: "Supervisor",
 };
 

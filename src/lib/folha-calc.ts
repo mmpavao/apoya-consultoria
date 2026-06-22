@@ -2,8 +2,7 @@
  * folha-calc — cálculo de folha de pagamento (CLT).
  *
  * TABELAS: VIGÊNCIA 2026 (verificadas em jun/2026). As alíquotas/faixas mudam
- * por ato do governo ~1×/ano — quando mudar, é trocar os números aqui (o agente
- * agente-tabelas-tributarias monitora e propõe a atualização com gate humano).
+ * por ato do governo ~1×/ano — quando mudar, é trocar os números aqui manualmente.
  * O motor (lógica progressiva + redutor) é coberto por testes.
  * Fontes: salário mínimo 2026 R$ 1.621; teto INSS R$ 8.475,55; IRRF Lei 15.270/2025.
  *

@@ -2,7 +2,7 @@
  * ModuleDashboard.tsx
  *
  * Dashboard padrão reutilizável para todos os módulos.
- * Aceita KPIs, status do agente, últimas execuções e ações rápidas.
+ * Aceita KPIs, alertas operacionais, últimas execuções e ações rápidas.
  */
 import React from "react";
 import { cn } from "@/lib/utils";

@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch }   from "@/components/ui/switch";
 import { X, Plus, Trash2, Loader2, Clock } from "lucide-react";
 import { useTarefas, TarefaTipo, TarefaPrioridade, calcularSlaHoras } from "@/hooks/use-tarefas";
-import { TODOS_RESPONSAVEIS, TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_EMOJI, TIPO_DOT } from "./tarefa-utils";
+import { useResponsaveis } from "@/hooks/use-responsaveis";
+import { TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_EMOJI, TIPO_DOT } from "./tarefa-utils";
 import { useClientes } from "@/hooks/use-clientes";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
@@ -32,14 +33,13 @@ const EMPTY_FORM = {
 export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Daniel Araújo" }: Props) {
   const { criarTarefa } = useTarefas();
   const { clientes }    = useClientes();
+  const { responsaveis } = useResponsaveis();
   const [salvando, setSalvando] = useState(false);
   const [form, setForm]         = useState({ ...EMPTY_FORM, clienteId: clienteIdPre ?? "" });
 
   const set = (k: keyof typeof EMPTY_FORM, v: unknown) => setForm(p => ({ ...p, [k]: v }));
   const tagsArr     = form.tags.split(",").map(t => t.trim()).filter(Boolean);
   const slaCalc     = calcularSlaHoras(form.tipo, tagsArr);
-  const respInfo    = TODOS_RESPONSAVEIS.find(r => r.nome === form.responsavel);
-  const aprovInfo   = TODOS_RESPONSAVEIS.find(r => r.nome === form.aprovador);
   const clienteSel  = clientes?.find(c => c.id === form.clienteId);
 
   function addSub()              { set("subtarefas", [...form.subtarefas, { titulo: "", responsavel: "" }]); }
@@ -70,7 +70,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
         status:           "aberta",
         prioridade:       form.prioridade,
         responsavel:      form.responsavel,
-        responsavel_tipo: respInfo?.tipo ?? "humano",
+        responsavel_tipo: "humano",
         criado_por:       currentUser,
         criado_por_tipo:  "humano",
         cliente_id:       form.clienteId || undefined,
@@ -78,7 +78,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
         data_prazo:       form.dataPrazo ? new Date(form.dataPrazo).toISOString() : undefined,
         requer_aprovacao: form.requerAprovacao,
         aprovador:        form.requerAprovacao ? form.aprovador || undefined : undefined,
-        aprovador_tipo:   form.requerAprovacao ? aprovInfo?.tipo ?? "humano" : undefined,
+        aprovador_tipo:   form.requerAprovacao ? "humano" : undefined,
         tags:             tagsArr,
         subtarefas:       subs,
         subtarefas_total: subs.length,
@@ -189,10 +189,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
               <Select value={form.responsavel} onValueChange={v => set("responsavel", v)}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                 <SelectContent>
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase">Agentes IA</div>
-                  {TODOS_RESPONSAVEIS.filter(r => r.tipo === "agente").map(r => <SelectItem key={r.nome} value={r.nome}>🤖 {r.nome}</SelectItem>)}
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase mt-1">Humanos</div>
-                  {TODOS_RESPONSAVEIS.filter(r => r.tipo === "humano").map(r => <SelectItem key={r.nome} value={r.nome}>👤 {r.nome}</SelectItem>)}
+                  {responsaveis.map(r => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -255,7 +252,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
               <Select value={form.aprovador} onValueChange={v => set("aprovador", v)}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar aprovador..." /></SelectTrigger>
                 <SelectContent>
-                  {TODOS_RESPONSAVEIS.map(r => <SelectItem key={r.nome} value={r.nome}>{r.tipo === "agente" ? "🤖" : "👤"} {r.nome}</SelectItem>)}
+                  {responsaveis.map(r => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -287,7 +284,7 @@ export function NovaTarefaForm({ open, onClose, clienteIdPre, currentUser = "Dan
                     <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Resp." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="default">— Mesmo —</SelectItem>
-                      {TODOS_RESPONSAVEIS.map(r => <SelectItem key={r.nome} value={r.nome} className="text-xs">{r.nome}</SelectItem>)}
+                      {responsaveis.map(r => <SelectItem key={r.nome} value={r.nome} className="text-xs">{r.nome}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <button onClick={() => removeSub(i)} className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
