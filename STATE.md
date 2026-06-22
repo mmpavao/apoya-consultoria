@@ -38,7 +38,7 @@ npx tsc --noEmit && npm test && npm run build
 
 - Migrations: agente ARQUITETO (Base44), **não** CI
 - Edge functions: só em tag prod + `deno check`
-- Versão atual: **v3.43.0** (próxima tag prod — cleanup pós-pivô manual)
+- Versão atual: **v3.43.0** (prod — cleanup pós-pivô manual)
 
 ## Gates locais
 
