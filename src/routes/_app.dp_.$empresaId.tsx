@@ -183,7 +183,9 @@ function DpEmpresaPage() {
   const [activeTab, setActiveTab] = useState<DpTab>("funcionarios");
 
   const cliente = clientes.find(c => c.id === empresaId);
-  const rb = REGIME_BADGE[cliente?.regime ?? "Simples"] ?? REGIME_BADGE["Simples"];
+  const rb = cliente?.regime
+    ? (REGIME_BADGE[cliente.regime] ?? { label: cliente.regime, cls: "bg-slate-100 text-slate-600" })
+    : { label: "Regime não informado", cls: "bg-slate-100 text-slate-600" };
 
   return (
     <div className="space-y-5 animate-fade-up p-6">

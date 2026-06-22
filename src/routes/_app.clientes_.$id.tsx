@@ -287,7 +287,7 @@ function ClienteDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Identidade */}
           <div className="flex items-start gap-4">
-            <Avatar nome={cliente.razaoSocial} regime={cliente.regime ?? "Simples"} />
+            <Avatar nome={cliente.razaoSocial} regime={cliente.regime ?? ""} />
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-foreground leading-tight">{cliente.razaoSocial}</h1>
               {cliente.nomeFantasia && (

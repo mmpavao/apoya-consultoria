@@ -1,14 +1,13 @@
 /**
- * TabFiscal — Aba Fiscal do cliente (refatorada)
+ * TabFiscal — Aba Fiscal do cliente (modo manual)
  *
  * Sub-abas:
- *   Resumo Fiscal  → dados fixos + status PGDAS/DAS/DTE (auto-fetch SERPRO)
- *   NF Emitidas    → notas emitidas pela empresa (Focus NF-e)
- *   NF Recebidas   → notas recebidas pela empresa
- *   Emitir NFS-e   → formulário de emissão
- *   Consultas      → acesso completo ao MCP SERPRO
+ *   Resumo Fiscal  → dados cadastrais + status DAS/PGDAS (registro manual)
+ *   NF Emitidas    → notas emitidas (histórico)
+ *   NF Recebidas   → notas recebidas
+ *   Apuração       → competência mensal + registrar DAS
  *
- * Filosofia: dados fixos já preenchidos, JSON nunca exposto ao usuário.
+ * Filosofia: operador registra no sistema; sem integrações automáticas.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fmtBRL, fmtDate } from "@/lib/format";
@@ -125,7 +124,7 @@ function StatusItem({ label, ok, detail, loading }: {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// RESUMO FISCAL (auto-fetch SERPRO)
+// RESUMO FISCAL (dados cadastrais + obrigações do mês)
 // ────────────────────────────────────────────────────────────────────────────
 function ResumoFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: boolean; tem_procuracao?: boolean } }) {
   const { obrigacoes } = useObrigacoes();
@@ -253,7 +252,7 @@ export function TabFiscal({ cliente }: { cliente: Cliente & { tem_certificado?: 
       {sub === "apuracao" && (
         <ApuracaoMensalCard
           clienteId={cliente.id}
-          regime={cliente.regime ?? "Simples"}
+          regime={cliente.regime ?? "—"}
         />
       )}
     </div>

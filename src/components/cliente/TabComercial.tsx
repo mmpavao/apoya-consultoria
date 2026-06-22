@@ -54,14 +54,7 @@ export function TabComercial({ cliente }: Props) {
 
       {/* Conteúdo da sub-aba */}
       {sub === "servicos"   && <TabServicos   clienteId={cliente.id} />}
-      {sub === "contratos"  && (
-        <TabContratos
-          clienteId={cliente.id}
-          clienteEmail={cliente.email}
-          clienteWhatsapp={cliente.whatsapp}
-          clienteNome={cliente.razaoSocial}
-        />
-      )}
+      {sub === "contratos"  && <TabContratos cliente={cliente} />}
       {sub === "financeiro" && <TabFinanceiro cliente={cliente} />}
     </div>
   );

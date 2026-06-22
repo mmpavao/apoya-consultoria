@@ -1,8 +1,11 @@
 /**
- * TabContratos — Gestão completa de contratos por cliente
- * Integração Clicksign: enviar, acompanhar, cancelar, baixar PDF assinado
+ * TabContratos — Gestão de contratos por cliente (modo manual)
+ * Templates com placeholders substituídos na criação; status de assinatura atualizado pelo operador.
  */
 import { useState } from "react";
+import type { Cliente } from "@/hooks/use-clientes";
+import { useEscritorio } from "@/hooks/use-escritorio";
+import { substituirPlaceholders } from "@/lib/contrato-placeholders";
 import { toast } from "sonner";
 import {
   FileText, Plus, Send, RefreshCw, XCircle, Download,
@@ -57,7 +60,7 @@ const TEMPLATES: Record<string, { titulo: string; html: string }> = {
 <h2>CLÁUSULA 5ª — FORO</h2>
 <p>Fica eleito o foro da Comarca de [CIDADE], para dirimir quaisquer questões oriundas do presente contrato.</p>
 
-<p>E por estarem de acordo, as partes assinam o presente contrato eletronicamente via plataforma Clicksign.</p>`,
+<p>E por estarem de acordo, as partes assinam o presente contrato conforme acordado entre si.</p>`,
   },
   abertura_empresa: {
     titulo: "Contrato de Abertura de Empresa",
@@ -96,7 +99,7 @@ const TEMPLATES: Record<string, { titulo: string; html: string }> = {
   },
 };
 
-// ── Badge de status Clicksign ─────────────────────────────────
+// ── Badge de status de assinatura ─────────────────────────────
 function StatusBadge({ status }: { status?: string }) {
   const map: Record<string, { label: string; color: string; icon: React.ElementType }> = {
     nao_enviado:           { label: "Não enviado",     color: "bg-zinc-100 text-zinc-600 border-zinc-200",         icon: FileText },
@@ -178,7 +181,7 @@ function ContratoRow({
               className="gap-1.5 h-7 px-2.5 text-xs bg-primary/90 hover:bg-primary"
             >
               {isBusy ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-              {isBusy ? "Enviando…" : "Enviar para assinar"}
+              {isBusy ? "Marcando…" : "Marcar como enviado (manual)"}
             </Button>
           ) : csStatus === "aguardando_assinatura" ? (
             <>
@@ -223,10 +226,10 @@ function ContratoRow({
       {/* Expanded detail */}
       {expanded && (
         <div className="border-t border-border/40 bg-muted/20 px-4 py-3 space-y-3">
-          {/* Dados Clicksign */}
+          {/* Metadados de assinatura externa (legado) */}
           {contrato.clicksign_envelope_id && (
             <div className="rounded-lg bg-background border border-border/60 p-3 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Clicksign</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Assinatura externa</p>
               <div className="grid grid-cols-1 gap-1 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground w-28 shrink-0">Envelope ID:</span>
@@ -282,14 +285,16 @@ function ContratoRow({
 
 // ── Modal Novo Contrato ────────────────────────────────────────
 function ModalNovoContrato({
-  open, onClose, clienteId,
+  open, onClose, clienteId, cliente,
   onCreate,
 }: {
   open: boolean;
   onClose: () => void;
   clienteId: string;
+  cliente: Cliente;
   onCreate: (clienteId: string, payload: NovoContratoPayload) => Promise<ContratoCliente>;
 }) {
+  const { escritorio } = useEscritorio();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Partial<NovoContratoPayload>>({
     tipo: "prestacao_servicos",
@@ -318,12 +323,19 @@ function ModalNovoContrato({
     if (!form.titulo || !form.data_inicio) { toast.error("Preencha título e data de início"); return; }
     setSaving(true);
     try {
+      const htmlBase = form.corpo_html ?? tpl?.html ?? "";
+      const corpo_html = substituirPlaceholders(htmlBase, {
+        cliente,
+        escritorio,
+        valorTotal: form.valor_total,
+        dataInicio: typeof form.data_inicio === "string" ? form.data_inicio : undefined,
+      });
       await onCreate(clienteId, {
         ...form as NovoContratoPayload,
         titulo: form.titulo!,
         tipo: form.tipo!,
         data_inicio: form.data_inicio!,
-        corpo_html: form.corpo_html ?? tpl?.html,
+        corpo_html,
         notificacao_canal: notifEmail && notifWhatsapp ? "both" : notifWhatsapp ? "whatsapp" : "email",
         deadline_days: form.deadline_days ?? 30,
       });
@@ -396,15 +408,15 @@ function ModalNovoContrato({
               onChange={e => setForm(f => ({ ...f, corpo_html: e.target.value }))}
               placeholder="Conteúdo HTML do contrato..." />
             <p className="text-[11px] text-muted-foreground">
-              Suporta HTML simples (h1, h2, p, strong). Este conteúdo será convertido em PDF e enviado ao Clicksign.
+              Suporta HTML simples (h1, h2, p, strong). Placeholders como [VALOR] e [CNPJ APOYA] são substituídos ao salvar.
             </p>
           </div>
 
-          {/* Configurações Clicksign */}
+          {/* Lembretes de assinatura (manual) */}
           <div className="rounded-xl border border-border/60 p-3 space-y-3 bg-muted/20">
             <p className="text-xs font-semibold flex items-center gap-1.5">
               <Shield className="h-3.5 w-3.5 text-primary" />
-              Configurações de assinatura (Clicksign)
+              Lembretes de assinatura (manual)
             </p>
 
             <div className="grid grid-cols-2 gap-4">
@@ -418,7 +430,7 @@ function ModalNovoContrato({
                 <Label className="text-xs">Lembrete automático (dias)</Label>
                 <Input type="number" min={1} max={30}
                   defaultValue={3} disabled />
-                <p className="text-[10px] text-muted-foreground">A cada 3 dias (padrão Clicksign)</p>
+                <p className="text-[10px] text-muted-foreground">Registre lembretes no seu calendário ou CRM</p>
               </div>
             </div>
 
@@ -490,17 +502,8 @@ function ModalNovoContrato({
 }
 
 // ── TabContratos (componente principal) ────────────────────────
-export function TabContratos({ 
-  clienteId, 
-  clienteEmail: _email, 
-  clienteWhatsapp: _wpp, 
-  clienteNome: _nome 
-}: { 
-  clienteId: string;
-  clienteEmail?: string;
-  clienteWhatsapp?: string;
-  clienteNome?: string;
-}) {
+export function TabContratos({ cliente }: { cliente: Cliente }) {
+  const clienteId = cliente.id;
   const {
     contratos, loading, actionLoading,
     criar, enviarParaAssinatura, reenviarNotificacao, cancelarEnvelope,
@@ -554,8 +557,8 @@ export function TabContratos({
         </Button>
       </div>
 
-      {/* Aviso sobre o fluxo */}
-      {contratos.some(c => c.clicksign_status === "aguardando_assinatura") && (
+      {/* Aviso sobre o fluxo manual */}
+      {pendentes > 0 && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2">
           <Clock className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
           <div>
@@ -563,7 +566,7 @@ export function TabContratos({
               {pendentes} contrato(s) aguardando assinatura
             </p>
             <p className="text-xs text-amber-600 mt-0.5">
-              O Clicksign envia lembretes automáticos a cada 3 dias. Use "Renotificar" para envio imediato.
+              Envie o documento ao cliente pelo seu canal (e-mail, WhatsApp ou presencial) e atualize o status aqui quando assinado.
             </p>
           </div>
         </div>
@@ -577,7 +580,7 @@ export function TabContratos({
           </div>
           <p className="text-sm font-medium text-muted-foreground">Nenhum contrato cadastrado</p>
           <p className="text-xs text-muted-foreground max-w-xs text-center">
-            Crie um contrato, preencha o conteúdo e envie para assinatura digital via Clicksign.
+            Crie um contrato a partir do template, revise o conteúdo e marque como enviado quando encaminhar ao cliente.
           </p>
           <Button size="sm" onClick={() => setModalOpen(true)} className="gap-2 mt-1">
             <Plus className="h-4 w-4" /> Criar primeiro contrato
@@ -604,12 +607,7 @@ export function TabContratos({
         <div className="rounded-xl bg-muted/40 border border-border/40 px-4 py-3 flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary/60 shrink-0" />
           <p className="text-xs text-muted-foreground">
-            Assinaturas eletrônicas com validade jurídica — powered by{" "}
-            <a href="https://clicksign.com" target="_blank" rel="noopener noreferrer"
-              className="text-primary hover:underline font-medium">
-              Clicksign
-            </a>
-            . Eventos são registrados em tempo real via webhook.
+            Assinatura é feita fora do sistema (e-mail, papel ou plataforma própria). Use os botões para registrar o andamento manualmente.
           </p>
         </div>
       )}
@@ -618,6 +616,7 @@ export function TabContratos({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         clienteId={clienteId}
+        cliente={cliente}
         onCreate={criar}
       />
     </div>
