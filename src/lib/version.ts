@@ -7,7 +7,7 @@ const env = (import.meta as any).env ?? {};
 export const APP_VERSION    = (env.VITE_APP_VERSION as string) || "3.3.0";
 export const APP_BUILD_TS   = (env.VITE_APP_BUILD_TS as string) || "2026-06-15T00:00:00";
 export const APP_BUILD_DATE = APP_BUILD_TS.slice(0, 10);
-export const APP_SPRINT     = "Time multi-agente vivo + Societário unificado";
+export const APP_SPRINT     = "Operação manual + Societário unificado";
 
 /** "15/06 23:45" — versão curta data/hora p/ o rodapé */
 export function buildStamp(): string {

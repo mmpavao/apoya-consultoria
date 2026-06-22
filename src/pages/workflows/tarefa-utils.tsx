@@ -1,14 +1,10 @@
 import { TarefaPrioridade, TarefaStatus, TarefaTipo, SlaStatus } from "@/hooks/use-tarefas";
 
-// ── Responsáveis ──────────────────────────────────────────────────────────────
-export const AGENTES_IA  = ["Ana", "Sofia", "Hugo", "Carla", "Pedro", "Rafael", "Marcos", "O Contador"];
-export const HUMANOS      = ["Daniel Araújo", "Marcio Pavão"];
-export const TODOS_RESPONSAVEIS = [
-  ...AGENTES_IA.map(n => ({ nome: n, tipo: "agente" as const })),
-  ...HUMANOS.map(n  => ({ nome: n, tipo: "humano" as const })),
-];
-
 // ── Labels ────────────────────────────────────────────────────────────────────
+export function responsavelInitials(nome: string): string {
+  return nome.split(" ").map(w => w[0]).slice(0, 2).join("");
+}
+
 export const STATUS_LABEL: Record<TarefaStatus, string> = {
   aberta: "Aberta", em_andamento: "Em Andamento",
   aguardando_aprovacao: "Aguard. Aprovação", aprovada: "Aprovada",
@@ -109,16 +105,13 @@ export function BadgeSLA({ sla_status, data_prazo }: { sla_status?: SlaStatus; d
   );
 }
 
-export function AvatarResponsavel({ nome, tipo, size = "sm" }: { nome: string; tipo: "agente" | "humano"; size?: "sm" | "md" }) {
+export function AvatarResponsavel({ nome, size = "sm" }: { nome: string; size?: "sm" | "md" }) {
   const initials = nome.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
-  const isAgent = tipo === "agente";
   const sz = size === "md" ? "w-8 h-8 text-sm" : "w-6 h-6 text-xs";
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={`${sz} rounded-full flex items-center justify-center font-semibold shrink-0 ${
-        isAgent ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
-      }`}>
-        {isAgent ? "AI" : initials}
+      <span className={`${sz} rounded-full flex items-center justify-center font-semibold shrink-0 bg-blue-100 text-blue-700`}>
+        {initials}
       </span>
       <span className="text-sm text-slate-700">{nome}</span>
     </span>

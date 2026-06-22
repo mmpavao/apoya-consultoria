@@ -35,7 +35,6 @@ const ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "supervisor", label: "Supervisor"     },
   { value: "contador",   label: "Contador"       },
   { value: "assistente", label: "Assistente"     },
-  { value: "agente",     label: "Agente"         },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

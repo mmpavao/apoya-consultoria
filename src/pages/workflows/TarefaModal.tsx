@@ -15,10 +15,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { Tarefa, TarefaStatus, TarefaTipo, TarefaPrioridade, useTarefas, Subtarefa, calcularSlaHoras } from "@/hooks/use-tarefas";
+import { useResponsaveis } from "@/hooks/use-responsaveis";
 import {
   BadgeStatus, BadgePrioridade, BadgeSLA, BadgeTipo, AvatarResponsavel,
-  STATUS_LABEL, TODOS_RESPONSAVEIS, TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_EMOJI,
-  formatData, formatDataRelativa,
+  STATUS_LABEL, TIPO_LABEL, PRIORIDADE_LABEL, PRIORIDADE_EMOJI,
+  formatData, formatDataRelativa, responsavelInitials,
 } from "./tarefa-utils";
 
 interface Props {
@@ -41,6 +42,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araújo", currentUserRole = "admin" }: Props) {
   const { atualizarTarefa, adicionarComentario, deletarTarefa } = useTarefas();
+  const { responsaveis } = useResponsaveis();
 
   // ── Estado local ─────────────────────────────────────────────────────────────
   const [activeTab,       setActiveTab]       = useState("detalhes");
@@ -101,14 +103,13 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
     setSalvando(true);
     try {
       const tagsArr = editTags.split(",").map(t => t.trim()).filter(Boolean);
-      const resp    = TODOS_RESPONSAVEIS.find(r => r.nome === editResponsavel);
       await atualizarTarefa(tarefa.id, {
         titulo:           editTitulo.trim(),
         descricao:        editDescricao.trim() || undefined,
         tipo:             editTipo,
         prioridade:       editPrioridade,
         responsavel:      editResponsavel,
-        responsavel_tipo: resp?.tipo ?? tarefa.responsavel_tipo,
+        responsavel_tipo: "humano",
         data_prazo:       editDataPrazo ? new Date(editDataPrazo).toISOString() : undefined,
         tags:             tagsArr,
         sla_horas:        calcularSlaHoras(editTipo, tagsArr),
@@ -312,10 +313,7 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
                   <Select value={editResponsavel} onValueChange={setEditResponsavel}>
                     <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase">Agentes IA</div>
-                      {TODOS_RESPONSAVEIS.filter(r => r.tipo === "agente").map(r => <SelectItem key={r.nome} value={r.nome}>🤖 {r.nome}</SelectItem>)}
-                      <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase mt-1">Humanos</div>
-                      {TODOS_RESPONSAVEIS.filter(r => r.tipo === "humano").map(r => <SelectItem key={r.nome} value={r.nome}>👤 {r.nome}</SelectItem>)}
+                      {responsaveis.map(r => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -340,8 +338,8 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
                     <Select value={editAprovador} onValueChange={setEditAprovador}>
                       <SelectTrigger className="h-9"><SelectValue placeholder="Selecionar aprovador..." /></SelectTrigger>
                       <SelectContent>
-                        {TODOS_RESPONSAVEIS.map(r => <SelectItem key={r.nome} value={r.nome}>{r.tipo === "agente" ? "🤖" : "👤"} {r.nome}</SelectItem>)}
-                      </SelectContent>
+                      {responsaveis.map(r => <SelectItem key={r.nome} value={r.nome}>{r.nome}</SelectItem>)}
+                    </SelectContent>
                     </Select>
                   </div>
                 )}
@@ -351,10 +349,10 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
             {/* Grid de informações (modo visualização) */}
             {!modoEdicao && (
               <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                <Field label="Responsável"><AvatarResponsavel nome={tarefa.responsavel} tipo={tarefa.responsavel_tipo} /></Field>
-                <Field label="Criado por"><AvatarResponsavel nome={tarefa.criado_por} tipo={tarefa.criado_por_tipo} /></Field>
+                <Field label="Responsável"><AvatarResponsavel nome={tarefa.responsavel} /></Field>
+                <Field label="Criado por"><AvatarResponsavel nome={tarefa.criado_por} /></Field>
                 {tarefa.requer_aprovacao && tarefa.aprovador && (
-                  <Field label="Aprovador"><AvatarResponsavel nome={tarefa.aprovador} tipo={tarefa.aprovador_tipo ?? "humano"} /></Field>
+                  <Field label="Aprovador"><AvatarResponsavel nome={tarefa.aprovador} /></Field>
                 )}
                 <Field label="Origem">{tarefa.origem ?? "sistema"}</Field>
                 <Field label="Aberta em">
@@ -469,10 +467,8 @@ export function TarefaModal({ tarefa, open, onClose, currentUser = "Daniel Araú
               )}
               {tarefa.comentarios.map(c => (
                 <div key={c.id} className="flex gap-3">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                    c.autor_tipo === "agente" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
-                  }`}>
-                    {c.autor_tipo === "agente" ? "AI" : c.autor.split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase()}
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 bg-blue-100 text-blue-700">
+                    {responsavelInitials(c.autor)}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-baseline gap-2 mb-1">

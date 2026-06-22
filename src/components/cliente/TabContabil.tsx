@@ -239,9 +239,7 @@ function SubAbaLancamentos({ clienteId }: { clienteId: string }) {
                 <td className="font-mono text-xs">{l.conta_debito}</td>
                 <td className="font-mono text-xs">{l.conta_credito}</td>
                 <td className="text-right font-medium">{FMT_BRL(l.valor)}</td>
-                <td><Badge variant={l.criado_por_tipo==="agente"?"secondary":"outline"} className="text-xs">
-                  {l.criado_por_tipo==="agente"?"Agente":"Manual"}
-                </Badge></td>
+                <td><Badge variant="outline" className="text-xs">Manual</Badge></td>
               </tr>
             ))}
           </tbody>

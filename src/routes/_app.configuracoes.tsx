@@ -217,7 +217,7 @@ function EscritorioSection() {
 // SEÇÃO: USUÁRIOS — corrigido: busca de profiles + convite via API
 // ═══════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════
-// SEÇÃO: USUÁRIOS — humanos + agentes IA com badge visual
+// SEÇÃO: USUÁRIOS — equipe humana (modo manual)
 // ═══════════════════════════════════════════════════════════════════════
 function UsuariosSection() {
   const { usuarios, loading, updateRole, refresh } = useUsuarios();
@@ -240,29 +240,15 @@ function UsuariosSection() {
     if (!inviteEmail.includes("@")) { toast.error("E-mail inválido"); return; }
     setInviting(true);
     try {
-      if (inviteRole === "agente") {
-        // Agentes IA: criar direto no banco sem enviar e-mail
-        const { data: created, error: err } = await (supabase as any)
-          .from("profiles").insert({
-            id: crypto.randomUUID(),
-            email: inviteEmail,
-            nome: inviteNome || inviteEmail,
-          }).select("id").single();
-        if (err) throw err;
-        await (supabase as any).from("user_roles").insert({ user_id: created.id, role: "agente" });
-        toast.success(`Agente "${inviteNome || inviteEmail}" cadastrado!`);
-      } else {
-        // Humanos: convidar via API (envia e-mail)
-        const token = session?.access_token;
-        const res = await fetch("/api/usuarios/convidar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify({ email: inviteEmail, nome: inviteNome, role: inviteRole }),
-        });
-        const data = await res.json() as any;
-        if (!res.ok) throw new Error(data.error ?? "Erro ao convidar");
-        toast.success(data.message ?? `Convite enviado para ${inviteEmail}!`);
-      }
+      const token = session?.access_token;
+      const res = await fetch("/api/usuarios/convidar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ email: inviteEmail, nome: inviteNome, role: inviteRole }),
+      });
+      const data = await res.json() as any;
+      if (!res.ok) throw new Error(data.error ?? "Erro ao convidar");
+      toast.success(data.message ?? `Convite enviado para ${inviteEmail}!`);
       setInviteOpen(false);
       setInviteEmail(""); setInviteNome(""); setInviteRole("assistente");
       await refresh();
@@ -273,18 +259,12 @@ function UsuariosSection() {
     }
   }
 
-  // Separar humanos de agentes para exibição
-  const humanos = usuarios.filter(u => !u.isAgent);
-  const agentes = usuarios.filter(u => u.isAgent);
-
   function UserRow({ u }: { u: typeof usuarios[0] }) {
     return (
       <div key={u.id} className="flex items-center justify-between px-5 py-3.5 gap-4">
         <div className="min-w-0 flex items-center gap-3">
-          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-            u.isAgent ? "bg-violet-100 text-violet-700" : "bg-primary/10 text-primary"
-          }`}>
-            {u.isAgent ? "🤖" : (u.nome || u.email).charAt(0).toUpperCase()}
+          <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-primary/10 text-primary">
+            {(u.nome || u.email).charAt(0).toUpperCase()}
           </div>
           <div>
             <p className="text-sm font-medium truncate">{u.nome || u.email}</p>
@@ -307,9 +287,7 @@ function UsuariosSection() {
             </>
           ) : (
             <>
-              <Badge
-                variant="outline"
-                className={`rounded-full text-xs ${u.isAgent ? "border-violet-300 text-violet-700 bg-violet-50" : ""}`}>
+              <Badge variant="outline" className="rounded-full text-xs">
                 {ROLE_LABELS[u.role] ?? u.role}
               </Badge>
               <Button size="sm" variant="ghost" onClick={() => { setEditId(u.id); setNewRole(u.role); }}>
@@ -330,26 +308,13 @@ function UsuariosSection() {
         </div>
       )}
 
-      {/* Humanos */}
-      {!loading && humanos.length > 0 && (
+      {!loading && usuarios.length > 0 && (
         <div className="surface-card overflow-hidden">
           <div className="px-5 py-2.5 bg-muted/40 border-b border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Equipe Humana ({humanos.length})</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Equipe ({usuarios.length})</p>
           </div>
           <div className="divide-y divide-border">
-            {humanos.map(u => <UserRow key={u.id} u={u} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Agentes IA */}
-      {!loading && agentes.length > 0 && (
-        <div className="surface-card overflow-hidden">
-          <div className="px-5 py-2.5 bg-violet-50/60 border-b border-violet-100">
-            <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide">🤖 Agentes IA ({agentes.length})</p>
-          </div>
-          <div className="divide-y divide-border">
-            {agentes.map(u => <UserRow key={u.id} u={u} />)}
+            {usuarios.map(u => <UserRow key={u.id} u={u} />)}
           </div>
         </div>
       )}
@@ -360,12 +325,10 @@ function UsuariosSection() {
         </div>
       )}
 
-      {/* Botão convidar */}
       <Button size="sm" variant="outline" className="gap-2 rounded-xl" onClick={() => setInviteOpen(true)}>
         <UserPlus className="h-4 w-4" />Adicionar usuário
       </Button>
 
-      {/* Modal novo usuário/agente */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -384,21 +347,16 @@ function UsuariosSection() {
                   ))}
                 </SelectContent>
               </Select>
-              {inviteRole === "agente" && (
-                <p className="text-xs text-violet-600 bg-violet-50 rounded-lg px-3 py-2 mt-1">
-                  🤖 Agentes IA são cadastrados diretamente — nenhum e-mail de convite é enviado.
-                </p>
-              )}
             </div>
             <div className="grid gap-1.5">
               <Label>Nome</Label>
-              <Input placeholder="Nome do usuário ou agente" value={inviteNome} onChange={e => setInviteNome(e.target.value)} />
+              <Input placeholder="Nome do usuário" value={inviteNome} onChange={e => setInviteNome(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label>E-mail {inviteRole !== "agente" && <span className="text-red-500">*</span>}</Label>
+              <Label>E-mail <span className="text-red-500">*</span></Label>
               <Input
                 type="email"
-                placeholder={inviteRole === "agente" ? "agente@sistema.io (opcional)" : "nome@exemplo.com"}
+                placeholder="nome@exemplo.com"
                 value={inviteEmail}
                 onChange={e => setInviteEmail(e.target.value)}
               />
@@ -409,8 +367,8 @@ function UsuariosSection() {
             <Button onClick={handleConvidar} disabled={inviting} className="gap-2">
               {inviting
                 ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                : inviteRole === "agente" ? "🤖" : <Mail className="h-4 w-4" />}
-              {inviteRole === "agente" ? "Cadastrar agente" : "Enviar convite"}
+                : <Mail className="h-4 w-4" />}
+              Enviar convite
             </Button>
           </DialogFooter>
         </DialogContent>

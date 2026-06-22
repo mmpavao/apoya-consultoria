@@ -132,7 +132,7 @@ function DemitirDialog({ open, onClose, funcId, funcNome, onOk }:
             </Select>
           </div>
           <div><Label>Data de Demissão</Label><Input type="date" value={data} onChange={e=>setData(e.target.value)}/></div>
-          <p className="text-xs text-muted-foreground">Os valores serão calculados pelo agente Hugo. Um registro de rescisão é criado automaticamente.</p>
+          <p className="text-xs text-muted-foreground">Um registro de rescisão será criado. Calcule e lance os valores manualmente na folha.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -309,7 +309,7 @@ function SubAbaFerias({ clienteId }: { clienteId: string }) {
       <Dialog open={showDialog} onOpenChange={setShow}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Agendar Férias</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground py-4">Selecione o funcionário e o período. O agente Hugo calculará os valores automaticamente.</p>
+          <p className="text-sm text-muted-foreground py-4">Selecione o funcionário e o período. Os valores devem ser calculados e registrados manualmente.</p>
           <DialogFooter><Button variant="outline" onClick={()=>setShow(false)}>Fechar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
