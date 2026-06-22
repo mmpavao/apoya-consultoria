@@ -1,10 +1,9 @@
 /**
  * ModuleDocumentosTab.tsx
  *
- * Componente reutilizável de Documentos para todos os módulos.
- * Usa as tabelas documento_pasta + documento_arquivo com filtro por modulo.
- * Upload para Supabase Storage bucket canônico "documentos-clientes"
- * (mesmo bucket do TabDocumentos do cliente — evita silo entre telas).
+ * Visão de documentos por módulo — usa o mesmo store canônico do cliente
+ * (documento_pasta + documento_arquivo, bucket "documentos-clientes").
+ * O prop `modulo` é só contexto de UI; não silencia docs entre telas.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +34,7 @@ interface Pasta {
   cor: string | null;
   icone: string | null;
   cliente_id: string | null;
-  modulo: string;
+  modulo?: string | null;
   created_at: string;
 }
 
@@ -50,7 +49,7 @@ interface Arquivo {
   storage_path: string;
   storage_url: string | null;
   tags: string[] | null;
-  modulo: string;
+  modulo?: string | null;
   created_at: string;
 }
 
@@ -99,25 +98,26 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
 
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /* ── Load ─────────────────────────────────────────── */
+  /* ── Load (cliente = fonte canônica; sem filtro por modulo) ── */
   const loadTudo = useCallback(async () => {
     setLoading(true);
     try {
-      // Cliente é a fonte canônica: além dos docs do módulo, inclui o drive do
-      // cliente (modulo IS NULL) pra não haver silo entre as telas.
-      const [{ data: ps }, { data: arqs }] = await Promise.all([
-        (supabase as any)
-          .from("documento_pasta")
-          .select("*")
-          .or(`modulo.eq.${modulo},modulo.is.null`)
-          .order("nome"),
-        (supabase as any)
-          .from("documento_arquivo")
-          .select("*")
-          .or(`modulo.eq.${modulo},modulo.is.null`)
-          .order("created_at", { ascending: false })
-          .limit(500),
-      ]);
+      let qPastas = (supabase as any)
+        .from("documento_pasta")
+        .select("*")
+        .order("nome");
+      let qArqs = (supabase as any)
+        .from("documento_arquivo")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (clienteSel !== "todos") {
+        qPastas = qPastas.eq("cliente_id", clienteSel);
+        qArqs = qArqs.eq("cliente_id", clienteSel);
+      }
+
+      const [{ data: ps }, { data: arqs }] = await Promise.all([qPastas, qArqs]);
       setPastas(ps ?? []);
       setArquivos(arqs ?? []);
     } catch (e: any) {
@@ -125,9 +125,10 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
     } finally {
       setLoading(false);
     }
-  }, [modulo]);
+  }, [clienteSel]);
 
   useEffect(() => { loadTudo(); }, [loadTudo]);
+  useEffect(() => { setPastaSel(null); }, [clienteSel]);
 
   /* ── Filtros ──────────────────────────────────────── */
   const arquivosFiltrados = useMemo(() => {
@@ -166,10 +167,11 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
 
     try {
       for (const file of Array.from(files)) {
-        const path = `${clienteSel}/${modulo}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+        const ext = file.name.split(".").pop() ?? "bin";
+        const path = `${clienteSel}/${pastaSel}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { error: upErr } = await (supabase as any).storage
           .from(CLIENTE_BUCKET)
-          .upload(path, file, { upsert: false });
+          .upload(path, file, { upsert: false, contentType: file.type });
         if (upErr) throw upErr;
 
         const { data: urlData } = (supabase as any).storage
@@ -185,7 +187,6 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
           bucket: CLIENTE_BUCKET,
           pasta_id: pastaSel,
           cliente_id: clienteSel,
-          modulo,
         });
       }
       toast.success(`${files.length} arquivo(s) enviado(s)!`, { id: toastId });
@@ -211,7 +212,6 @@ export function ModuleDocumentosTab({ modulo, titulo }: { modulo: Modulo; titulo
       const { error } = await (supabase as any).from("documento_pasta").insert({
         nome: novaPastaName.trim(),
         cor: novaPastaCor,
-        modulo,
         cliente_id: clienteSel,
       });
       if (error) throw error;

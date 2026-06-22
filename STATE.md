@@ -1,6 +1,6 @@
 # STATE — APOYA Gestão
 
-> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio) · **v3.46.0** em prod
+> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio) · **v3.47.0** em prod
 
 ## Status do repositório
 
@@ -8,9 +8,9 @@
 |------|--------|
 | Branch ativa | `main` |
 | PRs abertas | **1** (PR #3 legado SERPRO — fechar manualmente no GitHub) |
-| Versão prod | **v3.46.0** |
+| Versão prod | **v3.47.0** |
 | Modo | 100% manual — CRUD Supabase |
-| Próximo foco | Backlog Tema 8 (docs cliente ↔ módulos), Tema 2/6 (fachadas/KPIs), Tema 3 (folha/rescisão) — ver `BACKLOG.md` |
+| Próximo foco | Backlog Tema 7 (UI morta), Tema 2/6 (fachadas/KPIs), Tema 3 (folha/rescisão) — ver `BACKLOG.md` |
 
 ## Decisão vigente
 
@@ -50,7 +50,7 @@ npx tsc --noEmit && npm test && npm run build
 
 - Migrations: agente ARQUITETO (Base44), **não** CI
 - Edge functions: só em tag prod + `deno check`
-- Versão atual: **v3.46.0** (prod)
+- Versão atual: **v3.47.0** (prod)
 
 ## Gates locais
 
@@ -58,6 +58,7 @@ npx tsc --noEmit && npm test && npm run build
 
 ## Changelog recente
 
+- **v3.47.0**: documentos módulo ↔ cliente unificados (`ModuleDocumentosTab` por `cliente_id`)
 - **v3.46.0**: auth fail-closed centralizado (`api-auth.ts`) em todas as rotas `/api/*` restantes
 - **v3.45.0**: plano_contas insert com `natureza`; hooks contábeis expõem erro
 - **v3.44.0**: remoção resíduos agentes IA na UI; backlog P1 manual (contábil, erros UI, config honesta, folha DP)
