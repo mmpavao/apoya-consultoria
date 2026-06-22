@@ -125,7 +125,11 @@ function EmpresasTab() {
                   <div className="text-xs text-muted-foreground font-mono">{c.cnpj}</div>
                 </td>
                 <td className="px-4 py-3 hidden sm:table-cell">
-                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", REGIME_CLS[c.regime ?? "Simples"] ?? REGIME_CLS["Simples"])}>{c.regime ?? "Simples"}</span>
+                  {c.regime ? (
+                    <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", REGIME_CLS[c.regime] ?? REGIME_CLS["Simples"])}>{c.regime}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Não informado</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center hidden md:table-cell">
                   <span className="font-semibold">{por_empresa[c.id] ?? 0}</span>
@@ -413,10 +417,12 @@ function EsocialTab() {
   const [filtro, setFiltro] = useState<"todos"|"pendente"|"transmitido"|"erro">("todos");
   const { registros, loading, marcar } = useEsocial(empresaId, competencia);
 
-  const eventos = ESOCIAL_CATALOGO.map(c => {
-    const r = registros[c.codigo];
-    return { ...c, status: (r?.status ?? "pendente") as "pendente"|"transmitido"|"erro", transmitido_em: r?.transmitido_em, observacoes: r?.observacoes };
-  });
+  const eventos = empresaId
+    ? ESOCIAL_CATALOGO.map(c => {
+        const r = registros[c.codigo];
+        return { ...c, status: (r?.status ?? "pendente") as "pendente"|"transmitido"|"erro", transmitido_em: r?.transmitido_em, observacoes: r?.observacoes };
+      })
+    : [];
   const filtrados   = eventos.filter(e => filtro === "todos" || e.status === filtro);
   const transmitidos = eventos.filter(e => e.status === "transmitido").length;
   const pendentes   = eventos.filter(e => e.status === "pendente").length;
@@ -443,11 +449,13 @@ function EsocialTab() {
         {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
+      {empresaId && (
       <div className="grid grid-cols-3 gap-3">
         <DKpiCard icon={CheckCircle2}  label="Transmitidos" value={transmitidos} variant="default" />
         <DKpiCard icon={Clock}         label="Pendentes"    value={pendentes}    variant={pendentes > 0 ? "warning" : "default"} />
         <DKpiCard icon={AlertTriangle} label="Com erro"     value={erros}        variant={erros > 0 ? "danger" : "default"} />
       </div>
+      )}
 
       <div className="flex gap-1">
         {(["todos","transmitido","pendente","erro"] as const).map(f => (
@@ -507,7 +515,7 @@ const DP_PREFS = [
 ];
 
 function ConfigDP() {
-  const { config, loading, saving, save } = useDepartamentoConfig("dp");
+  const { config, loading, saving, save, error: cfgError } = useDepartamentoConfig("dp");
   const [vals, setVals] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setVals(Object.fromEntries(DP_PREFS.map(p => [p.key, (config[p.key] as boolean) ?? p.def])));
@@ -516,6 +524,11 @@ function ConfigDP() {
 
   return (
     <div className="space-y-4">
+      {cfgError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Não foi possível carregar preferências salvas — exibindo padrões. ({cfgError})
+        </div>
+      )}
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Preferências do DP</h3>

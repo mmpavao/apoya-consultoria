@@ -45,7 +45,7 @@ const SOC_PREFS = [
 ];
 
 function ConfigSocietario() {
-  const { config, loading, saving, save } = useDepartamentoConfig("societario");
+  const { config, loading, saving, save, error: cfgError } = useDepartamentoConfig("societario");
   const [vals, setVals] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setVals(Object.fromEntries(SOC_PREFS.map(p => [p.key, (config[p.key] as boolean) ?? p.def])));
@@ -54,6 +54,11 @@ function ConfigSocietario() {
 
   return (
     <div className="space-y-4">
+      {cfgError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Não foi possível carregar preferências salvas — exibindo padrões. ({cfgError})
+        </div>
+      )}
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Preferências Societárias</h3>
@@ -82,7 +87,7 @@ function ConfigSocietario() {
 }
 
 function SocietarioPage__Inner() {
-  const {processos,loading,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso} = useSocietario();
+  const {processos,loading,error:socError,criarProcesso,moverFase,adicionarComentario,atualizarProcesso,removerProcesso,load:reloadSoc} = useSocietario();
   const [view,setView]         = useState<ViewMode>("kanban");
   const [query,setQuery]       = useState("");
   const [filtroTipo,setFiltroTipo] = useState<"todos"|TipoProcesso>("todos");
@@ -135,8 +140,21 @@ function SocietarioPage__Inner() {
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-0">
+          {socError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700 mb-4">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Erro ao carregar processos: {socError}
+              <button type="button" onClick={() => reloadSoc()} className="ml-auto underline font-medium">Tentar de novo</button>
+            </div>
+          )}
           <ModuleDashboard
-            kpis={[
+            kpisLoading={loading}
+            kpis={socError ? [
+              { label: "Total Processos", value: "—", icon: FileText, variant: "default" },
+              { label: "Em Andamento", value: "—", icon: CheckCircle2, variant: "info" },
+              { label: "Concluídos", value: "—", icon: CheckCircle2, variant: "success" },
+              { label: "Atrasados", value: "—", icon: AlertTriangle, variant: "danger" },
+            ] : [
               { label: "Total Processos",   value: processos.length,                                                           icon: FileText,      variant: "default" },
               { label: "Em Andamento",      value: processos.filter(p => p.fase !== "concluido").length, icon: CheckCircle2, variant: "info" },
               { label: "Concluídos",        value: processos.filter(p => p.fase === "concluido").length,                       icon: CheckCircle2,  variant: "success" },

@@ -123,6 +123,15 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - Tema 2: copy honesta — cobrança sem gateway fantasma, integração bancária manual, notificações fiscal informacional
 - Tema 2: KPI eSocial DP calculado de `esocial_evento` (pendentes do mês)
 
+## Corrigido em v3.49.0 (PR — Tema 2/6 honestidade UI)
+
+- Tema 6: KPIs fiscais (`use-fiscal-kpis`) checam erro Supabase; dashboard fiscal exibe banner
+- Tema 6: financeiro/contábil/societário — `kpisLoading` + KPIs "—" quando fetch falha
+- Tema 6: `use-societario` expõe `error`; `use-departamento-config` expõe `error` nas configs
+- Tema 2: eSocial tab não conta 12 pendentes fake sem empresa selecionada
+- Tema 2: plano de contas — disclaimer template CFC quando empresa sem plano custom
+- Tema 2: régua cobrança — copy manual + erro ao carregar config; regime DP sem fabricar "Simples"
+
 ## Tema 1 — pendente (schema/migrations, não só código)
 
 - [P0] `cobrancas.created_by` — coluna não existe (insert já corrigido em `api/cobranca/criar`)
@@ -139,6 +148,6 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 2. ~~**Tema 4** (segurança)~~ — concluído v3.46.0.
 3. ~~**Tema 8** (docs cliente ↔ módulos)~~ — concluído v3.47.0.
 4. ~~**Tema 7** (abas/botões mortos)~~ — concluído v3.44 + v3.48.
-5. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI (parcialmente feito).
+5. ~~**Tema 2 + 6** (fachada + erro≠zero)~~ — parcialmente concluído v3.48–v3.49 (restam automações P0 em módulos legados).
 6. **Tema 3** (cálculo de folha/rescisão) — feature grande, precisa spec do Marcio.
 7. **Tema 9** (contratos, tipos, duplicação) — conforme prioridade.

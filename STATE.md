@@ -1,6 +1,6 @@
 # STATE — APOYA Gestão
 
-> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio) · **v3.48.0** em prod
+> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio) · **v3.49.0** em prod
 
 ## Status do repositório
 
@@ -8,9 +8,9 @@
 |------|--------|
 | Branch ativa | `main` |
 | PRs abertas | **1** (PR #3 legado SERPRO — fechar manualmente no GitHub) |
-| Versão prod | **v3.48.0** |
+| Versão prod | **v3.49.0** |
 | Modo | 100% manual — CRUD Supabase |
-| Próximo foco | Backlog Tema 2/6 (fachadas/KPIs restantes), Tema 3 (folha/rescisão) — ver `BACKLOG.md` |
+| Próximo foco | Backlog Tema 3 (folha/rescisão) e Tema 9 (contratos/tipos) — ver `BACKLOG.md` |
 
 ## Decisão vigente
 
@@ -50,7 +50,7 @@ npx tsc --noEmit && npm test && npm run build
 
 - Migrations: agente ARQUITETO (Base44), **não** CI
 - Edge functions: só em tag prod + `deno check`
-- Versão atual: **v3.48.0** (prod)
+- Versão atual: **v3.49.0** (prod)
 
 ## Gates locais
 
@@ -58,6 +58,7 @@ npx tsc --noEmit && npm test && npm run build
 
 ## Changelog recente
 
+- **v3.49.0**: KPIs/erros explícitos (fiscal, financeiro, contábil, societário); configs e eSocial honestos
 - **v3.48.0**: Registrar DAS na apuração; erros explícitos obrigações/cliente; copy honesta modo manual
 - **v3.47.0**: documentos módulo ↔ cliente unificados (`ModuleDocumentosTab` por `cliente_id`)
 - **v3.46.0**: auth fail-closed centralizado (`api-auth.ts`) em todas as rotas `/api/*` restantes

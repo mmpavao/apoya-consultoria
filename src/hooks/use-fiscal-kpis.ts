@@ -43,10 +43,7 @@ export function useFiscalKpis() {
       // NB: nomes reais do schema — obrigacoes.vencimento (não data_vencimento),
       // tabela das_guias (não das), validade em cliente_certificado.pfx_validade.
       const [
-        { count: vencidas },
-        { count: aVencer },
-        { count: dasPendentes },
-        { count: certExpirando },
+        r1, r2, r3, r4,
       ] = await Promise.all([
         db.from("obrigacoes")
           .select("id", { count: "exact", head: true })
@@ -63,7 +60,6 @@ export function useFiscalKpis() {
           .select("id", { count: "exact", head: true })
           .eq("status", "pendente"),
 
-        // Certificados expirando nos próximos 30 dias (ainda válidos hoje)
         db.from("cliente_certificado")
           .select("id", { count: "exact", head: true })
           .not("pfx_validade", "is", null)
@@ -71,11 +67,14 @@ export function useFiscalKpis() {
           .lte("pfx_validade", iso30d),
       ]);
 
+      const qErr = r1.error || r2.error || r3.error || r4.error;
+      if (qErr) throw qErr;
+
       setKpis({
-        obrigacoes_vencidas:    vencidas    ?? 0,
-        obrigacoes_a_vencer_7d: aVencer     ?? 0,
-        das_pendentes:          dasPendentes ?? 0,
-        certificados_expirando: certExpirando ?? 0,
+        obrigacoes_vencidas:    r1.count ?? 0,
+        obrigacoes_a_vencer_7d: r2.count ?? 0,
+        das_pendentes:          r3.count ?? 0,
+        certificados_expirando: r4.count ?? 0,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar KPIs fiscais");

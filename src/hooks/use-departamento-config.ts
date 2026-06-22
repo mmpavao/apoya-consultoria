@@ -13,9 +13,11 @@ export function useDepartamentoConfig(setor: string) {
   const [config, setConfig] = useState<DepartamentoConfig>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
@@ -26,9 +28,9 @@ export function useDepartamentoConfig(setor: string) {
       if (error) throw error;
       setConfig((data?.config as DepartamentoConfig) ?? {});
     } catch (e) {
-      // silencioso no load (tela usa os defaults); erro real aparece no save
       // eslint-disable-next-line no-console
       console.error("departamento_config load:", (e as Error)?.message);
+      setError((e as Error)?.message ?? "Erro ao carregar configurações");
     } finally {
       setLoading(false);
     }
@@ -59,5 +61,5 @@ export function useDepartamentoConfig(setor: string) {
     }
   }, [setor]);
 
-  return { config, loading, saving, save, reload: load };
+  return { config, loading, saving, save, error, reload: load };
 }
