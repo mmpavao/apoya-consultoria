@@ -59,14 +59,17 @@ function FinanceiroPage__Inner(){
     msg_lembrete: "", msg_vencida: "", msg_suspensao: "",
   });
   const [reguaLoaded, setReguaLoaded] = useState(false);
+  const [reguaLoadError, setReguaLoadError] = useState<string | null>(null);
   useEffect(() => {
     if (!showReguaModal || reguaLoaded) return;
     (async () => {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await (supabase as any).from("regua_cobranca_config")
+      const { data, error } = await (supabase as any).from("regua_cobranca_config")
         .select("dias_lembrete_1,dias_primeiro_contato,dias_segundo_contato,dias_suspensao,percentual_multa,percentual_juros_mes,msg_lembrete,msg_vencida,msg_suspensao")
         .eq("escritorio_id", "apoya").maybeSingle();
-      if (data) {
+      if (error) {
+        setReguaLoadError(error.message);
+      } else if (data) {
         const limpo = Object.fromEntries(Object.entries(data).filter(([, v]) => v != null));
         setReguaCfg(c => ({ ...c, ...limpo }));
       }
@@ -75,7 +78,7 @@ function FinanceiroPage__Inner(){
   }, [showReguaModal, reguaLoaded]);
   const setCfg = (k: string, v: string | number) => setReguaCfg(c => ({ ...c, [k]: v }));
   const [salvandoRegua, setSalvandoRegua] = useState(false);
-  const { config: depConfig, saving: savingCfg, save: saveDepConfig } = useDepartamentoConfig("financeiro");
+  const { config: depConfig, saving: savingCfg, save: saveDepConfig, error: depCfgError } = useDepartamentoConfig("financeiro");
   const [configsFin, setConfigsFin] = useState([
     { key: "nfse_auto",    label: "Registrar NFS-e após pagamento (manual)",     enabled: false },
     { key: "bloquear",     label: "Bloquear cliente inadimplente",             enabled: true  },
@@ -304,7 +307,13 @@ function FinanceiroPage__Inner(){
 
         <TabsContent value="dashboard" className="mt-0">
           <ModuleDashboard
-            kpis={[
+            kpisLoading={cobLoading}
+            kpis={cobError ? [
+              { label: "Total previsto", value: "—", icon: Wallet, variant: "default" },
+              { label: "Recebido", value: "—", icon: CheckCircle2, variant: "success" },
+              { label: "Em atraso", value: "—", icon: AlertTriangle, variant: "danger" },
+              { label: "Risco alto", value: "—", icon: ShieldAlert, variant: "warning" },
+            ] : [
               { label: "Total previsto", value: fmtBRL(kpi.total),   icon: Wallet,        variant: "default", hint: `${kpi.count} clientes` },
               { label: "Recebido",       value: fmtBRL(kpi.pago),    icon: CheckCircle2,  variant: "success", hint: `${Math.round(kpi.pago/(kpi.total||1)*100)}%` },
               { label: "Em atraso",      value: fmtBRL(kpi.vencido), icon: AlertTriangle, variant: "danger",  hint: `${items.filter(c=>c.status==="vencida").length} cobranças` },
@@ -457,6 +466,11 @@ function FinanceiroPage__Inner(){
 
         <TabsContent value="config" className="mt-0">
         <div className="rounded-xl border bg-card p-6 space-y-5">
+          {depCfgError && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Não foi possível carregar preferências salvas — exibindo padrões. ({depCfgError})
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Configurações Financeiras</h3>
             <Button size="sm" className="h-7 text-xs gap-1.5" disabled={savingCfg} onClick={salvarConfigsFin}>
@@ -496,8 +510,8 @@ function FinanceiroPage__Inner(){
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-border overflow-hidden max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
-                <p className="font-semibold text-foreground">Régua de Cobrança Automática</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Configure os disparos automáticos por atraso</p>
+                <p className="font-semibold text-foreground">Régua de Cobrança (configuração manual)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Prazos e mensagens de referência — execução pelo operador</p>
               </div>
               <button onClick={() => setShowReguaModal(false)} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
                 <X className="h-4 w-4"/>
@@ -505,6 +519,11 @@ function FinanceiroPage__Inner(){
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
               {!reguaLoaded && <p className="text-xs text-muted-foreground">Carregando configuração…</p>}
+              {reguaLoadError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  Erro ao carregar régua: {reguaLoadError}. Valores abaixo são padrão local.
+                </div>
+              )}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Prazos (dias)</p>
                 <div className="grid grid-cols-2 gap-3">

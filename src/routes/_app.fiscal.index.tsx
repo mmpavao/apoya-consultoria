@@ -428,7 +428,7 @@ function DocumentosTab() {
 // TAB — DASHBOARD FISCAL
 // ════════════════════════════════════════════════════════════════
 function DashboardTab() {
-  const { kpis, loading: kpiLoading, refetch } = useFiscalKpis();
+  const { kpis, loading: kpiLoading, error: kpiError, refetch } = useFiscalKpis();
   const [obrigacoes, setObrigacoes] = useState<any[]>([]);
   const [loadingOb, setLoadingOb]   = useState(true);
   const [obError, setObError]       = useState<string | null>(null);
@@ -468,11 +468,18 @@ function DashboardTab() {
 
   return (
     <div className="space-y-6">
+      {kpiError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar KPIs fiscais: {kpiError}
+          <button type="button" onClick={() => refetch()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <FKpiCard label="Obrigações Vencidas" value={kpis?.obrigacoes_vencidas ?? 0}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpiLoading} />
-        <FKpiCard label="A vencer (7 dias)"   value={kpis?.obrigacoes_a_vencer_7d ?? 0} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpiLoading} />
-        <FKpiCard label="DAS Pendentes"        value={kpis?.das_pendentes ?? 0}           icon={Receipt}       variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}          loading={kpiLoading} />
-        <FKpiCard label="Certificados < 30d"   value={kpis?.certificados_expirando ?? 0}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpiLoading} />
+        <FKpiCard label="Obrigações Vencidas" value={kpiError ? "—" : (kpis?.obrigacoes_vencidas ?? 0)}    icon={AlertTriangle} variant={(kpis?.obrigacoes_vencidas ?? 0) > 0 ? "danger" : "default"}  loading={kpiLoading} />
+        <FKpiCard label="A vencer (7 dias)"   value={kpiError ? "—" : (kpis?.obrigacoes_a_vencer_7d ?? 0)} icon={Calendar}      variant={(kpis?.obrigacoes_a_vencer_7d ?? 0) > 0 ? "warning" : "default"} loading={kpiLoading} />
+        <FKpiCard label="DAS Pendentes"        value={kpiError ? "—" : (kpis?.das_pendentes ?? 0)}           icon={Receipt}       variant={(kpis?.das_pendentes ?? 0) > 0 ? "warning" : "default"}          loading={kpiLoading} />
+        <FKpiCard label="Certificados < 30d"   value={kpiError ? "—" : (kpis?.certificados_expirando ?? 0)}  icon={ShieldAlert}   variant={(kpis?.certificados_expirando ?? 0) > 0 ? "warning" : "default"}  loading={kpiLoading} />
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">

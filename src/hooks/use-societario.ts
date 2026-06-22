@@ -97,9 +97,11 @@ function fromDbH(r: Record<string,any>): HistoricoEvento {
 export function useSocietario(opts?: {clienteId?:string;fase?:FaseProcesso;tipo?:TipoProcesso}) {
   const [processos,setProcessos] = useState<ProcessoSocietario[]>([]);
   const [loading,setLoading]     = useState(true);
+  const [error,setError]           = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (supabase as any).from("processos_societarios").select("*").order("created_at",{ascending:false});
@@ -109,7 +111,12 @@ export function useSocietario(opts?: {clienteId?:string;fase?:FaseProcesso;tipo?
       const {data,error} = await q;
       if (error) throw error;
       setProcessos((data??[]).map(fromDb));
-    } catch { toast.error("Erro ao carregar processos societários"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar processos societários";
+      setError(msg);
+      setProcessos([]);
+      toast.error(msg);
+    }
     finally  { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[opts?.clienteId,opts?.fase,opts?.tipo]);
@@ -160,7 +167,7 @@ export function useSocietario(opts?: {clienteId?:string;fase?:FaseProcesso;tipo?
   const porFase = (fase:FaseProcesso) => processos.filter(p=>p.fase===fase);
   const hoje = new Date().toISOString().split("T")[0];
   const vencidosNaFase = (fase:FaseProcesso) => processos.filter(p=>p.fase===fase&&p.prazo&&p.prazo<hoje&&p.fase!=="concluido");
-  return {processos,loading,load,criarProcesso,atualizarProcesso,moverFase,adicionarComentario,removerProcesso,porFase,vencidosNaFase};
+  return {processos,loading,error,load,criarProcesso,atualizarProcesso,moverFase,adicionarComentario,removerProcesso,porFase,vencidosNaFase};
 }
 
 export function useProcessoHistorico(processoId:string) {

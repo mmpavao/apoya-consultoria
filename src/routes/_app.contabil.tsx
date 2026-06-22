@@ -408,7 +408,7 @@ function ContaRow({ conta, depth }: { conta: ContaNode; depth: number }) {
 function PlanoContasTab() {
   const { clientes }              = useClientes();
   const [empresaId, setEmpresaId] = useState("");
-  const { contas: planoContas, loading, refetch }  = usePlanoContas(empresaId);
+  const { contas: planoContas, loading, error: planoError, refetch }  = usePlanoContas(empresaId);
   const { salvarConta, loading: salvando } = useSalvarPlanoConta();
   const { deletarConta }          = useDeletarPlanoConta();
   const [query, setQuery]         = useState("");
@@ -457,6 +457,14 @@ function PlanoContasTab() {
       {!podeEditar && (
         <p className="text-xs text-muted-foreground">Mostrando o plano padrão (CFC) — selecione uma empresa para criar/editar contas próprias.</p>
       )}
+      {podeEditar && !loading && !planoError && !hasCustom && (
+        <p className="text-xs text-muted-foreground">Empresa sem plano customizado — exibindo template CFC (referência, read-only).</p>
+      )}
+      {planoError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Erro ao carregar plano: {planoError}
+        </div>
+      )}
       <div className="rounded-lg border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -470,6 +478,8 @@ function PlanoContasTab() {
           <tbody className="divide-y divide-border/30">
             {loading ? (
               <tr><td colSpan={4} className="text-center py-10"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+            ) : planoError && empresaId ? (
+              <tr><td colSpan={4} className="text-center py-10 text-sm text-muted-foreground">Não foi possível carregar o plano desta empresa.</td></tr>
             ) : hasCustom ? (
               planoContas.filter((c: PlanoContas) => !query || c.nome.toLowerCase().includes(query.toLowerCase()) || c.codigo.includes(query)).map((c: PlanoContas) => (
                 <tr key={c.id} className="hover:bg-muted/20">
@@ -542,7 +552,7 @@ const CONTABIL_PREFS = [
 ];
 
 function ConfigContabil() {
-  const { config, loading, saving, save } = useDepartamentoConfig("contabil");
+  const { config, loading, saving, save, error: cfgError } = useDepartamentoConfig("contabil");
   const [vals, setVals] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setVals(Object.fromEntries(CONTABIL_PREFS.map(p => [p.key, (config[p.key] as boolean) ?? p.def])));
@@ -551,6 +561,11 @@ function ConfigContabil() {
 
   return (
     <div className="space-y-4">
+      {cfgError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Não foi possível carregar preferências salvas — exibindo padrões. ({cfgError})
+        </div>
+      )}
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Preferências Contábeis</h3>
@@ -590,7 +605,7 @@ function ConfigContabil() {
 // ═══════════════════════════════════════════════════════════
 function ContabilPageInner() {
   const { roles }                   = useAuth();
-  const { periodos, loading: pLoad, refresh: refreshPeriodos } = usePeriodosContabeis();
+  const { periodos, loading: pLoad, error: pError, refresh: refreshPeriodos } = usePeriodosContabeis();
   const [tab, setTab] = useState("dashboard");
   const [novoLancNonce, setNovoLancNonce] = useState(0);
   const podeAprovar = roles.includes("admin") || roles.includes("contador");
@@ -610,6 +625,13 @@ function ContabilPageInner() {
         <Button size="sm" variant="outline" className="gap-1" onClick={() => refreshPeriodos()}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
       </div>
 
+      {pError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Erro ao carregar períodos: {pError}
+          <button type="button" onClick={() => refreshPeriodos()} className="ml-auto underline font-medium">Tentar de novo</button>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
@@ -623,7 +645,11 @@ function ContabilPageInner() {
         </TabsList>
         <TabsContent value="dashboard" className="mt-0">
           <ModuleDashboard
-            kpis={[
+            kpis={pError ? [
+              { label: "Períodos Abertos",  value: "—", icon: Clock,        variant: "default" },
+              { label: "Períodos Fechados", value: "—", icon: CheckCircle2, variant: "default" },
+              { label: "Total de Períodos", value: "—", icon: BookOpen,     variant: "default" },
+            ] : [
               { label: "Períodos Abertos",  value: abertos,         icon: Clock,        variant: abertos > 0 ? "warning" : "default" },
               { label: "Períodos Fechados", value: fechados,        icon: CheckCircle2, variant: "default" },
               { label: "Total de Períodos", value: periodos.length, icon: BookOpen,     variant: "default" },
