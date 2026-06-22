@@ -66,7 +66,9 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - [P2] motor/ApuracaoMensalCard.tsx:303 — "Gerar DAS" só dá toast "em implementação".
 
 ## TEMA 8 — Documentos cliente ↔ módulos não sincronizam
-- [P2] cliente/TabDocumentos.tsx vs layout/ModuleDocumentosTab.tsx — buckets e filtro `modulo` diferentes → documentos do cliente nunca aparecem nas abas dos módulos e vice-versa. (= a decisão de "store canônico" pendente.)
+> **Corrigido v3.47.0:** `ModuleDocumentosTab` usa o mesmo contrato do cliente (`cliente_id`, bucket `documentos-clientes`, path `{cliente}/{pastaId}/…`). Prop `modulo` é só contexto de UI.
+
+- ~~[P2] cliente/TabDocumentos.tsx vs layout/ModuleDocumentosTab.tsx — buckets e filtro `modulo` diferentes~~ — unificado.
 
 ## TEMA 9 — Outros (tipos errados, duplicação divergente, contratos)
 - [P1] _app.contabil.tsx:181 vs cliente/TabContabil.tsx:146 — `tipo` debito/credito vs "manual" → KPIs de totais ignoram lançamentos do card do cliente.
@@ -106,6 +108,11 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - Tema 4: `/api/usuarios/convidar` — admin only (proxy para edge send-invite)
 - Tema 4: itens obsoletos (regua cron, pipeline MCP, webhooks) documentados como removidos no pivô
 
+## Corrigido em v3.47.0 (PR — Tema 8 documentos)
+
+- Tema 8: `ModuleDocumentosTab` lê/grava por `cliente_id` (sem silo por `modulo`)
+- Tema 8: upload com path `{cliente}/{pastaId}/…` alinhado ao `use-documentos-cliente`
+
 ## Tema 1 — pendente (schema/migrations, não só código)
 
 - [P0] `cobrancas.created_by` — coluna não existe (insert já corrigido em `api/cobranca/criar`)
@@ -120,7 +127,7 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 ## Ordem recomendada (Phase 2 — cada correção com TESTE de regressão)
 1. **Tema 1** (schema-mismatch) — destrava salvar/conciliar/cobrar. Maior valor, risco controlado.
 2. ~~**Tema 4** (segurança)~~ — concluído v3.46.0.
-3. **Tema 8** (docs cliente ↔ módulos) — sincronizar buckets/filtros.
+3. ~~**Tema 8** (docs cliente ↔ módulos)~~ — concluído v3.47.0.
 4. **Tema 7** (abas/botões mortos) — rápido, visível.
 5. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI.
 6. **Tema 3** (cálculo de folha/rescisão) — feature grande, precisa spec do Marcio.
