@@ -13,8 +13,8 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Building2, CheckCircle2, ChevronDown, ChevronUp,
   Copy, Eye, EyeOff, KeyRound, Mail, MessageSquare,
-  Network, Package, Plug, Plus, RefreshCw, Save,
-  Shield, Trash2, UserPlus, Users, XCircle, Zap,
+  Package, Plus, RefreshCw, Save,
+  Shield, Trash2, UserPlus, Users, XCircle,
   Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
