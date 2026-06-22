@@ -1,0 +1,21 @@
+---
+description: APOYA — sistema 100% manual (sem integrações/agentes/MCP). Regras do projeto.
+alwaysApply: true
+---
+
+# APOYA — sistema MANUAL (pivô 21/06)
+
+Leia o `AGENTS.md` na raiz para o contexto completo. Resumo das regras:
+
+- O sistema é **100% manual** por decisão do dono. Foram REMOVIDOS: todos os agentes
+  (`agente-*`) + cron, e as integrações SERPRO, NFS-e/Focus, Asaas, Pluggy, WhatsApp,
+  Clicksign e o MCP (worker `apoya-mcp` + rotas `/api/pipeline`). Única edge function
+  viva: `send-invite`.
+- **NÃO reintroduza** integração externa, agente, automação, MCP, cron ou webhook sem
+  pedido explícito do Marcio. As APIs voltam depois, uma de cada vez.
+- **PODE**: corrigir bugs de fluxo manual (CRUD/validação/UI), testes, limpeza de dead code.
+- Dados são CRUD direto no Supabase via hooks `use-*`. Banco é ÚNICO; migrations são
+  aplicadas out-of-band pelo ARQUITETO, não pelo CI.
+- Deploy: `tsc + npm test + npm run build` → push `main` (staging) → tag `vX.Y.Z` (prod).
+  Edge functions deployam só em tag e validam com `deno check`. Repo está em **v3.x**.
+- Nunca rode git destrutivo no working repo.
