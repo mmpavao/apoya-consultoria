@@ -157,6 +157,9 @@ function NovaTarefaDialog({
     if (!titulo.trim()) { toast.error("Campo obrigatório"); return; }
     setSalvando(true);
     try {
+      // criado_por e responsavel são NOT NULL na tabela tarefas — nunca enviar null.
+      const { data: { user } } = await supabase.auth.getUser();
+      const me = user?.email ?? "sistema";
       const { error } = await (supabase as any).from("tarefas").insert({
         titulo: titulo.trim(),
         setor,
@@ -165,10 +168,12 @@ function NovaTarefaDialog({
         data_prazo: prazo || null,
         cliente_id: clienteId || null,
         cliente_nome: clienteNome || null,
-        tipo: campos["tipo"] || null,
-        responsavel: campos["responsavel"] || null,
+        tipo: campos["tipo"] || "interno",
+        responsavel: campos["responsavel"] || me,
         descricao: campos["descricao"] || null,
         responsavel_tipo: "humano",
+        criado_por: me,
+        criado_por_tipo: "humano",
         origem: "manual",
         status: "aberta",
       });
