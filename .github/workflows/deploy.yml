@@ -1,30 +1,9 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-# DEPLOY — Cloudflare Workers + Supabase Edge Functions
+# DEPLOY — Cloudflare Worker apoya-gestao + send-invite (modo manual)
 #
-# PROTOCOLO STAGING-FIRST (implementado após incidente 2026-06-11):
+#   push main     → staging (apoya-gestao-staging)
+#   tag v*.*.*    → produção (apoya-gestao + send-invite)
 #
-#   push na main              →  SOMENTE staging
-#                                (apoya-gestao-staging + apoya-mcp-staging)
-#
-#   tag semântica v*.*.*      →  PRODUÇÃO
-#   (ex: git tag v1.2.3)         (apoya-gestao + apoya-mcp)
-#
-#   workflow_dispatch manual  →  escolha: staging OU produção
-#
-# NUNCA deploy automático de produção em push na main.
-#
-# SECRETS OBRIGATÓRIOS (GitHub → Settings → Secrets → Actions):
-#   CLOUDFLARE_API_TOKEN          Workers:Edit scope
-#   CLOUDFLARE_ACCOUNT_ID
-#   VITE_SUPABASE_PUBLISHABLE_KEY anon key — injetada no BUILD Vite (causa do incidente)
-#   VITE_SUPABASE_URL
-#   SUPABASE_URL
-#   SUPABASE_SERVICE_ROLE_KEY
-#   SUPABASE_ACCESS_TOKEN         para Supabase CLI (Edge Functions)
-#   ASAAS_API_KEY / FOCUSNFE_API_TOKEN / EVOLUTION_API_KEY / EVOLUTION_API_URL
-#   PLUGGY_CLIENT_ID / PLUGGY_CLIENT_SECRET / PLUGGY_WEBHOOK_SECRET
-#   APOYA_INTERNAL_SECRET
-# ═══════════════════════════════════════════════════════════════════════════════
+# SECRETS: CLOUDFLARE_*, VITE_SUPABASE_*, SUPABASE_*, SUPABASE_ACCESS_TOKEN
 
 name: Deploy — Cloudflare Workers + Supabase Edge Functions
 
@@ -51,7 +30,6 @@ jobs:
     outputs:
       target:        ${{ steps.set.outputs.target }}
       worker_gestao: ${{ steps.set.outputs.worker_gestao }}
-      worker_mcp:    ${{ steps.set.outputs.worker_mcp }}
     steps:
       - name: Determinar ambiente
         id: set
@@ -66,20 +44,14 @@ jobs:
 
           if [ "$TARGET" = "production" ]; then
             WORKER_GESTAO="apoya-gestao"
-            WORKER_MCP="apoya-mcp"
           else
             WORKER_GESTAO="apoya-gestao-staging"
-            WORKER_MCP="apoya-mcp-staging"
           fi
 
           echo "target=$TARGET"                 >> "$GITHUB_OUTPUT"
           echo "worker_gestao=$WORKER_GESTAO"   >> "$GITHUB_OUTPUT"
-          echo "worker_mcp=$WORKER_MCP"         >> "$GITHUB_OUTPUT"
 
-          echo "🎯 Ambiente: $TARGET"
-          echo "   apoya-gestao → $WORKER_GESTAO"
-          echo "   apoya-mcp    → $WORKER_MCP"
-          echo "   Trigger: ${{ github.event_name }} / ref: ${{ github.ref }}"
+          echo "🎯 Ambiente: $TARGET → $WORKER_GESTAO"
 
   # ── apoya-gestao ───────────────────────────────────────────────────────────
   deploy-gestao:
@@ -163,16 +135,6 @@ jobs:
           _s VITE_SUPABASE_URL             "${{ secrets.VITE_SUPABASE_URL }}"
           _s VITE_SUPABASE_PUBLISHABLE_KEY "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
           _s SUPABASE_PUBLISHABLE_KEY      "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
-          _s ASAAS_API_KEY                 "${{ secrets.ASAAS_API_KEY }}"
-          _s FOCUSNFE_API_TOKEN            "${{ secrets.FOCUSNFE_API_TOKEN }}"
-          _s EVOLUTION_API_KEY             "${{ secrets.EVOLUTION_API_KEY }}"
-          _s EVOLUTION_API_URL             "${{ secrets.EVOLUTION_API_URL }}"
-          _s PLUGGY_CLIENT_ID              "${{ secrets.PLUGGY_CLIENT_ID }}"
-          _s PLUGGY_CLIENT_SECRET          "${{ secrets.PLUGGY_CLIENT_SECRET }}"
-          _s PLUGGY_WEBHOOK_SECRET         "${{ secrets.PLUGGY_WEBHOOK_SECRET }}"
-          _s APOYA_INTERNAL_SECRET         "${{ secrets.APOYA_INTERNAL_SECRET }}"
-          _s APOYA_SERVICE_TOKEN           "${{ secrets.APOYA_SERVICE_TOKEN }}"
-          _s WORKER_BASE_URL               "https://apoyaproject.zapro.tech"
         env:
           CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -1,18 +1,19 @@
 import { useDas, type DasGuia, type DasStatus } from "@/hooks/use-das";
+import { useClientes } from "@/hooks/use-clientes";
+import { criarGuiasDoMes, marcarDasComoGerada, marcarDasLoteComoGeradas } from "@/lib/das-manual";
 import { fmtBRL, fmtDate } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, Download, FileText, Loader2,
-  MessageCircle, RefreshCw, Send, Wallet, AlertTriangle,
-  Receipt, Activity, Plus} from "lucide-react";
+  RefreshCw, Wallet, AlertTriangle, Plus, Check,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, InlineBadge, TableSearch, TableFooter, type ColDef } from "@/components/DataTable";
-import { PageHeader, PageTabs, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
+import { PageHeader, KpiGrid, KpiCard, Pagination } from "@/components/PagePlaceholder";
 import { DasGerarDialog } from "@/components/DasGerarDialog";
-// import { dasStore, type DasGuia, type DasStatus } from "@/lib/das-store";
 
 export const Route = createFileRoute("/_app/fiscal/das")({
   component: DasPage,
@@ -34,6 +35,7 @@ function DasPage() {
   const [ano, setAno]       = useState(now.getFullYear());
   const [mes, setMes]       = useState(now.getMonth() + 1);
   const { guias: items, loading: dasLoading, refresh } = useDas();
+  const { clientes } = useClientes();
   const [query, setQuery]   = useState("");
   const [regime, setRegime] = useState<"todos"|"MEI"|"Simples">("todos");
   const [dialogDas, setDialogDas] = useState(false);
@@ -48,17 +50,19 @@ function DasPage() {
     window.addEventListener("apoya:das:changed", fn);
     window.addEventListener("apoya:clientes:changed", fn);
     return () => { window.removeEventListener("apoya:das:changed", fn); window.removeEventListener("apoya:clientes:changed", fn); };
-  }, [comp]);
+  }, [comp, refresh]);
   useEffect(() => setSel(new Set()), [comp]);
+
+  const doMes = useMemo(() => items.filter(g => g.competencia === comp), [items, comp]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items
+    return doMes
       .filter(g => q ? `${g.clienteNome} ${g.cnpj}`.toLowerCase().includes(q) : true)
       .filter(g => regime === "todos" || g.regime === regime)
       .filter(g => status === "todos" || g.status === status)
       .sort((a,b) => a.clienteNome.localeCompare(b.clienteNome));
-  }, [items, query, regime, status]);
+  }, [doMes, query, regime, status]);
 
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
@@ -67,102 +71,45 @@ function DasPage() {
   const pageRows = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
   const kpi = useMemo(() => ({
-    total:    items.length,
-    pendente: items.filter(g => g.status==="pendente").length,
-    gerada:   items.filter(g => g.status==="gerada").length,
-    paga:     items.filter(g => g.status==="paga").length,
-    valor:    items.reduce((s,g) => s+g.valor, 0),
-  }), [items]);
+    total:    doMes.length,
+    pendente: doMes.filter(g => g.status==="pendente").length,
+    gerada:   doMes.filter(g => g.status==="gerada").length,
+    paga:     doMes.filter(g => g.status==="paga").length,
+    valor:    doMes.reduce((s,g) => s+g.valor, 0),
+  }), [doMes]);
 
   const toggleAll = () => setSel(sel.size===filtered.length ? new Set() : new Set(filtered.map(g=>g.id)));
   const toggleOne = (id:string) => { const s=new Set(sel); s.has(id)?s.delete(id):s.add(id); setSel(s); };
 
-  async function gerarLote() {
-    const ids = filtered.filter(g=>sel.has(g.id)&&(g.status==="pendente"||g.status==="erro")).map(g=>g.clienteId);
-    if(!ids.length){ toast.error("Selecione ao menos 1 DAS pendente"); return; }
+  async function marcarLoteGeradas() {
+    const ids = filtered
+      .filter(g => sel.has(g.id) && (g.status === "pendente" || g.status === "erro"))
+      .map(g => g.id);
+    if (!ids.length) { toast.error("Selecione guias pendentes ou com erro"); return; }
     setBusy(true);
-    toast.loading(`Gerando ${ids.length} DAS via SERPRO…`, {id:"das-lote"});
     try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", {id:"das-lote"}); return; }
-      let geradas = 0; let erros = 0;
-      for (const clienteId of ids) {
-        const res = await fetch("/api/das/gerar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-          body: JSON.stringify({ mode: "individual", cliente_id: clienteId, competencia: comp }),
-        });
-        const data = await res.json() as any;
-        if (data.ok && data.geradas > 0) geradas++;
-        else erros++;
-      }
+      const n = await marcarDasLoteComoGeradas(ids);
       await refresh();
-      if (erros === 0) toast.success(`${geradas} DAS gerada(s) via SERPRO`, {id:"das-lote"});
-      else toast.warning(`${geradas} gerada(s) · ${erros} com erro. Veja coluna Status.`, {id:"das-lote"});
+      toast.success(`${n} guia(s) marcada(s) como gerada`);
       setSel(new Set());
     } catch (e: any) {
-      toast.error("Erro ao gerar DAS: " + (e?.message ?? "Tente novamente"), {id:"das-lote"});
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function gerarTodosDoMes() {
-    setBusy(true);
-    toast.loading("Criando guias DAS para todos os clientes elegíveis…", {id:"das-init"});
-    try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", {id:"das-init"}); return; }
-      const res = await fetch("/api/das/gerar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: "lote", competencia: comp }),
-      });
-      const data = await res.json() as any;
-      if (data.ok) {
-        toast.success(`${data.geradas ?? 0} guia(s) DAS criada(s) para ${comp}`, {id:"das-init"});
-        await refresh();
-      } else {
-        toast.error(data.error ?? "Erro ao gerar DAS em lote", {id:"das-init"});
-      }
-    } catch (e: any) {
-      toast.error("Erro: " + (e?.message ?? "Tente novamente"), {id:"das-init"});
+      toast.error("Erro: " + (e?.message ?? "Tente novamente"));
     } finally {
       setBusy(false);
     }
   }
 
-  async function enviarWhats() {
-    const elig = filtered.filter(g=>sel.has(g.id)&&g.status==="gerada");
-    if(!elig.length){ toast.error("Selecione DAS já geradas"); return; }
+  async function inicializarMes() {
     setBusy(true);
-    toast.loading(`Enviando ${elig.length} DAS via WhatsApp…`, { id: "das-wpp" });
+    toast.loading("Criando guias para clientes elegíveis…", { id: "das-init" });
     try {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      if (!session) { toast.error("Sessão expirada", { id: "das-wpp" }); return; }
-      let enviadas = 0, erros = 0;
-      for (const g of elig) {
-        const nome = g.clienteNome.split(" ")[0];
-        const comp = g.competencia.split("-").reverse().join("/");
-        const msg =
-          `📄 Olá ${nome}! Segue o DAS da competência *${comp}*.\n` +
-          `💰 Valor: ${fmtBRL(g.valor)}\n` +
-          `📅 Vencimento: ${fmtDate(g.vencimento)}` +
-          (g.codigoBarras ? `\n🔢 Código de barras:\n${g.codigoBarras}` : "") +
-          (g.pdfUrl ? `\n🔗 Guia em PDF: ${g.pdfUrl}` : "");
-        const res = await fetch("/api/wa/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-          body: JSON.stringify({ telefone: "", mensagem: msg, cliente_id: g.clienteId }),
-        });
-        const data = await res.json().catch(() => ({})) as any;
-        if (data.ok) enviadas++; else erros++;
-      }
+      const { criadas, error } = await criarGuiasDoMes(comp, clientes, items);
       await refresh();
-      if (erros === 0) toast.success(`${enviadas} DAS enviado(s) por WhatsApp! 📱`, { id: "das-wpp" });
-      else toast.warning(`${enviadas} enviado(s) · ${erros} com erro (cliente sem WhatsApp?)`, { id: "das-wpp" });
-      setSel(new Set());
+      if (error) toast.error(error, { id: "das-init" });
+      else if (criadas === 0) toast.info("Todas as guias deste mês já existem", { id: "das-init" });
+      else toast.success(`${criadas} guia(s) criada(s) para ${comp}`, { id: "das-init" });
     } catch (e: any) {
-      toast.error("Erro WhatsApp: " + (e?.message ?? "Tente novamente"), { id: "das-wpp" });
+      toast.error("Erro: " + (e?.message ?? "Tente novamente"), { id: "das-init" });
     } finally {
       setBusy(false);
     }
@@ -206,7 +153,6 @@ function DasPage() {
       cell: g => (
         <div style={{overflow:"visible", whiteSpace:"normal"}}>
           <InlineBadge color={S_COLOR[g.status]} dot>{S_LABEL[g.status]}</InlineBadge>
-          {g.enviadoWaEm && <div className="text-[10px] text-emerald-600 mt-0.5">✓ WhatsApp</div>}
         </div>
       ),
     },
@@ -216,23 +162,14 @@ function DasPage() {
         <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {(g.status==="pendente"||g.status==="erro") && (
             <button className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Gerar DAS"
+              title="Marcar como gerada"
               onClick={async () => {
-                const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-                if (!session) { toast.error("Sessão expirada"); return; }
-                toast.loading("Gerando DAS via SERPRO…", {id:`das-${g.id}`});
-                try {
-                  const res = await fetch("/api/das/gerar", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ mode: "individual", cliente_id: g.clienteId, competencia: g.competencia }),
-                  });
-                  const data = await res.json() as any;
-                  if (data.ok && data.geradas > 0) { toast.success(`DAS gerada: ${data.resultados?.[0]?.codigo_barras?.slice(0,20) ?? "✓"}`, {id:`das-${g.id}`}); await refresh(); }
-                  else { toast.error(data.error ?? data.resultados?.[0]?.error ?? "Erro SERPRO", {id:`das-${g.id}`}); }
-                } catch(e:any) { toast.error(e.message, {id:`das-${g.id}`}); }
+                toast.loading("Atualizando…", { id: `das-${g.id}` });
+                const ok = await marcarDasComoGerada(g.id);
+                if (ok) { toast.success("Guia marcada como gerada", { id: `das-${g.id}` }); await refresh(); }
+                else toast.error("Erro ao atualizar", { id: `das-${g.id}` });
               }}>
-              <RefreshCw className="h-3.5 w-3.5" />
+              <Check className="h-3.5 w-3.5" />
             </button>
           )}
           {g.codigoBarras && (
@@ -258,35 +195,27 @@ function DasPage() {
 
       <PageHeader
         title="DAS em Lote"
-        subtitle="Geração via SERPRO · MEI e Simples Nacional"
+        subtitle="Registro manual · MEI e Simples Nacional"
         actions={
           <>
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={enviarWhats} disabled={sel.size===0}>
-              <MessageCircle className="h-4 w-4" /> WhatsApp
+              onClick={() => setDialogDas(true)}>
+              <Plus className="h-4 w-4" /> Nova guia
             </Button>
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={gerarTodosDoMes} disabled={busy}
-              title="Gera guias DAS para todos os clientes Simples Nacional e MEI do mês selecionado">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Plus className="h-4 w-4"/>}
-              {kpi.total === 0 ? "Gerar DAS do Mês" : "Inicializar Mês"}
+              onClick={inicializarMes} disabled={busy}
+              title="Cria guias pendentes para todos os clientes MEI/Simples do mês">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+              {kpi.total === 0 ? "Inicializar Mês" : "Completar Clientes"}
             </Button>
             <Button size="sm" className="rounded-xl gap-1.5 h-9"
-              onClick={gerarLote} disabled={busy||sel.size===0}
-              title="Selecione guias geradas para enviar via SERPRO">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
-              Enviar SERPRO ({sel.size})
+              onClick={marcarLoteGeradas} disabled={busy||sel.size===0}
+              title="Marca guias selecionadas como geradas após preenchimento manual">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}
+              Marcar geradas ({sel.size})
             </Button>
           </>
         }
-      />
-
-      <PageTabs
-        items={[
-          { to: "/fiscal/das",    label: "DAS em Lote", icon: Wallet },
-          { to: "/fiscal/nfse",   label: "NFS-e",       icon: Receipt },
-          { to: "/fiscal/serpro", label: "SERPRO",      icon: Activity },
-        ]}
       />
 
       <KpiGrid cols={5}>
@@ -298,7 +227,6 @@ function DasPage() {
       </KpiGrid>
 
 
-      {/* ── Tabela ── */}
       <DataTable
         rows={pageRows}
         cols={cols}
@@ -307,7 +235,7 @@ function DasPage() {
         onToggleAll={toggleAll}
         onToggleRow={toggleOne}
         emptyIcon={<FileText className="h-8 w-8"/>}
-        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — clique em "Gerar DAS do Mês" para criar as guias via SERPRO para todos os clientes`}
+        emptyText={`Nenhuma guia DAS para ${MESES[mes-1]}/${ano} — clique em "Inicializar Mês" para criar guias pendentes`}
         rowClassName={g => g.status==="paga" ? "opacity-50" : ""}
         toolbar={
           <>
@@ -343,16 +271,15 @@ function DasPage() {
         }
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <TableFooter total={items.length} filtered={filtered.length} selected={sel.size}/>
+        <TableFooter total={doMes.length} filtered={filtered.length} selected={sel.size}/>
         <Pagination page={page} totalPages={totalPages} onChange={setPage} pageSize={PAGE_SIZE} total={filtered.length}/>
       </div>
 
       <DasGerarDialog
         open={dialogDas}
         onClose={() => setDialogDas(false)}
-        onCreated={() => {}}
+        onCreated={() => { setDialogDas(false); refresh(); }}
       />
     </div>
   );
 }
-

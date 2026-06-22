@@ -1,31 +1,31 @@
 # APOYA Gestão
 
-Sistema multi-agentes de gestão para escritórios contábeis — clientes, fiscal, DP, financeiro, workflows e integrações (Asaas, NFS-e, WhatsApp, Pluggy, ClickSign, SERPRO).
+Software de contabilidade para escritórios (~8 clientes). **Modo manual:** operadores registram tudo direto no Supabase via CRUD — sem integrações externas ativas.
 
 ## Stack
 
 | Camada | Tecnologia |
 |--------|------------|
 | Frontend | React 19, TanStack Router/Start, Tailwind v4, shadcn/ui |
-| Backend | Supabase PostgreSQL + 15 Edge Functions (Deno) |
-| Deploy | Cloudflare Workers (`apoya-gestao` + `apoya-mcp`) |
+| Backend | Supabase PostgreSQL + Auth + Storage + RLS |
+| Edge Function | Apenas `send-invite` (convite interno de usuário) |
+| Deploy | Cloudflare Worker `apoya-gestao` |
 | CI/CD | GitHub Actions — `main` → staging, tag `v*.*.*` → produção |
 
 ## URLs
 
 - **Produção:** https://apoyaproject.zapro.tech
-- **Worker (fallback):** https://apoya-gestao.talkzzbot.workers.dev
-- **MCP:** https://apoya-mcp.talkzzbot.workers.dev
+- **Staging:** https://apoya-gestao-staging.talkzzbot.workers.dev
 - **Supabase:** `ajaqbdsalxfgrwpjbtbn`
 
 ## Setup local
 
 ```bash
 cp .env.example .env.local
-# Preencha VITE_SUPABASE_* e secrets server-side
+# Preencha VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY
 
 npm install
-npm run dev          # http://localhost:5173
+npm run dev
 ```
 
 ## Gates antes de deploy
@@ -36,41 +36,31 @@ npm test
 npm run build
 ```
 
-Ver `STANDARDS.md` para Definition of Done completa.
+Ver `STANDARDS.md` para Definition of Done.
 
 ## Deploy
 
-**Automático (recomendado):** push em `main` → staging. Tag semântica `v1.2.3` → produção.
-
-**Manual:**
+1. Push `main` → staging (automático)
+2. Validar staging
+3. Tag `v3.x.y` → produção
 
 ```bash
-npm run build
-./deploy.sh
+git tag v3.37.0 && git push origin v3.37.0
 ```
 
-Detalhes em `DEPLOY.md`, `docs/DEPLOY_PRODUCAO.md` (checklist produção) e `.github/workflows/deploy.yml`.
+Detalhes: `docs/DEPLOY_PRODUCAO.md`
 
-## Estrutura
+## Módulos (manual)
 
-```
-src/routes/          Rotas UI + API (/api/*)
-src/hooks/           Data fetching Supabase
-src/components/      UI por domínio
-supabase/migrations/ Schema SQL versionado
-supabase/functions/  Edge Functions (agentes)
-workers/apoya-mcp/   Worker MCP (85 tools)
-docs/PRD.md          Product Requirements Document
-BACKLOG.md           Bugs/endurecimento pendentes
-STATE.md             Estado atual do projeto
-```
+Clientes · Fiscal · Contábil · DP · Financeiro · Societário · Documentos · Workflows/Kanban
+
+Contato WhatsApp: link `wa.me` a partir do cadastro do cliente (sem Evolution API).
 
 ## Documentação
 
-- `docs/PRD.md` — visão de produto e módulos
-- `STANDARDS.md` — regras de qualidade (nunca fabricar dado, erro ≠ zero)
-- `BACKLOG.md` — auditoria de bugs por tema/prioridade
-- `STATE.md` — snapshot do estado e próximos passos
+- `STATE.md` — estado atual e regras do pivô manual
+- `STANDARDS.md` — padrões de qualidade
+- `BACKLOG.md` — bugs pendentes (fluxo manual)
 
 ## Repositório
 

@@ -1,12 +1,10 @@
-import { supabase } from "@/integrations/supabase/client";
 import { fmtBRL } from "@/lib/format";
 import React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  AlertTriangle, History, ArrowRight, Building2, Calendar,
+  AlertTriangle, ArrowRight, Building2, Calendar,
   CheckCircle2, Clock, DollarSign, FileText, Info,
-  Loader2, MessageSquare, Receipt, RefreshCw,
-  TrendingUp, Users, Zap,
+  RefreshCw, TrendingUp, Users, Workflow,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,142 +13,6 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useDashboard, type AlertaDash } from "@/hooks/use-dashboard";
 import { Button } from "@/components/ui/button";
-
-
-/* ── Agentes Autônomos ────────────────────────────────────── */
-interface AgenteMini {
-  nome:         string;
-  icone:        string;
-  alertas:      number;
-  total:        number;
-  executado_em: string;
-  loading:      boolean;
-  error:        string | null;
-  href:         string;
-}
-
-interface AgentesState {
-  fiscal:      AgenteMini;
-  rh:          AgenteMini;
-  financeiro:  AgenteMini;
-  orquestrador:{ loading: boolean; ultimo: string; alertas_total: number };
-}
-
-const mkAgente = (nome: string, icone: string, href: string): AgenteMini =>
-  ({ nome, icone, alertas: 0, total: 0, executado_em: "", loading: false, error: null, href });
-
-const AGENTES_DEFAULT: AgentesState = {
-  fiscal:       mkAgente("Fiscal",     "🧾", "/fiscal"),
-  rh:           mkAgente("RH / DP",    "👥", "/dp"),
-  financeiro:   mkAgente("Financeiro", "💰", "/financeiro"),
-  orquestrador: { loading: false, ultimo: "", alertas_total: 0 },
-};
-
-// interface legacy (mantido para AgenteCard)
-interface AgenteStatus {
-  vencidas: number; urgentes: number; no_prazo: number;
-  total: number; executado_em: string; loading: boolean; error: string | null;
-}
-const AGENTE_DEFAULT: AgenteStatus = {
-  vencidas: 0, urgentes: 0, no_prazo: 0, total: 0,
-  executado_em: "", loading: false, error: null,
-};
-
-// token do usuário logado (o gate dos agentes aceita JWT de usuário)
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-}
-
-async function fetchAgenteFiscal(): Promise<AgenteStatus> {
-  const resp = await fetch(
-    "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-fiscal",
-    { method: "POST", headers: await authHeaders() }
-  );
-  const result = await resp.json();
-  if (!result.success) throw new Error(result.error ?? "Erro no agente");
-  return {
-    vencidas:    result.resumo?.vencidas    ?? 0,
-    urgentes:    result.resumo?.urgentes    ?? 0,
-    no_prazo:    result.resumo?.no_prazo    ?? 0,
-    total:       result.resumo?.total       ?? 0,
-    executado_em: result.executado_em       ?? "",
-    loading:     false,
-    error:       null,
-  };
-}
-
-async function fetchOrquestrador(): Promise<{ fiscal: number; rh: number; financeiro: number; ts: string }> {
-  const resp = await fetch(
-    "https://ajaqbdsalxfgrwpjbtbn.supabase.co/functions/v1/agente-orquestrador",
-    { method: "POST", headers: await authHeaders() }
-  );
-  const r = await resp.json();
-  return {
-    fiscal:     r.resultados?.fiscal?.alertas_gerados     ?? 0,
-    rh:         r.resultados?.rh?.alertas_gerados         ?? 0,
-    financeiro: r.resultados?.financeiro?.alertas_gerados ?? 0,
-    ts:         r.executado_em ?? new Date().toISOString(),
-  };
-}
-
-function AgenteCard({
-  status, onExecute,
-}: { status: AgenteStatus; onExecute: () => void }) {
-  const fmtHora = (iso: string) => {
-    if (!iso) return "—";
-    try { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
-    catch { return "—"; }
-  };
-
-  return (
-    <div className="surface-card p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-primary">
-            <Zap className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Agente Fiscal</p>
-            <p className="text-xs text-muted-foreground">
-              {status.executado_em ? `Última execução: ${fmtHora(status.executado_em)}` : "Nunca executado"}
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onExecute}
-          disabled={status.loading}
-          className="h-8 rounded-full text-xs"
-        >
-          {status.loading
-            ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-            : <RefreshCw className="h-3 w-3 mr-1" />}
-          Executar
-        </Button>
-      </div>
-
-      {status.error ? (
-        <p className="text-xs text-destructive">{status.error}</p>
-      ) : (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-200">
-            <AlertTriangle className="h-3 w-3" /> {status.vencidas} vencidas
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.97_0.045_82)] px-3 py-1 text-xs font-medium text-[oklch(0.48_0.130_82)] ring-1 ring-amber-200">
-            <Clock className="h-3 w-3" /> {status.urgentes} urgentes
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-            <CheckCircle2 className="h-3 w-3" /> {status.no_prazo} no prazo
-          </span>
-          <span className="ml-auto text-xs text-muted-foreground">{status.total} total</span>
-        </div>
-      )}
-
-    </div>
-  );
-}
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
@@ -266,82 +128,18 @@ function DashSkeleton() {
 }
 
 
-/* ── Types + Hook: logs de execução dos agentes ─────────────── */
-interface CronLog {
-  id: string;
-  agente: string;
-  acao: string;
-  resultado: string;
-  detalhes: Record<string, unknown> | null;
-  erro_mensagem: string | null;
-  executado_em: string;
-}
-
-function useCronLogs() {
-  const [logs, setLogs] = React.useState<CronLog[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  const refetch = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const { supabase: sb } = await import("@/integrations/supabase/client");
-      const { data } = await (sb as any)
-        .from("agente_logs")
-        .select("id,agente,acao,resultado,detalhes,erro_mensagem,executado_em")
-        .order("executado_em", { ascending: false })
-        .limit(15);
-      setLogs((data as CronLog[]) ?? []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
-  }, []);
-
-  React.useEffect(() => { refetch(); }, [refetch]);
-  return { logs, loading, refetch };
-}
-
 /* ── Page ─────────────────────────────────────────────────── */
 function Dashboard() {
   const { profile, user } = useAuth();
   const { data, loading, error, refetch } = useDashboard();
-  const [agenteStatus, setAgenteStatus] = React.useState<AgenteStatus>(AGENTE_DEFAULT);
-  const [agentesState, setAgentesState] = React.useState<AgentesState>(AGENTES_DEFAULT);
-  const { logs: cronLogs, loading: cronLoading, refetch: refetchLogs } = useCronLogs();
-
-
-  const runAgente = React.useCallback(async () => {
-    setAgenteStatus(prev => ({ ...prev, loading: true, error: null }));
-    setAgentesState(prev => ({
-      ...prev,
-      orquestrador: { ...prev.orquestrador, loading: true },
-    }));
-    try {
-      const [fiscal, orch] = await Promise.all([
-        fetchAgenteFiscal(),
-        fetchOrquestrador(),
-      ]);
-      setAgenteStatus(fiscal);
-      setAgentesState(prev => ({
-        fiscal:      { ...prev.fiscal,     alertas: orch.fiscal,     total: fiscal.total, executado_em: orch.ts, loading: false, error: null },
-        rh:          { ...prev.rh,         alertas: orch.rh,         total: 0,            executado_em: orch.ts, loading: false, error: null },
-        financeiro:  { ...prev.financeiro, alertas: orch.financeiro, total: 0,            executado_em: orch.ts, loading: false, error: null },
-        orquestrador:{ loading: false, ultimo: orch.ts, alertas_total: orch.fiscal + orch.rh + orch.financeiro },
-      }));
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Erro desconhecido";
-      setAgenteStatus(prev => ({ ...prev, loading: false, error: msg }));
-      setAgentesState(prev => ({ ...prev, orquestrador: { ...prev.orquestrador, loading: false } }));
-    }
-  }, []);
-
-  React.useEffect(() => { runAgente(); }, [runAgente]);
 
   const nome = profile?.nome?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Contador";
 
   const acoes = [
-    { to: "/fiscal/das",  label: "Emitir DAS",   icon: FileText },
-    { to: "/fiscal/nfse", label: "Emitir NFS-e", icon: Receipt },
+    { to: "/fiscal/das",  label: "DAS",          icon: FileText },
+    { to: "/financeiro",  label: "Cobranças",    icon: DollarSign },
     { to: "/clientes",    label: "Novo cliente", icon: Building2 },
-    { to: "/whatsapp",    label: "WhatsApp",     icon: MessageSquare },
+    { to: "/workflows",   label: "Tarefas",      icon: Workflow },
   ];
 
   if (loading) return <DashSkeleton />;
@@ -435,17 +233,17 @@ function Dashboard() {
         />
         <MiniLink
           to="/financeiro"
-          label="NFS-e emitidas no mês"
-          value={String(kpis.nfseEmitidaMes)}
+          label="Honorários recebidos"
+          value={kpis.honorariosMes > 0 ? fmtBRL(kpis.honorariosMes) : "—"}
           sub={kpis.honorariosAtraso > 0 ? `${fmtBRL(kpis.honorariosAtraso)} de cobranças vencidas` : "Cobranças em dia"}
           icon={DollarSign}
         />
         <MiniLink
-          to="/whatsapp"
-          label="Mensagens não lidas"
-          value={String(kpis.wasMsgNaoLidas)}
-          sub={kpis.wasMsgNaoLidas > 0 ? "Clientes aguardando resposta" : "Nenhuma mensagem pendente"}
-          icon={MessageSquare}
+          to="/workflows"
+          label="Central de Operações"
+          value="Kanban"
+          sub="Tarefas e pipelines do escritório"
+          icon={Workflow}
         />
       </div>
 
@@ -566,78 +364,6 @@ function Dashboard() {
       </div>
 
 
-      {/* ── Agentes Autônomos ─────────────────────────────── */}
-      <section className="surface-card">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
-          <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-primary">
-              <Zap className="h-3.5 w-3.5" />
-            </span>
-            <h2 className="text-base font-semibold">Agentes Autônomos</h2>
-            {agentesState.orquestrador.loading && (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {agentesState.orquestrador.alertas_total > 0 && (
-              <span className="pill bg-destructive/10 text-destructive text-[11px]">
-                {agentesState.orquestrador.alertas_total} alerta{agentesState.orquestrador.alertas_total > 1 ? "s" : ""}
-              </span>
-            )}
-            <Button variant="outline" size="sm" onClick={runAgente}
-              disabled={agentesState.orquestrador.loading} className="h-8 rounded-full text-xs">
-              {agentesState.orquestrador.loading
-                ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                : <RefreshCw className="h-3 w-3 mr-1" />}
-              Executar todos
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
-          {([
-            { key: "fiscal",     cor: "text-blue-600",   bg: "bg-blue-50"   },
-            { key: "rh",         cor: "text-violet-600", bg: "bg-violet-50" },
-            { key: "financeiro", cor: "text-emerald-600",bg: "bg-emerald-50"},
-          ] as const).map(({ key, cor, bg }) => {
-            const ag = agentesState[key];
-            const fmtHora = (iso: string) => {
-              if (!iso) return "—";
-              try { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
-              catch { return "—"; }
-            };
-            return (
-              <a key={key} href={ag.href} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors">
-                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${bg}`}>
-                  {ag.icone}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{ag.nome}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ag.executado_em ? `Executado às ${fmtHora(ag.executado_em)}` : "Aguardando execução"}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  {ag.alertas > 0 ? (
-                    <span className={`text-sm font-bold ${cor}`}>{ag.alertas}</span>
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  )}
-                  <p className="text-[11px] text-muted-foreground">{ag.alertas > 0 ? "alertas" : "ok"}</p>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-        {agentesState.orquestrador.ultimo && (
-          <div className="px-6 py-2.5 border-t border-border/40 bg-muted/20">
-            <p className="text-[11px] text-muted-foreground">
-              Orquestrador executado às {new Date(agentesState.orquestrador.ultimo).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              {" · "}{agentesState.orquestrador.alertas_total} alerta{agentesState.orquestrador.alertas_total !== 1 ? "s" : ""} gerado{agentesState.orquestrador.alertas_total !== 1 ? "s" : ""}
-            </p>
-          </div>
-        )}
-      </section>
-
       {/* ── Alertas + Calendário fiscal ─────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
@@ -646,7 +372,7 @@ function Dashboard() {
           <div className="flex items-center justify-between px-6 py-5">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-destructive/10 text-destructive">
-                <Zap className="h-3.5 w-3.5" />
+                <AlertTriangle className="h-3.5 w-3.5" />
               </span>
               Alertas do dia
             </h2>
@@ -743,68 +469,6 @@ function Dashboard() {
             ))}
           </div>
         )}
-      </section>
-
-
-      {/* ── Histórico de Execuções dos Agentes ─────────────────── */}
-      <section className="surface-card">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
-          <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-muted text-muted-foreground">
-              <History className="h-3.5 w-3.5" />
-            </span>
-            <h2 className="text-base font-semibold">Histórico de Execuções</h2>
-            <span className="text-xs text-muted-foreground">Cron + Manual · últimas 15</span>
-          </div>
-          <button
-            onClick={refetchLogs}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <RefreshCw className="h-3 w-3" /> Atualizar
-          </button>
-        </div>
-        <div className="divide-y divide-border/40">
-          {cronLoading ? (
-            <div className="px-6 py-6 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-          ) : cronLogs.length === 0 ? (
-            <div className="px-6 py-6 text-center text-sm text-muted-foreground">Nenhuma execução registrada ainda.</div>
-          ) : (
-            cronLogs.map(log => {
-              const isOk  = log.resultado === "sucesso";
-              const isErr = log.resultado === "erro";
-              const ts    = log.executado_em
-                ? new Date(log.executado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-                : "—";
-              const det   = log.detalhes as Record<string, unknown> | null;
-              const durMs = typeof det?.duracao_ms === "number" ? `${(det.duracao_ms / 1000).toFixed(1)}s` : null;
-              return (
-                <div key={log.id} className="px-6 py-3 flex items-center gap-4 hover:bg-muted/20 transition-colors">
-                  <div className={`h-2 w-2 rounded-full shrink-0 ${isOk ? "bg-emerald-500" : isErr ? "bg-red-500" : "bg-amber-500"}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{log.agente}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted font-mono">{log.acao}</span>
-                      {log.erro_mensagem && (
-                        <span className="text-xs text-red-600 truncate max-w-xs">{log.erro_mensagem}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0 space-y-0.5">
-                    <p className="text-xs text-muted-foreground">{ts}</p>
-                    {durMs && <p className="text-[11px] text-muted-foreground/70">{durMs}</p>}
-                  </div>
-                  <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium border ${
-                    isOk  ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                    isErr ? "bg-red-50 text-red-700 border-red-200" :
-                    "bg-amber-50 text-amber-700 border-amber-200"
-                  }`}>
-                    {log.resultado}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
       </section>
 
     </div>

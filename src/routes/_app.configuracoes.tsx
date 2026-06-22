@@ -13,8 +13,8 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Building2, CheckCircle2, ChevronDown, ChevronUp,
   Copy, Eye, EyeOff, KeyRound, Mail, MessageSquare,
-  Network, Package, Plug, Plus, RefreshCw, Save,
-  Shield, Trash2, UserPlus, Users, XCircle, Zap,
+  Package, Plus, RefreshCw, Save,
+  Shield, Trash2, UserPlus, Users, XCircle,
   Info } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PagePlaceholder";
-import { WhatsappInstancesPanel } from "@/components/whatsapp/WhatsappInstancesPanel";
 import { PermissoesTab } from "@/components/PermissoesTab";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_TS, APP_SPRINT, VERSION_HISTORY } from "@/lib/version";
@@ -48,7 +47,7 @@ function ConfiguracoesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Configurações"
-        subtitle="Escritório · Usuários · Integrações · MCP"
+        subtitle="Escritório · Usuários · Templates · Permissões"
       />
       <Tabs defaultValue="escritorio" className="space-y-5">
         <TabsList className="h-10 rounded-xl bg-muted/60 p-1 flex flex-wrap gap-0.5">
@@ -59,7 +58,7 @@ function ConfiguracoesPage() {
             <Users className="h-4 w-4" />Usuários
           </TabsTrigger>
           <TabsTrigger value="whatsapp" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <MessageSquare className="h-4 w-4" />WhatsApp
+            <MessageSquare className="h-4 w-4" />Templates WA
           </TabsTrigger>
           <TabsTrigger value="permissoes" className="gap-2 rounded-lg text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <Shield className="h-4 w-4" />Permissões
@@ -421,21 +420,7 @@ function UsuariosSection() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// SEÇÃO: INTEGRAÇÕES — cards com toggle + descrição
-// ═══════════════════════════════════════════════════════════════════════
-
-const INTEG_META: Record<string, { icon: string; descricao: string; label: string }> = {
-  evolution:  { icon: "💬", label: "WhatsApp",  descricao: "Envio de mensagens via Evolution API self-hosted" },
-  serpro:     { icon: "🏛️", label: "SERPRO",    descricao: "Consultas fiscais MEI, PGDAS, Simples Nacional via gateway" },
-  focus:      { icon: "🧾", label: "Focus NF-e", descricao: "Emissão de NFS-e e consulta de notas fiscais" },
-  asaas:      { icon: "💰", label: "Asaas",     descricao: "Cobranças, boletos e Pix via Asaas" },
-  clicksign:  { icon: "✍️", label: "ClickSign", descricao: "Assinatura eletrônica de contratos" },
-  elevenlabs: { icon: "🎙️", label: "ElevenLabs",descricao: "Síntese de voz para atendimento automatizado" },
-};
-
-
-// ═══════════════════════════════════════════════════════════════════════
-// SEÇÃO: TEMPLATES WHATSAPP
+// SEÇÃO: TEMPLATES WHATSAPP (texto para wa.me manual)
 // ═══════════════════════════════════════════════════════════════════════
 function TemplatesSection() {
   const { escritorio, loading, saving, save } = useEscritorio();

@@ -1,8 +1,7 @@
 /**
  * Hook: useDashboard
  * KPIs reais do dashboard — substitui 100% os mocks estáticos do _app.index.tsx
- * Fonte: Supabase (clientes, das_guias, cobrancas, obrigacoes, mensagem_whatsapp,
- *                  calendario_fiscal, nfse_emitida)
+ * Fonte: Supabase (clientes, das_guias, cobrancas, obrigacoes, calendario_fiscal)
  */
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +19,6 @@ export interface DashboardKpis {
   obrigacoesMes:     number;       // total de obrigações do mês
   obrigacoesPendentes: number;
   obrigacoesAtrasadas: number;
-  wasMsgNaoLidas:    number;
-  nfseEmitidaMes:    number;
 }
 
 export interface CalFiscalItem {
@@ -66,7 +63,6 @@ const ZERO_KPIS: DashboardKpis = {
   dasEmAberto: 0, dasVencendoHoje: 0,
   honorariosMes: 0, honorariosAtraso: 0,
   obrigacoesMes: 0, obrigacoesPendentes: 0, obrigacoesAtrasadas: 0,
-  wasMsgNaoLidas: 0, nfseEmitidaMes: 0,
 };
 
 export function useDashboard() {
@@ -145,25 +141,7 @@ export function useDashboard() {
         o => o.status === "pendente" && o.vencimento && o.vencimento < hoje
       ).length;
 
-      /* ── 5. WhatsApp não lidas ──────────────────────────── */
-      const waNaoLidasResult = await supabase
-        .from("mensagem_whatsapp")
-        .select("id", { count: "exact", head: true })
-        .is("lida_em", null)
-        .eq("direcao", "recebida")
-        .then(r => r, () => ({ count: 0 }));
-      const waNaoLidas = waNaoLidasResult.count;
-
-      /* ── 6. NFS-e emitidas no mês ───────────────────────── */
-      const nfseResult = await supabase
-        .from("nfse_emitida")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "emitida")
-        .gte("created_at", `${mesAtual}-01`)
-        .then(r => r, () => ({ count: 0 }));
-      const nfseCount = nfseResult.count;
-
-      /* ── 7. Honorários por mês (últimos 6) ──────────────── */
+      /* ── 5. Honorários por mês (últimos 6) ──────────────── */
       const honorariosData: HonorarioMes[] = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(year, month - i, 1);
@@ -178,7 +156,7 @@ export function useDashboard() {
         honorariosData.push({ mes: mesLabel, recebido, previsto });
       }
 
-      /* ── 8. Calendário fiscal — próximas obrigações ─────── */
+      /* ── 6. Calendário fiscal — próximas obrigações ─────── */
       const calFiscalResult = await supabase
         .from("calendario_fiscal")
         .select("nome, dia_vencimento, mes_vencimento, periodicidade")
@@ -202,7 +180,7 @@ export function useDashboard() {
         };
       });
 
-      /* ── 9. Alertas dinâmicos ────────────────────────────── */
+      /* ── 7. Alertas dinâmicos ────────────────────────────── */
       const alertas: AlertaDash[] = [];
 
       if (dasVencHoje > 0)
@@ -229,8 +207,6 @@ export function useDashboard() {
         obrigacoesMes:       obArr.length,
         obrigacoesPendentes: obPendentes,
         obrigacoesAtrasadas: obAtrasadas,
-        wasMsgNaoLidas:      waNaoLidas ?? 0,
-        nfseEmitidaMes:      nfseCount  ?? 0,
       };
 
       setData({ kpis, calFiscal, clientesRecentes, honorariosData, alertas });

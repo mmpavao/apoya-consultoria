@@ -1,56 +1,51 @@
 # STATE — APOYA Gestão
 
-> Snapshot do estado do projeto. Atualizado em **2026-06-20** — pronto para deploy produção.
+> Atualizado: **2026-06-20** · Pivô **100% manual** (decisão Marcio)
 
-## Resumo
+## Decisão vigente
 
-| Métrica | Valor |
-|---------|-------|
-| **Pronto (estimado)** | ~75% |
-| **Build** | ✅ `tsc`, `test`, `build` verdes |
-| **Branch deploy** | `cursor/security-env-onboarding-d50a` → merge `main` → tag `v*.*.*` |
-| **Checklist DevOps** | `docs/DEPLOY_PRODUCAO.md` |
+**Zero integrações/agentes ativos.** Operadores humanos fazem o trabalho e registram no sistema via CRUD Supabase. APIs voltam depois, uma de cada vez, sob coordenação do Marcio.
 
-## O que funciona
+## Stack
 
-- Deploy CI/CD staging-first (Cloudflare Workers + Edge Functions em tag)
-- Módulos principais operacionais (Clientes, Fiscal, Financeiro, DP, Contabil, Workflows, CRM, WhatsApp)
-- Cálculo folha/rescisão com testes (`folha-calc`, `rescisao-calc`)
-- eSocial real (`esocial_evento`), conciliação bancária (`data_linha`), régua fail-closed
-- Pipeline MCP via `APOYA_SERVICE_TOKEN` (sem segredo hardcoded)
-- Documentos unificados: bucket canônico `documentos-clientes` (cliente ↔ módulos)
-- Webhook Asaas idempotente (re-entrega não re-dispara NFS-e)
-- Agentes fail-closed (`AGENTS_GATE_SECRET` + cron Vault)
+TanStack Start (React 19) → Cloudflare Worker `apoya-gestao` + Supabase `ajaqbdsalxfgrwpjbtbn`.
 
-## Pendências pós-produção (não bloqueiam deploy)
+## O que foi removido (não recriar)
 
-- Automações hardcoded nas UIs de setor → migrar para `automacoes_config`
-- Dados operacionais reais (lançamentos, funcionários em prod)
-- ESLint quebrado em `workers/misc/` (Prettier)
-- Focus NF-e congelado (decisão de produto)
-- Cobertura de testes ainda baixa (libs puras)
+- Agentes (`agente-*`), cron, MCP, `/api/pipeline/*`
+- SERPRO, NFS-e/Focus, Asaas, Pluggy, WhatsApp/Evolution, Clicksign-send
+- Rotas: `/whatsapp`, `/automacoes`, `/fiscal/nfse`, `/fiscal/serpro`
+- Edge functions: só **`send-invite`** permanece
 
-## Changelog desta sessão
+## O que funciona (manual)
 
-### Sessão 1 — Onboarding + segurança MCP
-- `README.md`, `.env.example`, `STATE.md`
-- `src/lib/worker-env.ts` — secrets fail-closed
-- Removido API key hardcoded em `/api/pipeline/*`
+| Módulo | Como |
+|--------|------|
+| Clientes | CRUD + abas (CNPJ digitado, wa.me) |
+| Fiscal | DAS, obrigações, documentos manuais |
+| Financeiro | Cobrança criar/editar/baixa; régua só configura |
+| DP | Folha (`folha_linha`), férias, rescisão, eSocial manual |
+| Contábil | Lançamentos, plano, conciliação |
+| Kanban | `update tarefas.etapa_pipeline` direto no Supabase |
+| Documentos | Bucket `documentos-clientes` |
 
-### Sessão 2 — Pronto para produção
-- Orquestrador + `requireAuth` fail-closed (cron Vault via RPC)
-- Webhook Asaas idempotente + setup-webhook upsert `integracao_config`
-- Documentos: bucket unificado `documentos-clientes`
-- `docs/DEPLOY_PRODUCAO.md` — checklist completo DevOps
-- CI: `WORKER_BASE_URL` + sync `AGENTS_GATE_SECRET` → Supabase
+## Regras de deploy
 
-## Deploy — comando DevOps
-
-```bash
-# 1. Merge PR → main (staging automático)
-# 2. Validar staging
-# 3. Tag produção:
-git tag v1.4.0 && git push origin v1.4.0
+```
+npx tsc --noEmit && npm test && npm run build
+→ push main (staging) → validar → tag v3.x.y (produção)
 ```
 
-Ver `docs/DEPLOY_PRODUCAO.md` para checklist completo.
+- Migrations: agente ARQUITETO (Base44), **não** CI
+- Edge functions: só em tag prod + `deno check`
+- Versão atual: `git tag --sort=-v:refname | head -1` (linha v3.x)
+
+## Gates locais
+
+✅ `tsc` · ✅ `test` (33) · ✅ `build`
+
+## Changelog recente
+
+- Pivô L1–L3: remoção agentes + integrações
+- Cleanup: dashboard sem chamadas a edge functions removidas; docs alinhados
+- Cleanup L4: DAS/fiscal 100% manual (sem SERPRO/WA API); dead code whatsapp/evolution removido
