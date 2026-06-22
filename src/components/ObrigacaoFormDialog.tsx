@@ -125,12 +125,17 @@ export function ObrigacaoFormDialog({ open, onClose, onCreated, obrigacao }: Pro
       if (error) { toast.error("Erro ao salvar: " + error.message); return; }
       toast.success("Obrigação atualizada!");
     } else {
-      // INSERT
+      // INSERT — nunca fabricar regime (STANDARDS #1). Exigir cliente com regime resolvido.
+      if (!cliente?.regime) {
+        setSaving(false);
+        toast.error("Cliente sem regime definido. Defina o regime no cadastro antes de criar obrigações.");
+        return;
+      }
       const { error } = await (supabase as any).from("obrigacoes").insert({
         id:           crypto.randomUUID(),
         cliente_id:   form.clienteId,
-        cliente_nome: cliente?.razaoSocial ?? "",
-        regime:       cliente?.regime ?? "Simples Nacional",
+        cliente_nome: cliente.razaoSocial ?? "",
+        regime:       cliente.regime,
         tipo:         form.tipo,
         descricao:    form.descricao,
         competencia:  form.competencia,

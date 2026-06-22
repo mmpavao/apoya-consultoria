@@ -23,13 +23,13 @@ export const Route = createFileRoute("/login")({
 const features = [
   {
     icon: FileText,
-    title: "Automação fiscal completa",
-    desc: "DAS e NFS-e emitidos em lote com um clique para todos os clientes.",
+    title: "Gestão fiscal centralizada",
+    desc: "DAS, obrigações e documentos de todos os clientes em um só lugar.",
   },
   {
     icon: MessageSquare,
-    title: "WhatsApp integrado",
-    desc: "Cobranças, lembretes e documentos enviados automaticamente.",
+    title: "Contato facilitado",
+    desc: "Abra a conversa do cliente no WhatsApp direto pelo cadastro.",
   },
   {
     icon: BarChart3,
