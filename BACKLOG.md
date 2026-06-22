@@ -39,11 +39,14 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - [P0] use-dp.ts:153-154 + dp/RescisaoDetalheDialog.tsx:10-11 — **rescisão sem cálculo**: verbas zeradas, só preenchimento manual.
 
 ## TEMA 4 — Segurança (auth não fail-closed / segredos)
-- [P1] src/routes/api/cobranca/regua.ts:77-80 — `isCron = !user && !!token`: **qualquer Bearer inválido roda a régua** (suspende clientes, dispara WhatsApp). Não fail-closed.
-- [P1] supabase/functions/* + config.toml — 6 edge functions com `verify_jwt=false` e sem checar auth no corpo; orquestrador dispara fan-out service-role sem auth.
-- [P3] src/routes/api/pipeline/index.ts:13 + mover.ts:17 — API key do MCP hardcoded no fonte (segredo versionado).
-- [P3] src/routes/api/cobranca/setup-webhook.ts:98 — `update().eq("tipo","asaas")` (não upsert): se a linha não existe, token nunca grava → webhook rejeita tudo.
-- [P3] src/routes/api/serpro/status.ts:10 — GET sem auth (read-only, baixo impacto).
+> **Pivô manual:** rotas `regua`, `pipeline`, `setup-webhook`, `serpro/status` e webhooks Asaas **foram removidas**. Restam 5 rotas `/api/*` + edge `send-invite`.
+
+- ~~[P1] api/cobranca/regua.ts~~ — **removida no pivô** (régua automática desativada).
+- [P1] supabase/functions/send-invite + config.toml — `verify_jwt=false` **intencional**; auth fail-closed no corpo (JWT + role admin). Demais edge functions removidas.
+- ~~[P3] api/pipeline/*~~ — **removido no pivô** (MCP/cron).
+- ~~[P3] api/cobranca/setup-webhook.ts~~ — **removido no pivô** (Asaas).
+- ~~[P3] api/serpro/status.ts~~ — **removido no pivô** (SERPRO).
+- [P1] Rotas `/api/*` restantes — auth centralizada em `src/lib/api-auth.ts` (401 sem token, 403 sem role).
 
 ## TEMA 5 — Idempotência ausente (agentes/webhooks)
 - [P2] _shared/agent.ts:51-77 + orquestrador:101-127 — `upsertPipelineTask` é read-then-insert racy (sem unique index em `metadados->>dedup_key`) → cron + manual duplicam tarefas.
@@ -95,6 +98,14 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 - Tema 1: `plano_contas` insert inclui `natureza` (NOT NULL) + `aceita_lancamento`
 - Tema 6: hooks contábeis expõem `error` (não só toast + lista vazia)
 
+## Corrigido em v3.46.0 (PR — Tema 4 segurança)
+
+- Tema 4: `src/lib/api-auth.ts` — auth fail-closed centralizado (`requireStaff`, `requireAdmin`, `requireFinanceStaff`)
+- Tema 4: `/api/cobranca/criar` e `/api/cobranca/contratar-servico` — exigem staff financeiro
+- Tema 4: `/api/admin/regua-config` — admin only; `/api/admin/bloquear-cliente` — admin ou contador
+- Tema 4: `/api/usuarios/convidar` — admin only (proxy para edge send-invite)
+- Tema 4: itens obsoletos (regua cron, pipeline MCP, webhooks) documentados como removidos no pivô
+
 ## Tema 1 — pendente (schema/migrations, não só código)
 
 - [P0] `cobrancas.created_by` — coluna não existe (insert já corrigido em `api/cobranca/criar`)
@@ -108,8 +119,9 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 
 ## Ordem recomendada (Phase 2 — cada correção com TESTE de regressão)
 1. **Tema 1** (schema-mismatch) — destrava salvar/conciliar/cobrar. Maior valor, risco controlado.
-2. **Tema 4** (segurança) — régua fail-closed + auth edge.
-3. **Tema 7** (abas/botões mortos) — rápido, visível.
-4. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI.
-5. **Tema 3** (cálculo de folha/rescisão) — feature grande, precisa spec do Marcio.
-6. **Tema 8/9** (docs, contratos, tipos, duplicação) — conforme prioridade.
+2. ~~**Tema 4** (segurança)~~ — concluído v3.46.0.
+3. **Tema 8** (docs cliente ↔ módulos) — sincronizar buckets/filtros.
+4. **Tema 7** (abas/botões mortos) — rápido, visível.
+5. **Tema 2 + 6** (fachada + erro≠zero) — honestidade da UI.
+6. **Tema 3** (cálculo de folha/rescisão) — feature grande, precisa spec do Marcio.
+7. **Tema 9** (contratos, tipos, duplicação) — conforme prioridade.

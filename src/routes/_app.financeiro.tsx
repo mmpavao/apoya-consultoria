@@ -52,8 +52,7 @@ function FinanceiroPage__Inner(){
   const [status, setStatus] = useState<"todos"|CobrancaStatus>("todos");
   const [dialogCob, setDialogCob]     = useState(false);
   const [showReguaModal, setShowReguaModal] = useState(false);
-  // Config REAL da régua (a mesma tabela que a execução /api/cobranca/regua lê).
-  // Antes o modal editava um array decorativo salvo em pipeline_config (quebrado).
+  // Config REAL da régua (tabela regua_cobranca_config — execução automática removida no pivô manual).
   const [reguaCfg, setReguaCfg] = useState({
     dias_lembrete_1: 5, dias_primeiro_contato: 1, dias_segundo_contato: 15, dias_suspensao: 45,
     percentual_multa: 2, percentual_juros_mes: 1,
