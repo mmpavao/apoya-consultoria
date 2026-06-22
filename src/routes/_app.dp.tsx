@@ -157,6 +157,7 @@ function EmpresasTab() {
 // TAB — FOLHA DE PAGAMENTO
 // ═══════════════════════════════════════════════════════════
 function FolhaTab({ autoNovo = 0 }: { autoNovo?: number }) {
+  const navigate = useNavigate();
   const now = new Date();
   const [ano, setAno]           = useState(now.getFullYear());
   const { clientes }            = useClientes();
@@ -229,12 +230,20 @@ function FolhaTab({ autoNovo = 0 }: { autoNovo?: number }) {
     },
     {
       key: "acoes", header: "", className: "text-right",
-      cell: (f: FolhaMensal) => f.status === "aberta" ? (
-        <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={fechandoId === f.id}
-          onClick={async () => { setFechandoId(f.id); await fecharFolha(f.id); await loadFolhas(); setFechandoId(null); }}>
-          {fechandoId === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} Fechar
-        </Button>
-      ) : null,
+      cell: (f: FolhaMensal) => (
+        <div className="inline-flex gap-1 justify-end">
+          <Button size="sm" variant="outline" className="h-6 text-xs gap-1"
+            onClick={() => navigate({ to: "/dp/$empresaId", params: { empresaId } })}>
+            <ArrowRight className="h-3 w-3" /> Linhas
+          </Button>
+          {f.status === "aberta" && (
+            <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={fechandoId === f.id}
+              onClick={async () => { setFechandoId(f.id); await fecharFolha(f.id); await loadFolhas(); setFechandoId(null); }}>
+              {fechandoId === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} Fechar
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -494,7 +503,7 @@ const DP_PREFS = [
   { key: "alerta_rescisao",  label: "Alertar rescisões pendentes",            def: true },
   { key: "aprovacao_folha",  label: "Aprovação antes de fechar folha",        def: false },
   { key: "notif_ferias",     label: "Notificação de férias vencendo (30d)",   def: true },
-  { key: "esocial_auto",     label: "Transmissão eSocial automática",         def: false },
+  { key: "esocial_auto",     label: "Transmissão eSocial (desativada — manual)", def: false },
 ];
 
 function ConfigDP() {
@@ -527,13 +536,12 @@ function ConfigDP() {
       </div>
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <h3 className="text-sm font-semibold">eSocial</h3>
-        <div className="grid gap-3 md:grid-cols-2">
-          {[{ label: "Ambiente", val: "Produção" }, { label: "Versão do leiaute", val: "2.5" }, { label: "Status", val: "Conectado" }, { label: "Certificado", val: "Válido até 12/2026" }].map(item => (
-            <div key={item.label} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-              <span className="text-xs text-muted-foreground">{item.label}</span>
-              <span className="text-sm font-medium">{item.val}</span>
-            </div>
-          ))}
+        <p className="text-xs text-muted-foreground">
+          Transmissão manual — registre eventos na aba eSocial ou marque status após enviar pelo portal do governo.
+        </p>
+        <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          Sem integração automática com o eSocial nesta versão.
         </div>
       </div>
     </div>

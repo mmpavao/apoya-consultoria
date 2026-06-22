@@ -105,11 +105,11 @@ export function useDashboard() {
       }));
 
       /* ── 2. DAS ─────────────────────────────────────────── */
-      const { data: dasGuias } = await supabase
+      const { data: dasGuias, error: dasErr } = await supabase
         .from("das_guias")
         .select("status, vencimento")
-        .in("status", ["pendente", "gerada", "enviada", "vencida"])
-        .then(r => r, () => ({ data: [] })) as any;
+        .in("status", ["pendente", "gerada", "enviada", "vencida"]);
+      if (dasErr) throw dasErr;
 
       const dasArr       = (dasGuias ?? []) as any[];
       const dasEmAberto  = dasArr.filter(d => ["pendente","gerada","enviada"].includes(d.status)).length;
@@ -157,14 +157,13 @@ export function useDashboard() {
       }
 
       /* ── 6. Calendário fiscal — próximas obrigações ─────── */
-      const calFiscalResult = await supabase
+      const { data: calItems, error: calErr } = await supabase
         .from("calendario_fiscal")
         .select("nome, dia_vencimento, mes_vencimento, periodicidade")
         .eq("ativo", true)
         .order("dia_vencimento", { ascending: true })
-        .limit(5)
-        .then(r => r, () => ({ data: [] as any[] }));
-      const calItems = calFiscalResult.data;
+        .limit(5);
+      if (calErr) throw calErr;
 
       const calFiscal: CalFiscalItem[] = (calItems ?? []).map((item: any) => {
         const mesRef  = item.mes_vencimento ?? (month + 1);

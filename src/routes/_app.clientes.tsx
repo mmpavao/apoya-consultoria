@@ -128,7 +128,7 @@ function ClientesPage(){
       key:"cliente", header:"Cliente",
       cell: c=>(
         <div className="flex items-center gap-2.5" style={{overflow:"visible",whiteSpace:"normal"}}>
-          <Initials nome={c.razaoSocial} regime={c.regime}/>
+          <Initials nome={c.razaoSocial} regime={c.regime ?? "Simples"}/>
           <div>
             <span className="font-medium text-foreground leading-tight">
               {c.razaoSocial}
@@ -147,8 +147,8 @@ function ClientesPage(){
       key:"regime", header:"Regime",
       headerClassName:"hidden sm:table-cell", className:"hidden sm:table-cell",
       cell: c=>(
-        <InlineBadge color={R_C[c.regime]} dot>
-          {REGIME_LABEL[c.regime]??c.regime}
+        <InlineBadge color={R_C[c.regime ?? "Simples"] ?? "gray"} dot>
+          {c.regime ? (REGIME_LABEL[c.regime] ?? c.regime) : "—"}
           {c.regimeHibrido && <span className="ml-1 opacity-60">·H</span>}
         </InlineBadge>
       ),

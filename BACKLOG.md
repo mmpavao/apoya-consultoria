@@ -76,6 +76,15 @@ errado no banco (saves que falham calado), depois fachadas, segurança e o resto
 
 ---
 
+## Corrigido em v3.44 (branch cursor/backlog-fixes-d50a)
+
+- Tema 1: totais contábeis (partida dobrada) — `use-contabil.ts`
+- Tema 2/6: painéis fake eSocial (DP) e Societário → manual/persistido
+- Tema 6: erros silenciosos dashboard (DAS, calendário fiscal, obrigações fiscal)
+- Tema 7: Folha DP → link para editor de linhas em `/dp/$empresaId`
+- Regime: não fabricar "Simples" quando ausente no banco
+- Financeiro: copy alinhada ao modo manual (régua, toggles)
+
 ## Contagem (sem falsos positivos)
 - **P0: ~13** (Temas 1, 2, 3) — bugs que quebram salvar/telas ou expõem mock como real.
 - **P1: ~16** — alto impacto.

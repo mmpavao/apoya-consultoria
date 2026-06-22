@@ -23,7 +23,7 @@ const venc20 = (() => {
 
 export function DasGerarDialog({ open, onClose, onCreated }: Props) {
   const { clientes } = useClientes();
-  const elegíveis = clientes.filter(c => ["MEI", "Simples"].includes(c.regime) && c.status === "ativo");
+  const elegíveis = clientes.filter(c => c.regime && ["MEI", "Simples"].includes(c.regime) && c.status === "ativo");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ clienteId: "", competencia: prevMonth, vencimento: venc20, valor: "" });
 
@@ -38,6 +38,7 @@ export function DasGerarDialog({ open, onClose, onCreated }: Props) {
     if (!form.clienteId || !form.vencimento) { toast.error("Selecione o cliente e o vencimento"); return; }
     // tipo (DAS/DASMEI) e regime dependem do cliente — exigir resolvido p/ não gravar guia errada.
     if (!cliente) { toast.error("Cliente não encontrado — recarregue a página e selecione novamente"); return; }
+    if (!cliente?.regime) { toast.error("Cliente sem regime definido"); return; }
     setSaving(true);
     const { error } = await supabase.from("das_guias").insert({
       cliente_id: form.clienteId,
