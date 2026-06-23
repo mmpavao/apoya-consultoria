@@ -1,6 +1,6 @@
 # STATE — APOYA Gestão
 
-> Atualizado: **2026-06-20** · Pivô **100% manual** · **v3.50.0** em prod · **Backlog Phase 2 encerrado**
+> Atualizado: **2026-06-22** · Pivô **100% manual** · **v3.53.0** em prod · **Backlog Phase 2 encerrado**
 
 ## Status do repositório
 
@@ -8,7 +8,7 @@
 |------|--------|
 | Branch ativa | `main` |
 | PRs abertas | **1** (PR #3 legado SERPRO — fechar manualmente no GitHub) |
-| Versão prod | **v3.50.0** |
+| Versão prod | **v3.53.0** |
 | Modo | 100% manual — CRUD Supabase |
 | Backlog Phase 2 | **Encerrado** — ver `BACKLOG.md` |
 
@@ -52,7 +52,7 @@ npx tsc --noEmit && npm test && npm run build
 
 - Migrations: agente ARQUITETO (Base44), **não** CI
 - Edge functions: só em tag prod + `deno check`
-- Versão atual: **v3.50.0** (prod)
+- Versão atual: **v3.53.0** (prod)
 
 ## Gates locais
 
