@@ -14,7 +14,6 @@ import { Route as LoginDevRouteImport } from './routes/login-dev'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
-import { Route as CheckoutIdRouteImport } from './routes/checkout.$id'
 import { Route as AppWorkflowsRouteImport } from './routes/_app.workflows'
 import { Route as AppSocietarioRouteImport } from './routes/_app.societario'
 import { Route as AppObrigacoesRouteImport } from './routes/_app.obrigacoes'
@@ -60,11 +59,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
-} as any)
-const CheckoutIdRoute = CheckoutIdRouteImport.update({
-  id: '/checkout/$id',
-  path: '/checkout/$id',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const AppWorkflowsRoute = AppWorkflowsRouteImport.update({
   id: '/workflows',
@@ -190,7 +184,6 @@ export interface FileRoutesByFullPath {
   '/obrigacoes': typeof AppObrigacoesRoute
   '/societario': typeof AppSocietarioRoute
   '/workflows': typeof AppWorkflowsRoute
-  '/checkout/$id': typeof CheckoutIdRoute
   '/clientes/$id': typeof AppClientesIdRoute
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
   '/dp/$empresaId': typeof AppDpEmpresaIdRoute
@@ -217,7 +210,6 @@ export interface FileRoutesByTo {
   '/obrigacoes': typeof AppObrigacoesRoute
   '/societario': typeof AppSocietarioRoute
   '/workflows': typeof AppWorkflowsRoute
-  '/checkout/$id': typeof CheckoutIdRoute
   '/': typeof AppIndexRoute
   '/clientes/$id': typeof AppClientesIdRoute
   '/configuracoes/servicos': typeof AppConfiguracoesServicosRoute
@@ -247,7 +239,6 @@ export interface FileRoutesById {
   '/_app/obrigacoes': typeof AppObrigacoesRoute
   '/_app/societario': typeof AppSocietarioRoute
   '/_app/workflows': typeof AppWorkflowsRoute
-  '/checkout/$id': typeof CheckoutIdRoute
   '/_app/': typeof AppIndexRoute
   '/_app/clientes_/$id': typeof AppClientesIdRoute
   '/_app/configuracoes_/servicos': typeof AppConfiguracoesServicosRoute
@@ -278,7 +269,6 @@ export interface FileRouteTypes {
     | '/obrigacoes'
     | '/societario'
     | '/workflows'
-    | '/checkout/$id'
     | '/clientes/$id'
     | '/configuracoes/servicos'
     | '/dp/$empresaId'
@@ -305,7 +295,6 @@ export interface FileRouteTypes {
     | '/obrigacoes'
     | '/societario'
     | '/workflows'
-    | '/checkout/$id'
     | '/'
     | '/clientes/$id'
     | '/configuracoes/servicos'
@@ -334,7 +323,6 @@ export interface FileRouteTypes {
     | '/_app/obrigacoes'
     | '/_app/societario'
     | '/_app/workflows'
-    | '/checkout/$id'
     | '/_app/'
     | '/_app/clientes_/$id'
     | '/_app/configuracoes_/servicos'
@@ -353,7 +341,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   LoginDevRoute: typeof LoginDevRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
-  CheckoutIdRoute: typeof CheckoutIdRoute
   ApiAdminBloquearClienteRoute: typeof ApiAdminBloquearClienteRoute
   ApiAdminReguaConfigRoute: typeof ApiAdminReguaConfigRoute
   ApiCobrancaContratarServicoRoute: typeof ApiCobrancaContratarServicoRoute
@@ -397,13 +384,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
-    }
-    '/checkout/$id': {
-      id: '/checkout/$id'
-      path: '/checkout/$id'
-      fullPath: '/checkout/$id'
-      preLoaderRoute: typeof CheckoutIdRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/_app/workflows': {
       id: '/_app/workflows'
@@ -602,7 +582,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   LoginDevRoute: LoginDevRoute,
   UnauthorizedRoute: UnauthorizedRoute,
-  CheckoutIdRoute: CheckoutIdRoute,
   ApiAdminBloquearClienteRoute: ApiAdminBloquearClienteRoute,
   ApiAdminReguaConfigRoute: ApiAdminReguaConfigRoute,
   ApiCobrancaContratarServicoRoute: ApiCobrancaContratarServicoRoute,

@@ -1,11 +1,11 @@
 /**
- * TabCertificados — Upload simples de certificado digital A1/A3
- * Fluxo: usuário arrasta o .pfx + informa senha → sistema extrai dados
- * automaticamente. Nenhum campo manual de razão social ou CNPJ.
+ * TabCertificados — Cadastro manual de certificado digital A1/A3
+ * Fluxo: operador anexa o .pfx (arquivado no Storage) e informa tipo e
+ * validade manualmente. CNPJ/razão vêm do cadastro do cliente.
  */
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  FileKey2, Shield, ShieldOff, Upload, Eye, EyeOff,
+  FileKey2, Shield, ShieldOff, Upload,
   CheckCircle2, AlertTriangle, Clock, Loader2, X,
   RefreshCw, Info,
 } from "lucide-react";
@@ -52,8 +52,8 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
   const [cert, setCert]           = useState<CertInfo>(EMPTY);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [showSenha, setShowSenha] = useState(false);
-  const [senha, setSenha]         = useState("");
+  const [tipoInput, setTipoInput]         = useState<"A1" | "A3">("A1");
+  const [validadeInput, setValidadeInput] = useState("");
   const [dragOver, setDragOver]   = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [savingProc, setSavingProc]     = useState(false);
@@ -82,6 +82,8 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
             focusEntregueEm:    data.focus_cert_enviado_em,
             focusCertId:        data.focus_cert_ref,
           });
+          setTipoInput(data.tipo === "A3" ? "A3" : "A1");
+          setValidadeInput(data.pfx_validade?.split("T")[0] ?? "");
         }
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
@@ -105,37 +107,23 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
 
   async function handleUpload() {
     if (!selectedFile) { toast.error("Selecione o arquivo .pfx"); return; }
-    if (!senha || senha.length < 4) { toast.error("Informe a senha do certificado"); return; }
+    if (!validadeInput) { toast.error("Informe a validade do certificado"); return; }
 
     setUploading(true);
-    toast.loading("Processando certificado…", { id: "cert-up" });
+    toast.loading("Salvando certificado…", { id: "cert-up" });
 
     try {
-      // 1. Converter para base64
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-
-      // 2. Extrair metadados via Edge Function
-      let certMeta = {
+      // Metadados informados manualmente pelo operador (modo manual).
+      // CNPJ e razão social vêm do cadastro do cliente.
+      const certMeta = {
         nomeRazao: razaoSocial ?? "",
         cnpj:      (cnpj ?? "").replace(/\D/g, ""),
         serial:    "",
-        validoAte: "",
-        tipo:      "A1" as "A1" | "A3",
-        focusCertId: undefined as string | undefined,
+        validoAte: validadeInput,
+        tipo:      tipoInput,
       };
 
-      try {
-        const { data: parsed } = await supabase.functions.invoke(
-          "parse-certificate",
-          { body: { pfxBase64: b64, password: senha } }
-        );
-        if (parsed?.ok) {
-          certMeta = { ...certMeta, ...parsed };
-        }
-      } catch { /* fallback: usa dados do cliente */ }
-
-      // 3. Upload Supabase Storage (bucket privado)
+      // Upload Supabase Storage (bucket privado) — apenas arquiva o .pfx
       const storagePath = `certificados/${clienteId}/${Date.now()}_cert.pfx`;
       const { error: storErr } = await supabase.storage
         .from("documentos-clientes")
@@ -212,7 +200,6 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
       }));
 
       setSelectedFile(null);
-      setSenha("");
       toast.success("Certificado cadastrado com sucesso!", { id: "cert-up" });
       onCertificateUpdated?.();
     } catch (err: any) {
@@ -371,36 +358,38 @@ export function TabCertificados({ clienteId, cnpj, razaoSocial, onCertificateUpd
           )}
         </div>
 
-        {/* Senha */}
-        <div className="space-y-1.5">
-          <Label htmlFor="cert-senha" className="text-sm">Senha do certificado</Label>
-          <div className="relative max-w-xs">
-            <Input
-              id="cert-senha"
-              type={showSenha ? "text" : "password"}
-              placeholder="Senha do .pfx"
-              value={senha}
-              onChange={e => setSenha(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleUpload()}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSenha(p => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        {/* Tipo + validade (entrada manual) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="cert-tipo" className="text-sm">Tipo do certificado</Label>
+            <select
+              id="cert-tipo"
+              value={tipoInput}
+              onChange={e => setTipoInput(e.target.value === "A3" ? "A3" : "A1")}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {showSenha ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
-            </button>
+              <option value="A1">A1 (arquivo .pfx)</option>
+              <option value="A3">A3 (token/cartão)</option>
+            </select>
           </div>
-          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-            <Info className="h-3 w-3 shrink-0"/>
-            Nome, CNPJ e validade são lidos automaticamente do certificado
-          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="cert-validade" className="text-sm">Validade do certificado</Label>
+            <Input
+              id="cert-validade"
+              type="date"
+              value={validadeInput}
+              onChange={e => setValidadeInput(e.target.value)}
+            />
+          </div>
         </div>
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Info className="h-3 w-3 shrink-0"/>
+          Nome e CNPJ vêm do cadastro do cliente. Informe tipo e validade manualmente.
+        </p>
 
         <Button
           onClick={handleUpload}
-          disabled={!selectedFile || !senha || uploading}
+          disabled={!selectedFile || !validadeInput || uploading}
           className="w-full bg-apoya-orange hover:bg-apoya-orange/90 text-white gap-2"
         >
           {uploading

@@ -1,7 +1,7 @@
 /**
  * Hook: useSocios
  * Gerencia o quadro societário de um cliente (tabela cliente_socio).
- * Também expõe consultaCNPJ para auto-fill no cadastro.
+ * Cadastro 100% manual.
  */
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,42 +32,6 @@ export interface Socio {
   createdAt: string;
 }
 
-export interface DadosCNPJ {
-  cnpj: string;
-  razaoSocial: string;
-  nomeFantasia?: string;
-  situacaoCadastral: string;
-  dataAbertura?: string;
-  atividadePrincipal?: string;
-  cnae?: string;
-  naturezaJuridica?: string;
-  optanteSimples: boolean;
-  optanteMei: boolean;
-  porte?: string;
-  capitalSocial?: number;
-  email?: string;
-  telefone?: string;
-  logradouro?: string;
-  numero?: string;
-  complemento?: string;
-  bairro?: string;
-  municipio?: string;
-  uf?: string;
-  cep?: string;
-  codigoMunicipioIbge?: number;
-  socios: Array<{
-    nome: string;
-    cnpjCpf: string;
-    qualificacao: string;
-    codigoQualificacao: number;
-    faixaEtaria?: string;
-    dataEntrada?: string;
-    nomeRepresentante?: string;
-    cpfRepresentante?: string;
-    qualificacaoRepresentante?: string;
-  }>;
-}
-
 function fromDb(row: Record<string, unknown>): Socio {
   return {
     id:                       row.id as string,
@@ -93,56 +57,6 @@ function fromDb(row: Record<string, unknown>): Socio {
     isAtivo:                  row.is_ativo as boolean,
     createdAt:                row.created_at as string,
   };
-}
-
-// ── Consulta pública do CNPJ via BrasilAPI ──────────────────────────
-export async function consultaCNPJ(cnpj: string): Promise<DadosCNPJ | null> {
-  const limpo = cnpj.replace(/\D/g, "");
-  if (limpo.length !== 14) return null;
-
-  try {
-    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`);
-    if (!res.ok) return null;
-    const d = await res.json();
-
-    return {
-      cnpj:              d.cnpj ?? limpo,
-      razaoSocial:       d.razao_social ?? "",
-      nomeFantasia:      d.nome_fantasia ?? undefined,
-      situacaoCadastral: d.descricao_situacao_cadastral ?? "DESCONHECIDA",
-      dataAbertura:      d.data_inicio_atividade ?? undefined,
-      atividadePrincipal: d.cnae_fiscal_descricao ?? undefined,
-      cnae:              d.cnae_fiscal ? String(d.cnae_fiscal) : undefined,
-      naturezaJuridica:  d.natureza_juridica ?? undefined,
-      optanteSimples:    d.opcao_pelo_simples ?? false,
-      optanteMei:        d.opcao_pelo_mei ?? false,
-      porte:             d.porte ?? undefined,
-      capitalSocial:     d.capital_social ? Number(d.capital_social) : undefined,
-      email:             d.email ?? undefined,
-      telefone:          d.ddd_telefone_1 ? d.ddd_telefone_1.replace(/\D/g, "") : undefined,
-      logradouro:        d.logradouro ? `${d.descricao_tipo_de_logradouro ?? ""} ${d.logradouro}`.trim() : undefined,
-      numero:            d.numero ?? undefined,
-      complemento:       d.complemento ?? undefined,
-      bairro:            d.bairro ?? undefined,
-      municipio:         d.municipio ?? undefined,
-      uf:                d.uf ?? undefined,
-      cep:               d.cep ? d.cep.replace(/\D/g, "").replace(/^(\d{5})(\d{3})$/, "$1-$2") : undefined,
-      codigoMunicipioIbge: d.codigo_municipio_ibge ? Number(d.codigo_municipio_ibge) : undefined,
-      socios:            (d.qsa ?? []).map((s: Record<string, unknown>) => ({
-        nome:                     s.nome_socio ?? "",
-        cnpjCpf:                  s.cnpj_cpf_do_socio ?? "",
-        qualificacao:             s.qualificacao_socio ?? "",
-        codigoQualificacao:       Number(s.codigo_qualificacao_socio ?? 0),
-        faixaEtaria:              s.faixa_etaria ?? undefined,
-        dataEntrada:              s.data_entrada_sociedade ?? undefined,
-        nomeRepresentante:        s.nome_representante_legal ?? undefined,
-        cpfRepresentante:         s.cpf_representante_legal ?? undefined,
-        qualificacaoRepresentante: s.qualificacao_representante_legal ?? undefined,
-      })),
-    };
-  } catch {
-    return null;
-  }
 }
 
 // ── Hook principal ──────────────────────────────────────────────────
@@ -222,51 +136,5 @@ export function useSocios(clienteId: string | null) {
     await load();
   }, [load]);
 
-  // Importar sócios em lote (pós-consulta CNPJ)
-  // Estratégia: DELETE sócios antigos (origem=cnpj) + INSERT novos.
-  // Evita problemas com upsert e índice parcial.
-  const importarDosCNPJ = useCallback(async (
-    clienteIdTarget: string,
-    sociosCNPJ: DadosCNPJ["socios"]
-  ) => {
-    if (!sociosCNPJ.length) return;
-
-    // Remover sócios importados anteriormente para este cliente
-    await (supabase as any)
-      .from("cliente_socio")
-      .delete()
-      .eq("cliente_id", clienteIdTarget);
-
-    const rows = sociosCNPJ.map(s => {
-      const cpfDigits = (s.cnpjCpf ?? "").replace(/\D/g, "");
-      const tipo_socio = cpfDigits.length === 14 ? "pj" : "pf";
-      return {
-        cliente_id:                 clienteIdTarget,
-        nome:                       s.nome,
-        cnpj_cpf_socio:             s.cnpjCpf || null,
-        tipo_socio,
-        qualificacao:               s.qualificacao || null,
-        codigo_qualificacao:        s.codigoQualificacao || null,
-        data_entrada:               s.dataEntrada || null,
-        nome_representante:         s.nomeRepresentante || null,
-        cpf_representante:          s.cpfRepresentante || null,
-        qualificacao_representante: s.qualificacaoRepresentante || null,
-        is_administrador:           !!(s.qualificacao?.toLowerCase().includes("administrador")),
-        is_ativo:                   true,
-      };
-    });
-
-    const { error } = await (supabase as any)
-      .from("cliente_socio")
-      .insert(rows);
-
-    if (error) {
-      console.error("importarDosCNPJ error:", error);
-      toast.error("Erro ao importar sócios: " + error.message);
-    } else {
-      await load();
-    }
-  }, [load]);
-
-  return { socios, loading, error, load, upsert, remove, importarDosCNPJ };
+  return { socios, loading, error, load, upsert, remove };
 }

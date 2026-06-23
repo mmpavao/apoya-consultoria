@@ -1,6 +1,6 @@
 /**
  * Módulo Contabilidade — /_app/contabil
- * Tabs: Pipeline | Períodos | Lançamentos | Plano de Contas | Automações | Configurações
+ * Tabs: Pipeline | Períodos | Lançamentos | Plano de Contas | Configurações
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { fmtBRL, fmtDate } from "@/lib/format";

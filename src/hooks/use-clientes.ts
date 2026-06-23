@@ -45,7 +45,6 @@ export interface Cliente {
   aliquotaIss?: number;
   cpf?: string;
   codigoMunicipioIbge?: string;
-  nfseioEmitenteId?: string;
   createdAt: string;
 }
 
@@ -94,7 +93,7 @@ function fromDb(row: Record<string, unknown>): Cliente {
     cpf:               row.cpf as string | undefined,
     codigoMunicipioIbge: row.codigo_municipio_ibge as string | undefined,
     createdAt:         row.created_at as string,
-    // campos SERPRO — mantidos como any para evitar breaking change no tipo Cliente
+    // flags de certificado/procuração eCAC — mantidos como any para evitar breaking change no tipo Cliente
     ...((row.tem_certificado !== undefined) ? { tem_certificado: row.tem_certificado as boolean } : {}),
     ...((row.tem_procuracao  !== undefined) ? { tem_procuracao:  row.tem_procuracao  as boolean } : {}),
   };

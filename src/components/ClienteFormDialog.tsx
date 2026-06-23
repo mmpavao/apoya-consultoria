@@ -1,10 +1,10 @@
 /**
- * ClienteFormDialog — Cadastro e edição de cliente
- * v3: auto-fill no onBlur do CNPJ + enriquecimento SERPRO + todos os campos do motor
+ * ClienteFormDialog — Cadastro e edição de cliente (100% manual)
+ * CNPJ e demais dados são digitados pelo operador.
  */
 import { useState, useRef } from "react";
 import { toast } from "sonner";
-import { Search, Loader2, Building2, MapPin, Phone, DollarSign, FileText, Users } from "lucide-react";
+import { Loader2, Building2, MapPin, Phone, DollarSign, FileText, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,7 +171,7 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
           {/* ── SEÇÃO: IDENTIFICAÇÃO ── */}
           {section === "identificacao" && (
             <>
-              {/* CNPJ + lookup */}
+              {/* CNPJ (digitação manual) */}
               <div className="grid gap-1.5">
                 <Label className="text-xs font-medium">CNPJ *</Label>
                 <Input
@@ -289,21 +289,21 @@ export function ClienteFormDialog({ open, onClose, onOpenChange, cliente }: Prop
                 <ToggleField label="Regime híbrido (Reforma Tributária)" checked={!!form.regimeHibrido} onChange={v => update_("regimeHibrido", v)} hint="CBS/IBS separados do DAS — janelas abril/setembro" />
               </div>
 
-              {/* ── Acesso SERPRO ── */}
+              {/* ── Certificado e procuração eCAC ── */}
               <div className="pt-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Acesso SERPRO / eCAC</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Certificado e Procuração eCAC</p>
                 <div className="space-y-2.5">
                   <ToggleField
                     label="Tem Certificado Digital A1/A3"
                     checked={!!(form as any).tem_certificado}
                     onChange={v => update_("tem_certificado" as any, v)}
-                    hint="Necessário para consultas avançadas via SERPRO"
+                    hint="Detalhes do certificado ficam na aba Certificados do cliente"
                   />
                   <ToggleField
                     label="Tem Procuração no eCAC"
                     checked={!!(form as any).tem_procuracao}
                     onChange={v => update_("tem_procuracao" as any, v)}
-                    hint="Autoriza APOYA a consultar dados fiscais em nome do cliente"
+                    hint="Procuração eletrônica concedida à APOYA no eCAC"
                   />
                 </div>
               </div>

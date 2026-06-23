@@ -80,8 +80,8 @@ export default {
     }
 
     // ── Injetar secrets/vars do CF Worker em globalThis.__env__ ──────────────
-    // Necessário para que rotas server-side (api/pipeline, api/das, etc.)
-    // consigam ler APOYA_SERVICE_TOKEN e outros secrets via (globalThis as any).__env__
+    // Necessário para que as rotas server-side (/api/*) consigam ler os
+    // secrets do Supabase via (globalThis as any).__env__
     if (env && typeof env === "object") {
       (globalThis as any).__env__ = env;
       // Também popular process.env para compatibilidade com libs que usam process.env

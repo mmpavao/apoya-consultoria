@@ -18,12 +18,10 @@ import {
   Building2,
   Receipt,
   DollarSign,
-  MessageSquare,
   Settings,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
-  Bot,
   UserRoundSearch,
   Landmark,
 } from "lucide-react";

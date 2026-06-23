@@ -1,5 +1,3 @@
-import type { Cliente, Regime } from "@/hooks/use-clientes";
-
 export function onlyDigits(v: string) {
   return (v || "").replace(/\D/g, "");
 }
@@ -27,38 +25,4 @@ export function isValidCNPJ(v: string) {
   const d1 = calc(c.slice(0, 12));
   const d2 = calc(c.slice(0, 12) + d1);
   return d1 === parseInt(c[12], 10) && d2 === parseInt(c[13], 10);
-}
-
-export type CNPJLookup = Partial<Pick<Cliente, "razaoSocial" | "nomeFantasia" | "email" | "telefone" | "atividadePrincipal" | "endereco" | "regime">>;
-
-// Busca via BrasilAPI (público, sem auth). Fallback silencioso se offline.
-export async function lookupCNPJ(cnpj: string): Promise<CNPJLookup | null> {
-  const c = onlyDigits(cnpj);
-  if (c.length !== 14) return null;
-  try {
-    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${c}`);
-    if (!res.ok) return null;
-    const d = await res.json();
-    const regime: Regime | undefined =
-      d.opcao_pelo_mei ? "MEI" :
-      d.opcao_pelo_simples ? "Simples" : undefined;
-    return {
-      razaoSocial: d.razao_social,
-      nomeFantasia: d.nome_fantasia || undefined,
-      email: d.email || undefined,
-      telefone: d.ddd_telefone_1 || undefined,
-      atividadePrincipal: d.cnae_fiscal_descricao,
-      regime,
-      endereco: {
-        cep: d.cep,
-        logradouro: d.logradouro,
-        numero: d.numero,
-        bairro: d.bairro,
-        municipio: d.municipio,
-        uf: d.uf,
-      },
-    };
-  } catch {
-    return null;
-  }
 }

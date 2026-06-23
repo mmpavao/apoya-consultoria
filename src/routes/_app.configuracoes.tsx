@@ -1,8 +1,6 @@
 /**
  * Configurações — APOYA Gestão
- * Reestruturado: 6 abas fragmentadas → 2 abas limpas
- *   Aba 1 — Geral:    Escritório · Usuários · Integrações · Templates · Permissões · Serviços
- *   Aba 2 — MCP/API:  Servidor MCP APOYA + API Keys + Logs
+ * Abas: Escritório · Usuários · Templates WA · Permissões · Serviços · Sistema
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { fmtDate } from "@/lib/format";

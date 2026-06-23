@@ -14,10 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 type TableName =
   | "clientes"
   | "cobrancas"
-  | "obrigacoes"
-  | "wa_instance"
-  | "wa_conversa"
-  | "mensagem_whatsapp";
+  | "obrigacoes";
 
 const CHANNEL_ID = "apoya:realtime:master";
 
@@ -41,15 +38,6 @@ export function initRealtime() {
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "obrigacoes" }, () => {
       window.dispatchEvent(new CustomEvent("apoya:rt:obrigacoes"));
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "wa_instance" }, () => {
-      window.dispatchEvent(new CustomEvent("apoya:rt:wa_instance"));
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "wa_conversa" }, () => {
-      window.dispatchEvent(new CustomEvent("apoya:rt:wa_conversa"));
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "mensagem_whatsapp" }, () => {
-      window.dispatchEvent(new CustomEvent("apoya:rt:mensagem_whatsapp"));
     })
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
