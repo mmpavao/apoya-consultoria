@@ -1,0 +1,36 @@
+export const ptBR = {
+  nav: {
+    chat: 'Chat',
+    agents: 'Agentes',
+    approvals: 'Aprovações',
+    activity: 'Atividade',
+    memory: 'Memória',
+    connectors: 'Conectores',
+    settings: 'Configurações',
+  },
+  chat: {
+    placeholder: 'Diga ao JARVIS o que fazer…',
+    send: 'Enviar',
+    plan: 'Plano',
+    thinking: 'pensando',
+    acting: 'executando',
+  },
+  approvals: {
+    empty: 'Nenhuma aprovação pendente.',
+    approve: 'Aprovar',
+    reject: 'Rejeitar',
+    affected: 'Itens afetados',
+  },
+  agents: { idle: 'ocioso', thinking: 'pensando', acting: 'executando', tokens: 'tokens' },
+  activity: { empty: 'Sem atividade registrada.', undo: 'Desfazer', reversible: 'reversível' },
+  memory: { empty: 'Nenhum fato armazenado.', remove: 'Remover' },
+  connectors: { add: 'Adicionar servidor MCP', test: 'Testar', remove: 'Remover', tools: 'ferramentas' },
+  settings: {
+    model: 'Modelo',
+    language: 'Idioma',
+    apiKey: 'Chave de API (Keychain)',
+    killSwitch: 'Parar tudo',
+    cost: 'Consumo de tokens',
+  },
+  common: { killSwitch: 'Kill switch' },
+} as const;
