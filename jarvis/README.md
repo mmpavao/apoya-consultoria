@@ -21,7 +21,8 @@ interfaces e **só são exercitáveis em macOS**.
 
 | Camada | Estado | Verificável em Linux/CI |
 |---|---|---|
-| Núcleo TS (domínio, tools, orquestrador, governança, memória, MCP, custo) | ✅ implementado + 40 testes | **Sim** (`tsc` + `vitest`) |
+| Núcleo TS (domínio, tools, orquestrador, governança, memória, MCP, custo) | ✅ implementado + 45 testes | **Sim** (`tsc` + `vitest`) |
+| Persistência SQLite (`node:sqlite`, migrations, stores) | ✅ sessões/fila/audit/memória sobrevivem a restart | **Sim** (testes de reabertura) |
 | Bridge Rust (`src-tauri`) | ✅ scaffold com `#[cfg(target_os)]` p/ macOS | Parcial (`cargo test` p/ guards) |
 | Frontend React (7 telas, i18n, store) | ✅ scaffold tipado | `tsc --noEmit` |
 | Build/assinatura `.app`/`.dmg`, voz | ⏳ requer macOS | Não |
@@ -86,6 +87,20 @@ Default `claude-sonnet-4-6`; tabela de modelos/preços em
 `core/src/infrastructure/llm/modelInfo.ts`. O orquestrador depende só da
 interface `LlmClient` — nenhum outro arquivo muda ao trocar de modelo/provedor.
 
+## Persistência (PRD §5, §8)
+
+Por padrão o núcleo roda 100% em memória. Defina `JARVIS_DB_PATH` (ou
+`bootstrap({ dbPath })`) para ligar a persistência em SQLite via `node:sqlite`
+(sem build nativo): sessões, mensagens, fila de background, audit log e memória
+sobrevivem a restart. A escolha entre stores em memória e SQLite vive só em
+`bootstrap.ts` — nenhum call site muda. Migrations versionadas em
+`core/src/infrastructure/db/migrations/` são aplicadas idempotentemente na
+abertura.
+
+```bash
+JARVIS_DB_PATH=~/.jarvis/jarvis.db node dist/cli.js "..."
+```
+
 ## Segurança (PRD §4.5)
 
 - Secrets no **Keychain do macOS** — nunca em arquivo, nunca no contexto do LLM.
@@ -106,4 +121,5 @@ interface `LlmClient` — nenhum outro arquivo muda ao trocar de modelo/provedor
 | §4 MCP | `infrastructure/mcp/McpClientPool.ts` |
 | §1/§10 Troca de modelo | `infrastructure/llm/*` |
 | §5 Modelo de dados | `infrastructure/db/schema.ts` + `db/migrations/` |
+| §8 Confiabilidade (persistência) | `infrastructure/db/{Database,sqliteStores}.ts` — `bootstrap({ dbPath })` |
 ```

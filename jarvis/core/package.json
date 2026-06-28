@@ -6,7 +6,7 @@
   "description": "JARVIS orchestration core — the model-agnostic multi-agent engine (PRD §4).",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json && cp -r src/infrastructure/db/migrations dist/infrastructure/db/migrations",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

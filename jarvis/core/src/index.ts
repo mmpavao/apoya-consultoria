@@ -13,6 +13,7 @@ export { TaskQueue } from './application/TaskQueue.js';
 export { MemoryService } from './infrastructure/memory/MemoryService.js';
 export { McpClientPool, type McpServerConfig } from './infrastructure/mcp/McpClientPool.js';
 export { createLlmClient, type LlmConfig } from './infrastructure/llm/createLlmClient.js';
+export { openDatabase, runMigrations, type Db } from './infrastructure/db/Database.js';
 export { DEFAULT_MODEL, MODELS } from './infrastructure/llm/modelInfo.js';
 export { AGENTS, DEFAULT_AGENT } from './config/agents.js';
 export type { Tool, ToolContext, PermissionLevel } from './domain/tools/Tool.js';

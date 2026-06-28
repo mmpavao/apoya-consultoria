@@ -11,6 +11,8 @@ export interface Settings {
   model: string;
   locale: 'pt-BR' | 'en-US';
   apiKey?: string;
+  /** SQLite file path. When set, stores persist (PRD §8); omit/':memory:' for ephemeral. */
+  dbPath?: string;
 }
 
 export function loadSettings(env: NodeJS.ProcessEnv = process.env): Settings {
@@ -20,5 +22,6 @@ export function loadSettings(env: NodeJS.ProcessEnv = process.env): Settings {
     model: env.JARVIS_MODEL ?? DEFAULT_MODEL,
     locale: (env.JARVIS_LOCALE as Settings['locale']) ?? 'pt-BR',
     apiKey,
+    dbPath: env.JARVIS_DB_PATH,
   };
 }
