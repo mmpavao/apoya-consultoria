@@ -1,4 +1,9 @@
-import type { LlmClient, LlmMessage, LlmContentBlock } from '../domain/llm/LlmClient.js';
+import type {
+  LlmClient,
+  LlmMessage,
+  LlmContentBlock,
+  LlmResponse,
+} from '../domain/llm/LlmClient.js';
 import type { AgentDefinition } from '../domain/entities/Agent.js';
 import type { ToolContext } from '../domain/tools/Tool.js';
 import type { ToolRegistry } from './ToolRegistry.js';
@@ -6,7 +11,8 @@ import type { ToolExecutor } from './ToolExecutor.js';
 import type { CostTracker } from './CostTracker.js';
 
 export interface AgentStepEvent {
-  kind: 'agent_text' | 'tool_call' | 'tool_result';
+  /** `agent_delta` = incremental streamed token; `agent_text` = consolidated turn text. */
+  kind: 'agent_delta' | 'agent_text' | 'tool_call' | 'tool_result';
   agent: string;
   text?: string;
   toolName?: string;
@@ -49,12 +55,10 @@ export class AgentRunner {
     for (let i = 1; i <= this.maxIterations; i++) {
       if (ctx.signal?.aborted) break;
 
-      const res = await this.llm.complete({
-        system: agent.systemPrompt,
-        messages,
-        tools,
-        maxTokens: 2048,
-      });
+      // Stream the turn: emit token deltas live (PRD §6.2), then act on the
+      // consolidated final message. Streaming is a superset of complete() —
+      // message_done carries the full response (text + tool_use + usage).
+      const res = await this.streamTurn(agent, messages, tools, onEvent);
       this.cost.record({
         sessionId: ctx.sessionId,
         agent: agent.name,
@@ -105,6 +109,30 @@ export class AgentRunner {
     }
 
     return { finalText, iterations: this.maxIterations };
+  }
+
+  /** Drives one streamed LLM turn, emitting deltas and returning the final message. */
+  private async streamTurn(
+    agent: AgentDefinition,
+    messages: LlmMessage[],
+    tools: ReturnType<ToolRegistry['schemasFor']>,
+    onEvent: (e: AgentStepEvent) => void,
+  ): Promise<LlmResponse> {
+    let final: LlmResponse | null = null;
+    for await (const event of this.llm.stream({
+      system: agent.systemPrompt,
+      messages,
+      tools,
+      maxTokens: 2048,
+    })) {
+      if (event.type === 'text_delta') {
+        onEvent({ kind: 'agent_delta', agent: agent.name, text: event.text });
+      } else if (event.type === 'message_done') {
+        final = event.response;
+      }
+    }
+    if (!final) throw new Error(`stream ended without a final message for ${agent.name}`);
+    return final;
   }
 }
 

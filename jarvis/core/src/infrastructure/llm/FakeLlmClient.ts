@@ -38,7 +38,11 @@ export class FakeLlmClient implements LlmClient {
   async *stream(req: LlmRequest): AsyncIterable<LlmStreamEvent> {
     const response = await this.complete(req);
     for (const block of response.content) {
-      if (block.type === 'text') yield { type: 'text_delta', text: block.text };
+      if (block.type !== 'text') continue;
+      // Chunk by word so consumers see incremental deltas, like a real stream.
+      for (const chunk of block.text.match(/\S+\s*/g) ?? []) {
+        yield { type: 'text_delta', text: chunk };
+      }
     }
     yield { type: 'message_done', response };
   }

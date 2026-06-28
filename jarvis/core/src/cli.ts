@@ -45,8 +45,10 @@ function render(e: OrchestratorEvent): void {
       console.log(`\n▶ step ${e.step} → ${e.agent}`);
       break;
     case 'agent_event':
-      if (e.kind === 'agent_text' && e.text) console.log(`  ${e.agent}: ${e.text}`);
-      else if (e.kind === 'tool_call') console.log(`  ↳ tool ${e.toolName}`);
+      // Stream tokens inline; the consolidated agent_text is suppressed to avoid
+      // printing the turn twice.
+      if (e.kind === 'agent_delta' && e.text) process.stdout.write(e.text);
+      else if (e.kind === 'tool_call') console.log(`\n  ↳ tool ${e.toolName}`);
       else if (e.kind === 'tool_result') console.log(`  ↳ result (${e.ok ? 'ok' : 'error'})`);
       break;
     case 'done':

@@ -21,7 +21,8 @@ interfaces e **só são exercitáveis em macOS**.
 
 | Camada | Estado | Verificável em Linux/CI |
 |---|---|---|
-| Núcleo TS (domínio, tools, orquestrador, governança, memória, MCP, custo) | ✅ implementado + 45 testes | **Sim** (`tsc` + `vitest`) |
+| Núcleo TS (domínio, tools, orquestrador, governança, memória, MCP, custo) | ✅ implementado + 47 testes | **Sim** (`tsc` + `vitest`) |
+| Streaming ponta-a-ponta (deltas de token → eventos do orquestrador) | ✅ `AgentRunner` consome `llm.stream()` | **Sim** (testes determinísticos) |
 | Persistência SQLite (`node:sqlite`, migrations, stores) | ✅ sessões/fila/audit/memória sobrevivem a restart | **Sim** (testes de reabertura) |
 | Bridge Rust (`src-tauri`) | ✅ scaffold com `#[cfg(target_os)]` p/ macOS | Parcial (`cargo test` p/ guards) |
 | Frontend React (7 telas, i18n, store) | ✅ scaffold tipado | `tsc --noEmit` |
