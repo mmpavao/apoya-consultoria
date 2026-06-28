@@ -1,0 +1,27 @@
+{
+  "name": "@jarvis/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JARVIS orchestration core — the model-agnostic multi-agent engine (PRD §4).",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp -r src/infrastructure/db/migrations dist/infrastructure/db/migrations",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cli": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "drizzle-orm": "^0.44.0",
+    "pino": "^9.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
+  }
+}

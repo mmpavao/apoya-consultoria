@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+core/node_modules/
+
+# Build output
+dist/
+core/dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Local env / secrets (secrets live in the macOS Keychain, never in files)
+.env
+.env.local
+
+# Logs / OS
+*.log
+.DS_Store

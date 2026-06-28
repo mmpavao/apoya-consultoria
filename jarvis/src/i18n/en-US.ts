@@ -1,0 +1,36 @@
+export const enUS = {
+  nav: {
+    chat: 'Chat',
+    agents: 'Agents',
+    approvals: 'Approvals',
+    activity: 'Activity',
+    memory: 'Memory',
+    connectors: 'Connectors',
+    settings: 'Settings',
+  },
+  chat: {
+    placeholder: 'Tell JARVIS what to do…',
+    send: 'Send',
+    plan: 'Plan',
+    thinking: 'thinking',
+    acting: 'acting',
+  },
+  approvals: {
+    empty: 'No pending approvals.',
+    approve: 'Approve',
+    reject: 'Reject',
+    affected: 'Affected items',
+  },
+  agents: { idle: 'idle', thinking: 'thinking', acting: 'acting', tokens: 'tokens' },
+  activity: { empty: 'No activity recorded.', undo: 'Undo', reversible: 'reversible' },
+  memory: { empty: 'No facts stored.', remove: 'Remove' },
+  connectors: { add: 'Add MCP server', test: 'Test', remove: 'Remove', tools: 'tools' },
+  settings: {
+    model: 'Model',
+    language: 'Language',
+    apiKey: 'API key (Keychain)',
+    killSwitch: 'Stop everything',
+    cost: 'Token usage',
+  },
+  common: { killSwitch: 'Kill switch' },
+} as const;
